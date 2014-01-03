@@ -3,11 +3,11 @@ Tutorial
 ===================
 
 
-1. Download the package from the Github repository ::
+1. Download the package from the Github repository::
 
 	git clone git@github.com:alexlib/pivpy.git
 
-2. From the command line run the ``tmp.py`` ::
+2. From the command line run the ``tmp.py``::
 
 	% python tmp.py
 	

@@ -20,3 +20,6 @@ or use the following code from your Python environment::
 	mean = averf(data)
 	showf(mean,var,units) 
 	
+	
+.. image:: out.png
+	

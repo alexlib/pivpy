@@ -1,6 +1,6 @@
 ===================
 Tutorial
-=================
+===================
 
 
 1. Download the package from the Github repository::

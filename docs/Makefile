@@ -45,7 +45,7 @@ html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
-	cd $(BUILDDIR)
+	cd $(BUILDDIR)/html
 	git add .
 	git commit -m "added docs"
 	git push origin gh-pages

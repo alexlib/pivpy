@@ -45,13 +45,7 @@ html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
-	cd ../../pivpy-docs/html
-	git add .
-	git status
-	git commit -m "added docs"
-	git push origin gh-pages
-	@echo
-	@echo "Pushed it to the Github gh-pages repo"
+
 
 dirhtml:
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml

@@ -6,13 +6,11 @@ Tutorial
 1. Download the package from the Github repository::
 
 	git clone git@github.com:alexlib/pivpy.git
-	
 
 2. From the command line run the ``tmp.py``::
 
 	% python tmp.py
-	
-	
+		
 or use the following code from your Python environment::
 
 	from pivpy.io import loadvec_dir

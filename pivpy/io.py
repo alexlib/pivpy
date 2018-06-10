@@ -42,7 +42,9 @@ def loadvec(filename,rows=None, cols=None):
     """
         loadvec(filename)
     """
-    d = np.loadtxt(filename,skiprows=1,delimiter=',',dtype={'names': ('x', 'y', 'u', 'v'),'formats': ('f4', 'f4', 'f4', 'f4')},usecols=(0,1,2,3)).reshape(rows,cols)
+    d = np.loadtxt(filename,skiprows=1,delimiter=',',
+        dtype={'names': ('x', 'y', 'u', 'v'),'formats': ('f4', 'f4', 'f4', 'f4')},
+        usecols=(0,1,2,3)).reshape(rows,cols)
     return d
     
     

@@ -11,7 +11,6 @@ def showf(data, var=None, units=None, fig=None):
     showf(data, var, units)
     """
     fig = pl.figure(None if fig is None else fig.number)
-    pl.hold(False)
     # import pdb; pdb.set_trace()
     xlabel = (None if var is None else var[0]) + ' [' + (None if units is None else units[0])+']'
     ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'

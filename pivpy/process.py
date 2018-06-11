@@ -1,16 +1,19 @@
 """ Processing PIV flow fields """
+import xarray as xr
+import numpy as np
 
 def averf(data):
-    """
-    averf(d) creates ensemble average field
-    """
-    
-    av = data[0]
-    for d in data[1:]:
-        av['u'] += d['u']
-        av['v'] += d['v']
-    
-    av['u'] /= len(d)
-    av['v'] /= len(d)
-    
-    return av
+    """ Ensemble average """
+    return data.mean(dim='t')
+
+
+def filterf(data):
+    """Gaussian filtering of velocity """
+    from scipy.ndimage.filters import gaussian_filter as gf
+    data['u'] = xr.DataArray(gf(data['u'],1),dims=('x','y'))
+    data['v'] = xr.DataArray(gf(data['v'],1),dims=('x','y'))
+    return data
+
+
+def vec2scal(data):
+    data['w'] = 

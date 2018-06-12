@@ -4,9 +4,11 @@ Various plots
 
 """
 
-import numpy as np, matplotlib.pyplot as pl   
+import numpy as np
+import matplotlib.pyplot as pl
+import xarray as xr
     
-def showf(data, var=None, units=None, fig=None):
+def showf_ownclass(data, var=None, units=None, fig=None):
     """ 
     showf(data, var, units)
     """
@@ -32,5 +34,51 @@ def showf(data, var=None, units=None, fig=None):
     pl.show()
         
          
-             
+def showf(data, var=None, units=None, fig=None):
+    """ 
+    showf(data, var, units)
+    Arguments:
+        data : xarray.DataSet that contains dimensions of t,x,y
+               and variables u,v and maybe w (scalar)
+    """
+    fig = pl.figure(None if fig is None else fig.number)
+    # import pdb; pdb.set_trace()
+    # xlabel = (None if var is None else var[0]) + ' [' + (None if units is None else units[0])+']'
+    # ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
+        
+    
+    for t in data['t']:
+        d = data.isel(t=t)
+        pl.quiver(d['x'],d['y'],d['u'],d['v'],d['u']**2 + d['v']**2)
+        pl.xlabel(xlabel)
+        pl.ylabel(ylabel)
+        pl.title(str(k))
+        pl.draw()
+        pl.pause(0.1)
+        
+    pl.show()  
+
+def showscal(data):
+    """ 
+    showf(data, var, units)
+    Arguments:
+        data : xarray.DataSet that contains dimensions of t,x,y
+               and a variable w (scalar)
+    """
+    # fig = pl.figure(None if fig is None else fig.number)
+    # import pdb; pdb.set_trace()
+    # xlabel = (None if var is None else var[0]) + ' [' + (None if units is None else units[0])+']'
+    # ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
+        
+    pl.figure()
+    for t in data['t']:
+        d = data.isel(t=t)
+        pl.contour(d['x'],d['y'],d['w'])
+        # pl.xlabel(xlabel)
+        # pl.ylabel(ylabel)
+        # pl.title(str(k))
+        pl.draw()
+        pl.pause(0.1)
+        
+    pl.show()              
      

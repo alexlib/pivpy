@@ -15,5 +15,27 @@ def filterf(data):
     return data
 
 
-def vec2scal(data):
-    data['w'] = 
+def vec2scal(data,property='curl'):
+    """ creates a dataset of scalar values on the same 
+    dimensions and coordinates as the vector dataset
+    Agruments:
+        data : xarray.DataSet with u,v on t,x,y grid
+    Returns:
+        scalar_data : xarray.Dataset w on t,x,y grid
+        'w' represents one of the following properties:
+            - 'curl' or 'rot' - vorticity
+
+    """
+    # prepare space
+    d = data.copy()
+    d['w'] = xr.DataArray(np.zeros_like(d['u']),dims=['t','x','y'])
+    if property is 'curl':
+        #    estimate curl
+        for t in d.t:
+            tmp = d.isel(t=t)
+            ux,uy = np.gradient(tmp['u'])
+            vx,vy = np.gradient(tmp['v'])
+            tmp['w'] += vy - ux
+        
+    d = d.drop(['u','v','cnc'])
+    return d

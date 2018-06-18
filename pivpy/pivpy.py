@@ -8,6 +8,19 @@ from numpy import sin, cos, pi, asarray, array, shape, zeros, logical_and
 from scipy.stats import norm
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.filters import median_filter
+import xarray as xr
+
+
+class VectorField:
+    def __init__(self,x,y,u,v,chc,dt,l_units,t_units='s'):
+        """
+            
+        """
+        _u = xr.DataArray(d[:,:,2],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
+        _v = xr.DataArray(d[:,:,3],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
+        _cnc = xr.DataArray(d[:,:,4],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
+        self.data = xr.Dataset({'u': u, 'v': v,'cnc':cnc})
+        self.attr= {}
 
 class Vec:
     def __init__(self,x,y,u,v,chc,dt,lUnits='m',tUnits='s'):

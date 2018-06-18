@@ -23,16 +23,22 @@ import matplotlib.pyplot as plt
 # vecPlot.genVorticityMap(vec)
 # plt.show()
 
+
+import os
+fname = 'Run000001.T000.D000.P000.H001.L.vec'
+path = './data/'
+
+
 def test_get_dt():
     """ test if we get correct delta t """
-    import os
-
-    fname = 'Run000001.T000.D000.P000.H001.L.vec'
-    path = './data/'
-
-    with open(os.path.join(os.path.abspath(path),fname)) as f:
-        header = f.readline()
-        
-    ind1 = header.find('MicrosecondsPerDeltaT')
-    dt = float(header[ind1:].split('"')[1])
+    dt = io.get_dt(fname, path)
     assert dt == 2000.
+
+def test_get_units():
+    lUnits,vUnits,tUnits = io.get_units(fname, path)
+    assert lUnits == 'mm'
+    assert vUnits == 'm/s'
+    assert tUnits == 's'
+
+    lUnits,vUnits,tUnits = io.get_units('exp1_001_b.vec', path)
+    assert lUnits is None

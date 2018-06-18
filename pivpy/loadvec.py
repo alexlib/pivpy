@@ -16,67 +16,9 @@ from vecPy import Vec
 from string import upper, lower
 
 
-def get_dt(fname,path):
-    """given a .vec file this will return the delta t 
-    from the file in micro seconds"""
-    # os.chdir(path) BUG
-    fname = os.path.join(os.path.abspath(path),fname) # just make a full path name 
-    # new way of opening and closing the file
-    with open(fname) as f:
-        header = f.readline()
-        
-    ind1 = header.find('MicrosecondsPerDeltaT')
-    dt = float(header[ind1:].split('"')[1])
-    return dt
 
-def get_units(fname, path):
-    """ given a .vec file this will return the names of length and velocity units """
-    # os.chdir(path) BUG
-    fname = os.path.join(os.path.abspath(path),fname) # just make a full path name 
-    # new way of opening and closing the file
-    with open(fname) as f:
-        header = f.readline()
-    
-    ind2= header.find('VARIABLES=')
-    ind3 = header.find('"X',ind2)
-    ind4 = header.find('"',ind3+1)
-    header[ind3:ind4+1]
-    lUnits = header[ind3+3:ind4]
-    # print lUnits
 
-#     ind3 = header.find('"Y',ind2)
-#     ind4 = header.find('"',ind3+1)
-#     header[ind3:ind4+1]
-#     lUnits = header[ind3+3:ind4]
-#     print lUnits
 
-    ind3 = header.find('"U',ind2)
-    ind4 = header.find('"',ind3+1)
-    header[ind3:ind4+1]
-    velUnits = header[ind3+3:ind4]
-    # print velUnits
-    
-#    tUnits = velUnits.split('/')[1]
-    if velUnits == 'pixel':
-        tUnits = 'dt'
-    else:
-        tUnits = velUnits.split('/')[1]
-# 
-#     ind3 = header.find('"V',ind2)
-#     ind4 = header.find('"',ind3+1)
-#     header[ind3:ind4+1]
-#     velUnits = header[ind3+3:ind4]
-#     print velUnits
-
-    # fallback if nothing is read properly
-    if lUnits is None:
-        lUnits = 'mm'
-    if velUnits is None:
-        velUnits = 'm/s'
-    if tUnits is None:
-        tUnits = 's'
-    
-    return lUnits, velUnits, tUnits
 
 
 def get_data(fname,path):

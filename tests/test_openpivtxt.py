@@ -1,6 +1,5 @@
-#!/usr/bin/python
 
-from vecPy import loadVec
+""" from vecPy import loadVec
 from vecPy import vecPlot
 from vecPy.vecPy import Vec
 import matplotlib.pyplot as plt
@@ -46,6 +45,6 @@ plt.show()
 
 plt.figure()
 vecPlot.genVorticityMap(vec)
-plt.show()
+plt.show() """
 
 

@@ -171,7 +171,7 @@ class Vec:
             if len(i)>0:
                 indexes.append(i)
         if len(indexes)==0:
-            print 'not valid crop values'
+            print('not valid crop values')
             return
         indexes = array(indexes)
         x, y = zeros(shape(indexes[:,:,0])), zeros(shape(indexes[:,:,0]))

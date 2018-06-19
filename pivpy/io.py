@@ -8,6 +8,7 @@ import numpy as np
 import xarray as xr
 from glob import glob
 import os
+from pivpy.pivpy import VectorField
 
 def get_units(fname, path):
     """ given a .vec file this will return the names 
@@ -110,14 +111,10 @@ def loadvec(filename,rows=None, cols=None):
     """
     if rows is None or cols is None:
         _,_,rows,cols = parse_header(filename)
-    d = np.loadtxt(filename,skiprows=1,delimiter=',',usecols=(0,1,2,3,4)).reshape(rows,cols,5)
     
-    u = xr.DataArray(d[:,:,2],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
-    v = xr.DataArray(d[:,:,3],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
-    cnc = xr.DataArray(d[:,:,4],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
-    data = xr.Dataset({'u': u, 'v': v,'cnc':cnc})  
+    data = np.loadtxt(filename,skiprows=1,delimiter=',',usecols=(0,1,2,3,4)).reshape(rows,cols,5)
     
-    return data
+    return VectorField(data)
     
     
     

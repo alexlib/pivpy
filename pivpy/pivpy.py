@@ -9,18 +9,76 @@ from scipy.stats import norm
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.filters import median_filter
 import xarray as xr
+import xray
+
+""" learn from this example 
 
 
-class VectorField:
-    def __init__(self,x,y,u,v,chc,dt,l_units,t_units='s'):
+import xarray as xr
+
+
+@xr.register_dataset_accessor('geo')
+class GeoAccessor(object):
+    def __init__(self, xarray_obj):
+        self._obj = xarray_obj
+        self._center = None
+
+    @property
+    def center(self):
+        " Return the geographic center point of this dataset."
+        if self._center is None:
+            # we can use a cache on our accessor objects, because accessors
+            # themselves are cached on instances that access them.
+            lon = self._obj.latitude
+            lat = self._obj.longitude
+            self._center = (float(lon.mean()), float(lat.mean()))
+        return self._center
+
+    def plot(self):
+        " Plot data on a map."
+        return 'plotting!'
+
+
+    In [1]: ds = xr.Dataset({'longitude': np.linspace(0, 10),
+   ...:                  'latitude': np.linspace(0, 20)})
+   ...: 
+
+In [2]: ds.geo.center
+Out[2]: (10.0, 5.0)
+
+In [3]: ds.geo.plot()
+Out[3]: 'plotting!'
+
+"""
+@xr.register_dataset_accessor('fluct')
+
+class VectorField(object):
+    def __init__(self,data,dt=1.0,l_units='pix',t_units='dt'):
         """
-            
+        Arguments:
+            data : 3D numpy array of rows x cols x 5 matrices:
+            [x,y,u,v,chc] 
+            x,y,u,v,chc are numpy float 2D arrays of 
+            the same size rows x cols  
+            into xarray DataSets, such that 
+            u,v,chs are the data arrays
+            x,y are coordinates and 
+            'x','y' are dimensions
+            'dt' is a float that becomes an attribute
+            'l_units' are units of length, string converted to an 
+            attribute
+            't_units' are time units (either 'dt' or 's'), 
+            str->xr.attr
+            'rows','cols' are additional attributes which are 
+            just data.shape[0,1]
+           
         """
-        _u = xr.DataArray(d[:,:,2],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
-        _v = xr.DataArray(d[:,:,3],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
-        _cnc = xr.DataArray(d[:,:,4],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
-        self.data = xr.Dataset({'u': u, 'v': v,'cnc':cnc})
-        self.attr= {}
+        _u = xr.DataArray(data[:,:,2],dims=('x','y'),coords={'x':data[:,:,0][0,:],'y':data[:,:,1][:,0]})
+        _v = xr.DataArray(data[:,:,3],dims=('x','y'),coords={'x':data[:,:,0][0,:],'y':data[:,:,1][:,0]})
+        _chc = xr.DataArray(data[:,:,4],dims=('x','y'),coords={'x':data[:,:,0][0,:],'y':data[:,:,1][:,0]})
+        self.obj = xr.Dataset({'u': _u, 'v': _v,'chc':_chc})
+        self.obj.attrs = {'dt':dt, 'l_units':l_units,'t_units':t_units,
+                        'rows':self.obj.shape[0],'cols':self.obj.shape[1]}
 
 class Vec:
     def __init__(self,x,y,u,v,chc,dt,lUnits='m',tUnits='s'):

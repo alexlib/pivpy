@@ -42,3 +42,8 @@ def test_get_units():
 
     lUnits,vUnits,tUnits = io.get_units('exp1_001_b.vec', path)
     assert lUnits is None
+
+def test_loadvec():
+    data = io.loadvec(os.path.join(path,fname))
+    assert(data['u'][0,0] == 0.000000)
+    assert(data.x[0,0] == 0.312480)

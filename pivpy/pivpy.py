@@ -9,7 +9,6 @@ from scipy.stats import norm
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.filters import median_filter
 import xarray as xr
-import xray
 
 """ learn from this example 
 
@@ -50,10 +49,9 @@ In [3]: ds.geo.plot()
 Out[3]: 'plotting!'
 
 """
-@xr.register_dataset_accessor('fluct')
-
+@xr.register_dataset_accessor('piv')
 class VectorField(object):
-    def __init__(self,data,dt=1.0,l_units='pix',t_units='dt'):
+    def __init__(self,xarray_obj):
         """
         Arguments:
             data : 3D numpy array of rows x cols x 5 matrices:
@@ -73,12 +71,15 @@ class VectorField(object):
             just data.shape[0,1]
            
         """
-        _u = xr.DataArray(data[:,:,2],dims=('x','y'),coords={'x':data[:,:,0][0,:],'y':data[:,:,1][:,0]})
-        _v = xr.DataArray(data[:,:,3],dims=('x','y'),coords={'x':data[:,:,0][0,:],'y':data[:,:,1][:,0]})
-        _chc = xr.DataArray(data[:,:,4],dims=('x','y'),coords={'x':data[:,:,0][0,:],'y':data[:,:,1][:,0]})
-        self.obj = xr.Dataset({'u': _u, 'v': _v,'chc':_chc})
-        self.obj.attrs = {'dt':dt, 'l_units':l_units,'t_units':t_units,
-                        'rows':self.obj.shape[0],'cols':self.obj.shape[1]}
+        self._obj = xarray_obj
+
+    # @property
+    # def vel_units(self):
+    #     " Return the geographic center point of this dataset."
+    #     if self._vel_units is None:
+    #         self._vel_units = self._obj.attrs.l_units + '/' + self._obj.attrs.t_units 
+    #     return self._vel_units
+        
 
 class Vec:
     def __init__(self,x,y,u,v,chc,dt,lUnits='m',tUnits='s'):

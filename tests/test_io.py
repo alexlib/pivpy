@@ -45,5 +45,10 @@ def test_get_units():
 
 def test_loadvec():
     data = io.loadvec(os.path.join(path,fname))
-    assert(data['u'][0,0] == 0.000000)
-    assert(data.x[0,0] == 0.312480)
+    assert data['u'].shape == (63,63)
+    assert data['u'][0,0] == 0.0
+    assert data.coords['x'][0] == 0.31248
+
+def test_vel_units():
+    data = io.loadvec(os.path.join(path,fname))
+    assert data.vel_units == 'm/s'

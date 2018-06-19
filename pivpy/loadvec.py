@@ -15,12 +15,6 @@ from numpy import genfromtxt, meshgrid, where, zeros
 from vecPy import Vec
 from string import upper, lower
 
-
-
-
-
-
-
 def get_data(fname,path):
     """this function gathers and retuens the data found in
     a single .vec file"""

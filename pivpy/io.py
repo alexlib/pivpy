@@ -10,7 +10,7 @@ from glob import glob
 import os
 from pivpy.pivpy import VectorField
 
-def get_units(fname, path):
+def get_units(fname, path='.'):
     """ given a .vec file this will return the names 
     of length and velocity units 
     fallback option is all None
@@ -55,7 +55,7 @@ def get_units(fname, path):
     return lUnits, velUnits, tUnits
 
 
-def get_dt(fname,path):
+def get_dt(fname,path='.'):
     """given a .vec file this will return the delta t 
     from the file in micro seconds"""
     # os.chdir(path) BUG
@@ -97,7 +97,8 @@ def parse_header(filename):
     
         
 
-def loadvec(filename,rows=None, cols=None):
+def loadvec(filename,rows=None, cols=None, dt=None, 
+                        l_units=None,vel_units=None, t_units=None):
     """
         loadvec(filename,rows=rows,cols=cols)
         Loads the VEC file (TECPLOT format by TSI Inc.) and OpenPIV format
@@ -111,10 +112,26 @@ def loadvec(filename,rows=None, cols=None):
     """
     if rows is None or cols is None:
         _,_,rows,cols = parse_header(filename)
+
+    if dt is None:
+        dt = get_dt(filename)
     
-    data = np.loadtxt(filename,skiprows=1,delimiter=',',usecols=(0,1,2,3,4)).reshape(rows,cols,5)
+    data = np.loadtxt(filename,skiprows=1,delimiter=',',
+                    usecols=(0,1,2,3,4)).reshape(rows,cols,5)
+
+    if l_units is None and vel_units is None and t_units is None:
+        l_units, vel_units, t_units = get_units(filename)
     
-    return VectorField(data)
+
+    _u = xr.DataArray(data[:,:,2],dims=('x','y'),coords={'x':data[:,:,0][0,:],'y':data[:,:,1][:,0]})
+    _v = xr.DataArray(data[:,:,3],dims=('x','y'),coords={'x':data[:,:,0][0,:],'y':data[:,:,1][:,0]})
+    _chc = xr.DataArray(data[:,:,4],dims=('x','y'),coords={'x':data[:,:,0][0,:],'y':data[:,:,1][:,0]})
+    _field = xr.Dataset({'u': _u, 'v': _v,'chc':_chc})
+    _field.attrs = {'dt':dt, 'l_units':l_units,'t_units':t_units,
+                    'rows':rows,'cols':cols,'vel_units':vel_units}
+
+    
+    return _field
     
     
     

@@ -1,5 +1,4 @@
 from pivpy import io, vecplot
-from pivpy.pivpy import VectorField
 import matplotlib.pyplot as plt
 
 

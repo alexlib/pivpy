@@ -73,6 +73,12 @@ class VectorField(object):
         """
         self._obj = xarray_obj
 
+    def pan(self,dx=0.0,dy=0.0):
+        """ moves the field by dx,dy in the same units as x,y """
+        self._obj['x'] += dx
+        self._obj['y'] += dy
+        return self._obj
+
     # @property
     # def vel_units(self):
     #     " Return the geographic center point of this dataset."

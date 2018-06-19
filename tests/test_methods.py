@@ -24,7 +24,7 @@ def test_add():
 
 def test_pan():
     """ test a shift by dx,dy using pan method """
-    _c = _a.piv.pan(1.0,-1.0)
+    _c = _a.piv.pan(1.0,-1.0) # note the use of .piv.
     assert np.allclose(_c.coords['x'][0],1.312480)
     assert np.allclose(_c.coords['y'][0], -1.31248)
 

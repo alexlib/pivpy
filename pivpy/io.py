@@ -8,9 +8,6 @@ import numpy as np
 import xarray as xr
 from glob import glob
 import os
-from pivpy.pivpy import VectorField
-
-
 
 
 def load_directory(directory):
@@ -51,7 +48,7 @@ def load_directory(directory):
 def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None):
     """
         loadvec(filename,rows=rows,cols=cols)
-        Loads the VEC file (TECPLOT format by TSI Inc.) and OpenPIV format
+        Loads the VEC file (TECPLOT format by TSI Inc.), OpenPIV VEC or TXT formats
         Arguments:
             filename : file name, expected to have a header and 5 columns
             rows, cols : number of rows and columns of a vector field,
@@ -63,18 +60,23 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None)
     if rows is None or cols is None:
         variables,units,rows,cols, dt = parse_header(filename)
 
-    d = np.loadtxt(filename,skiprows=1,delimiter=',',usecols=(0,1,2,3,4)).reshape(rows,cols,5)
-    
+    if rows is None: # means no headers
+        d = np.loadtxt(filename,usecols=(0,1,2,3,4))
+        rows = np.unique(d[:,0])
+        cols = np.unique(d[:,1])
+        d = d.reshape(rows,cols,5)
+    else:
+        d = np.loadtxt(filename,skiprows=1,delimiter=',',usecols=(0,1,2,3,4)).reshape(rows,cols,5)
+
     u = xr.DataArray(d[:,:,2],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
     v = xr.DataArray(d[:,:,3],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
     cnc = xr.DataArray(d[:,:,4],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
     data = xr.Dataset({'u': u, 'v': v,'cnc':cnc})
 
 
-    if variables is not None or units is None:
-        data.attrs['variables'] = variables
-        data.attrs['units'] = units  
-        data.attrs['dt'] = dt
+    data.attrs['variables'] = variables
+    data.attrs['units'] = units  
+    data.attrs['dt'] = dt
     
     return data
     
@@ -97,17 +99,10 @@ def parse_header(filename):
     with open(filename) as fid:
         header = fid.readline()
 
-    # if the .vec file does not have a header
+    # if the file does not have a header, can be from OpenPIV or elsewhere
+    # return None 
     if header[:5] != 'TITLE':
-        variables = ['X','Y','U','V','CHC']
-        units = ['pixel','pixel','pixel','pixel']
-        rows = None
-        cols = None
-        dt = None
-        return (variables, units, rows, cols, dt)
-
-
-
+        return (None,None,None,None,None)
 
     header_list = header.replace(',',' ').replace('=',' ').replace('"',' ').split()
     
@@ -151,3 +146,38 @@ def get_units(fname):
     tUnits = velUnits.split('/')[1]
     
     return lUnits, velUnits, tUnits
+
+
+#  part extended by Ron Shnapp 24.5.15
+
+
+    
+# def get_data_openpiv_txt(fname,path):
+#     """this function gathers and retuens the data found in
+#     a single .txt file created by OpenPIV"""
+
+
+    
+#     fname = os.path.join(os.path.abspath(path),fname)
+#     if os.path.isfile(fname) and fname.endswith('.txt'): 
+#         data = genfromtxt(fname,usecols=(0,1,2,3,4))
+#     else:
+#         raise ValueError('Wrong file or file extension')
+
+#     return data
+
+	   
+     
+# def readTimeStamp(fname,path):
+#     """reads an insight tstmp file and returns
+#     an array of the times at which photos were
+#     taken at relative to the begining of
+#     aquasition"""
+#     fname = os.path.join(os.path.abspath(path),fname)
+#     num_lines = sum(1 for line in open(fname))
+#     f = open(fname)
+#     for i in range(3):
+#         f.readline()
+#     strt = [f.readline().split()[1] for i in range(num_lines-4)]
+#     t = [float(i)/1000000 for i in strt]
+#     return t

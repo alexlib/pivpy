@@ -7,6 +7,7 @@ Various plots
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
+from . import process
     
 def showf_ownclass(data, var=None, units=None, fig=None):
     """ 
@@ -82,10 +83,8 @@ def showscal(data,bckgr='ken'):
     # import pdb; pdb.set_trace()
     # xlabel = (None if var is None else var[0]) + ' [' + (None if units is None else units[0])+']'
     # ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
-        
-    if bckgr == 'ken':
-        """ default is kinetic energy """
-        data['w'] = data['u']**2 + data['v']**2
+    
+    d = process.vec2scal(data,property=bckgr)
 
     plt.figure()
     if 't' in data.dims: 

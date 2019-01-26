@@ -15,7 +15,7 @@ def filterf(data):
     return data
 
 
-def vec2scal(data,property='curl'):
+def vec2scal(data, property='curl'):
     """ creates a dataset of scalar values on the same 
     dimensions and coordinates as the vector dataset
     Agruments:
@@ -29,13 +29,16 @@ def vec2scal(data,property='curl'):
     # prepare space
     d = data.copy()
     d['w'] = xr.DataArray(np.zeros_like(d['u']),dims=['t','x','y'])
-    if property is 'curl':
-        #    estimate curl
+
         for t in d.t:
             tmp = d.isel(t=t)
-            ux,uy = np.gradient(tmp['u'])
-            vx,vy = np.gradient(tmp['v'])
-            tmp['w'] += vy - ux
-        
+            if property is 'curl':
+                #    estimate curl
+                ux,_ = np.gradient(tmp['u'])
+                _,vy = np.gradient(tmp['v'])
+                tmp['w'] += vy - ux
+            elif property is 'ken':
+                tmp['w'] = tmp['u']**2 + tmp['v']**2
+    
     d = d.drop(['u','v','cnc'])
     return d

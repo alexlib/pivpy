@@ -5,14 +5,14 @@ Various plots
 """
 
 import numpy as np
-import matplotlib.pyplot as pl
+import matplotlib.pyplot as plt
 import xarray as xr
     
 def showf_ownclass(data, var=None, units=None, fig=None):
     """ 
     showf(data, var, units)
     """
-    fig = pl.figure(None if fig is None else fig.number)
+    fig = plt.figure(None if fig is None else fig.number)
     # import pdb; pdb.set_trace()
     xlabel = (None if var is None else var[0]) + ' [' + (None if units is None else units[0])+']'
     ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
@@ -24,14 +24,14 @@ def showf_ownclass(data, var=None, units=None, fig=None):
         
     
     for k,d in enumerate(data):
-        pl.quiver(d['x'],d['y'],d['u'],d['v'],d['u']**2 + d['v']**2)
-        pl.xlabel(xlabel)
-        pl.ylabel(ylabel)
-        pl.title(str(k))
-        pl.draw()
-        pl.pause(0.1)
+        plt.quiver(d['x'],d['y'],d['u'],d['v'],d['u']**2 + d['v']**2)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.title(str(k))
+        plt.draw()
+        plt.pause(0.1)
         
-    pl.show()
+    plt.show()
         
          
 def showf(data, variables=None, units=None, fig=None):
@@ -69,29 +69,33 @@ def showf(data, variables=None, units=None, fig=None):
         pl.ylabel(ylabel)
         pl.draw()
         
-    pl.show()  
+    plt.show()  
 
-def showscal(data):
+def showscal(data,bckgr='ken'):
     """ 
     showf(data, var, units)
     Arguments:
         data : xarray.DataSet that contains dimensions of t,x,y
                and a variable w (scalar)
     """
-    # fig = pl.figure(None if fig is None else fig.number)
+    # fig = plt.figure(None if fig is None else fig.number)
     # import pdb; pdb.set_trace()
     # xlabel = (None if var is None else var[0]) + ' [' + (None if units is None else units[0])+']'
     # ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
         
-    pl.figure()
+    if bckgr == 'ken':
+        """ default is kinetic energy """
+        data['w'] = data['u']**2 + data['v']**2
+
+    plt.figure()
     for t in data['t']:
         d = data.isel(t=t)
-        pl.contour(d['x'],d['y'],d['w'])
-        # pl.xlabel(xlabel)
-        # pl.ylabel(ylabel)
-        # pl.title(str(k))
-        pl.draw()
-        pl.pause(0.1)
+        plt.contour(d['x'],d['y'],d['w'])
+        # plt.xlabel(xlabel)
+        # plt.ylabel(ylabel)
+        # plt.title(str(k))
+        plt.draw()
+        plt.pause(0.1)
         
-    pl.show()              
+    plt.show()              
      

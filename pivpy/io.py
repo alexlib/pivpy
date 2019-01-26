@@ -7,8 +7,66 @@ Contains functions for reading flow fields in various formats
 import numpy as np
 import xarray as xr
 from glob import glob
-import os.path
+import os
+from pivpy.pivpy import VectorField
 
+def get_units(fname, path='.'):
+    """ given a .vec file this will return the names 
+    of length and velocity units 
+    fallback option is all None
+    """
+
+    lUnits, velUnits, tUnits = None, None, None
+
+    fname = os.path.join(os.path.abspath(path),fname) # just make a full path name 
+    # new way of opening and closing the file
+    with open(fname) as f:
+        header = f.readline()
+    
+
+    ind2= header.find('VARIABLES=')
+    print(ind2)
+
+    if ind2 > 0: # only if there is a valid header
+
+        ind3 = header.find('"X',ind2)
+        ind4 = header.find('"',ind3+1)
+        header[ind3:ind4+1]
+        lUnits = header[ind3+3:ind4]
+
+        ind3 = header.find('"U',ind2)
+        ind4 = header.find('"',ind3+1)
+        header[ind3:ind4+1]
+        velUnits = header[ind3+3:ind4]
+
+        if velUnits == 'pixel':
+            tUnits = 'dt'
+        else:
+            tUnits = velUnits.split('/')[1]
+
+        # fallback if nothing is read properly
+        if lUnits is None:
+            lUnits = 'mm'
+        if velUnits is None:
+            velUnits = 'm/s'
+        if tUnits is None:
+            tUnits = 's'
+    
+    return lUnits, velUnits, tUnits
+
+
+def get_dt(fname,path='.'):
+    """given a .vec file this will return the delta t 
+    from the file in micro seconds"""
+    # os.chdir(path) BUG
+    fname = os.path.join(os.path.abspath(path),fname) # just make a full path name 
+    # new way of opening and closing the file
+    with open(fname) as f:
+        header = f.readline()
+        
+    ind1 = header.find('MicrosecondsPerDeltaT')
+    dt = float(header[ind1:].split('"')[1])
+    return dt
 
 def load_directory(directory):
     """ 
@@ -70,7 +128,7 @@ def parse_header(filename):
     
         
 
-def loadvec(filename, rows=None, cols=None, variables=None, units=None):
+def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None):
     """
         loadvec(filename,rows=rows,cols=cols)
         Loads the VEC file (TECPLOT format by TSI Inc.) and OpenPIV format
@@ -85,6 +143,9 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None):
     if rows is None or cols is None:
         variables,units,rows,cols = parse_header(filename)
 
+    if dt is None:
+        dt = get_dt(filename)
+
     d = np.loadtxt(filename,skiprows=1,delimiter=',',usecols=(0,1,2,3,4)).reshape(rows,cols,5)
     
     u = xr.DataArray(d[:,:,2],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
@@ -93,9 +154,10 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None):
     data = xr.Dataset({'u': u, 'v': v,'cnc':cnc})
 
 
-    if variables is not None:
+    if variables is not None or units is None:
         data.attrs['variables'] = variables
         data.attrs['units'] = units  
+        data.attrs['dt'] = dt
     
     return data
     

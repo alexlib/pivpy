@@ -87,17 +87,17 @@ def showscal(data,bckgr='ken'):
     d = process.vec2scal(data,property=bckgr)
 
     plt.figure()
-    if 't' in data.dims: 
-        for t in data['t']:
-            d = data.isel(t=t)
-            plt.contour(d['x'],d['y'],d['w'])
+    if 't' in d.dims:
+        for t in d['t']:
+            tmp = d.isel(t=t)
+            plt.contour(tmp['x'],tmp['y'],tmp['w'])
             # plt.xlabel(xlabel)
             # plt.ylabel(ylabel)
             # plt.title(str(k))
             plt.draw()
             plt.pause(0.1)
     else:
-        plt.contour(data['x'],data['y'],data['w'])
+        plt.contour(d['x'],d['y'],d['w'])
         plt.draw()
     plt.show()              
      

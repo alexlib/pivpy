@@ -28,8 +28,7 @@ def vec2scal(data, property='curl'):
     """
     # prepare space
     d = data.copy()
-    d['w'] = xr.DataArray(np.zeros_like(d['u']),dims=['t','x','y'])
-
+    if 't' in d.dims:
         for t in d.t:
             tmp = d.isel(t=t)
             if property is 'curl':
@@ -39,6 +38,14 @@ def vec2scal(data, property='curl'):
                 tmp['w'] += vy - ux
             elif property is 'ken':
                 tmp['w'] = tmp['u']**2 + tmp['v']**2
+    else:
+        if property is 'curl':
+            #    estimate curl
+            ux,_ = np.gradient(d['u'])
+            _,vy = np.gradient(d['v'])
+            d['w'] += vy - ux
+        elif property is 'ken':
+            d['w'] = d['u']**2 + d['v']**2
     
     d = d.drop(['u','v','cnc'])
     return d

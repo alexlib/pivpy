@@ -54,20 +54,20 @@ def showf(data, variables=None, units=None, fig=None):
         ylabel += ' ' + units[1]
 
 
-    fig = pl.figure(None if fig is None else fig.number)  
+    fig = plt.figure(None if fig is None else fig.number)  
     if 't' in data.dims:
         for t in data['t']:
             d = data.isel(t=t)
-            pl.quiver(d['x'],d['y'],d['u'],d['v'],d['u']**2 + d['v']**2)
-            pl.xlabel(xlabel)
-            pl.ylabel(ylabel)
-            pl.draw()
-            pl.pause(0.1)
+            plt.quiver(d['x'],d['y'],d['u'],d['v'],d['u']**2 + d['v']**2)
+            plt.xlabel(xlabel)
+            plt.ylabel(ylabel)
+            plt.draw()
+            plt.pause(0.1)
     else:
-        pl.quiver(data['x'],data['y'],data['u'],data['v'],data['u']**2 + data['v']**2)
-        pl.xlabel(xlabel)
-        pl.ylabel(ylabel)
-        pl.draw()
+        plt.quiver(data['x'],data['y'],data['u'],data['v'],data['u']**2 + data['v']**2)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.draw()
         
     plt.show()  
 
@@ -88,14 +88,17 @@ def showscal(data,bckgr='ken'):
         data['w'] = data['u']**2 + data['v']**2
 
     plt.figure()
-    for t in data['t']:
-        d = data.isel(t=t)
-        plt.contour(d['x'],d['y'],d['w'])
-        # plt.xlabel(xlabel)
-        # plt.ylabel(ylabel)
-        # plt.title(str(k))
+    if 't' in data.dims: 
+        for t in data['t']:
+            d = data.isel(t=t)
+            plt.contour(d['x'],d['y'],d['w'])
+            # plt.xlabel(xlabel)
+            # plt.ylabel(ylabel)
+            # plt.title(str(k))
+            plt.draw()
+            plt.pause(0.1)
+    else:
+        plt.contour(data['x'],data['y'],data['w'])
         plt.draw()
-        plt.pause(0.1)
-        
     plt.show()              
      

@@ -50,7 +50,7 @@ Out[3]: 'plotting!'
 
 """
 @xr.register_dataset_accessor('piv')
-class VectorField(object):
+class PIVAccessor(object):
     def __init__(self,xarray_obj):
         """
         Arguments:
@@ -72,6 +72,12 @@ class VectorField(object):
            
         """
         self._obj = xarray_obj
+        self._average = None # not initialized
+
+    @property
+    def average(self):
+        " Return the mean flow field ."
+        return self._obj.mean(dim='t')
 
     def pan(self,dx=0.0,dy=0.0):
         """ moves the field by dx,dy in the same units as x,y """

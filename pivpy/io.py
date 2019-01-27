@@ -7,10 +7,10 @@ Contains functions for reading flow fields in various formats
 import numpy as np
 import xarray as xr
 from glob import glob
-import os
+import os, re
 
 
-def load_directory(directory):
+def load_directory(path,basename=''):
     """ 
     load_directory (path)
 
@@ -28,12 +28,12 @@ def load_directory(directory):
 
     See more: loadvec
     """
-    files  = glob(os.path.join(directory,'*.vec'))
-    variables, units, rows, cols, dt = parse_header(files[0])
+    files  = glob(os.path.join(path,basename,'*.vec'))
+    variables, units, rows, cols, dt, frame = parse_header(files[0])
     
     data = []
-    for f in files:
-        data.append(loadvec(f,rows,cols,variables,units))
+    for i,f in enumerate(files):
+        data.append(loadvec(f,rows,cols,variables,units,frame+i))
            
     
     combined = xr.concat(data, dim='t')
@@ -45,7 +45,7 @@ def load_directory(directory):
 
         
 
-def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None):
+def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None, frame=0):
     """
         loadvec(filename,rows=rows,cols=cols)
         Loads the VEC file (TECPLOT format by TSI Inc.), OpenPIV VEC or TXT formats
@@ -54,11 +54,13 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None)
             rows, cols : number of rows and columns of a vector field,
             if None, None, then parse_header is called to infer the number
             written in the header
+            dt : time interval (default is None)
+            frame : frame or time marker (default is None)
         Output:
             data is a xAarray Dataset, see xarray for help 
     """
     if rows is None or cols is None:
-        variables,units,rows,cols, dt = parse_header(filename)
+        variables,units,rows,cols, dt, frame = parse_header(filename)
 
     if rows is None: # means no headers
         d = np.loadtxt(filename,usecols=(0,1,2,3,4))
@@ -71,8 +73,9 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None)
     u = xr.DataArray(d[:,:,2],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
     v = xr.DataArray(d[:,:,3],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
     cnc = xr.DataArray(d[:,:,4],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
-    data = xr.Dataset({'u': u, 'v': v,'cnc':cnc})
-
+    
+    data = xr.Dataset({'u': u, 'v': v,'cnc':cnc}).expand_dims(dim='t')
+    data = data.assign_coords(t = frame)
 
     data.attrs['variables'] = variables
     data.attrs['units'] = units  
@@ -96,13 +99,24 @@ def parse_header(filename):
         cols : number of columns of the dataset 
         dt   : time interval between the two PIV frames in microseconds
     """
+
+    # split path from the filename
+    fname = os.path.basename(filename)
+    # get the number in a filename if it's a .vec file from Insight
+    if '.' in fname[:-4]: # day2a005003.T000.D000.P003.H001.L.vec
+        frame = int(re.findall('\d+',fname.split('.')[0])[-1])
+    elif '_' in filename[:-4]:
+        frame = int(re.findall('\d+',fname.split('_')[1])[-1]) # exp1_001_b.vec, .txt
+
+    print(fname, frame)
+
     with open(filename) as fid:
         header = fid.readline()
-
+    
     # if the file does not have a header, can be from OpenPIV or elsewhere
     # return None 
     if header[:5] != 'TITLE':
-        return (None,None,None,None,None)
+        return (None,None,None,None,None,frame)
 
     header_list = header.replace(',',' ').replace('=',' ').replace('"',' ').split()
     
@@ -121,11 +135,11 @@ def parse_header(filename):
     dt = float(header[ind1:].split('"')[1])
     
     
-    return (variables, units, rows, cols, dt)
+    return (variables, units, rows, cols, dt, frame)
         
 
 
-def get_units(fname):
+def get_units(filename):
     """ 
     get_units(filename)
 
@@ -135,15 +149,20 @@ def get_units(fname):
 
     """
 
-    _, units, _, _, _ = parse_header(fname)
+    lUnits, velUnits, tUnits = None, None, None
+
+    _, units, _, _, _, _ = parse_header(filename)
+
+    if units is None:
+        return lUnits, velUnits, tUnits
 
     lUnits = units[0]
     velUnits = units[2]
 
     if velUnits == 'pixel':
-        velUnits = velUnits+'/dt'
-        
-    tUnits = velUnits.split('/')[1]
+        velUnits = velUnits+'/dt' # make it similar to m/s
+
+    tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
     
     return lUnits, velUnits, tUnits
 

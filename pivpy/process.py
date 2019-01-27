@@ -26,26 +26,26 @@ def vec2scal(data, property='curl'):
             - 'curl' or 'rot' - vorticity
 
     """
+    print("inside vec2scal")
+    print(data)
+
     # prepare space
-    d = data.copy()
-    if 't' in d.dims:
-        for t in d.t:
-            tmp = d.isel(t=t)
-            if property is 'curl':
-                #    estimate curl
-                ux,_ = np.gradient(tmp['u'])
-                _,vy = np.gradient(tmp['v'])
-                tmp['w'] += vy - ux
-            elif property is 'ken':
-                tmp['w'] = tmp['u']**2 + tmp['v']**2
-    else:
+    d = data.copy(deep=True)
+    d = d.assign(variables=r'w')
+    d.attrs['variables'] = ['x','y','w']
+
+    print("after assignment")
+    print(d)
+
+    for t in d['t']:
+        tmp = d.isel(t=t)
         if property is 'curl':
             #    estimate curl
-            ux,_ = np.gradient(d['u'])
-            _,vy = np.gradient(d['v'])
-            d['w'] += vy - ux
+            ux,_ = np.gradient(tmp['u'])
+            _,vy = np.gradient(tmp['v'])
+            tmp['w'] += vy - ux
         elif property is 'ken':
-            d['w'] = d['u']**2 + d['v']**2
+            tmp['w'] = tmp['u']**2 + tmp['v']**2
     
     d = d.drop(['u','v','cnc'])
     return d

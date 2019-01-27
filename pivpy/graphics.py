@@ -55,24 +55,20 @@ def showf(data, variables=None, units=None, fig=None):
         ylabel += ' ' + units[1]
 
 
-    fig = plt.figure(None if fig is None else fig.number)  
-    if 't' in data.dims:
-        for t in data['t']:
-            d = data.isel(t=t)
-            plt.quiver(d['x'],d['y'],d['u'],d['v'],d['u']**2 + d['v']**2)
-            plt.xlabel(xlabel)
-            plt.ylabel(ylabel)
-            plt.draw()
-            plt.pause(0.1)
-    else:
-        plt.quiver(data['x'],data['y'],data['u'],data['v'],data['u']**2 + data['v']**2)
+    fig = plt.figure(None if fig is None else fig.number)
+
+
+    for t in data['t']:
+        d = data.isel(t=t)
+        plt.quiver(d['x'],d['y'],d['u'],d['v'],d['u']**2 + d['v']**2)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         plt.draw()
+        plt.pause(0.1)
         
     plt.show()  
 
-def showscal(data,bckgr='ken'):
+def showscal(data, property='ken'):
     """ 
     showf(data, var, units)
     Arguments:
@@ -84,20 +80,16 @@ def showscal(data,bckgr='ken'):
     # xlabel = (None if var is None else var[0]) + ' [' + (None if units is None else units[0])+']'
     # ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
     
-    d = process.vec2scal(data,property=bckgr)
+    d = process.vec2scal(data,property=property)
 
     plt.figure()
-    if 't' in d.dims:
-        for t in d['t']:
-            tmp = d.isel(t=t)
-            plt.contour(tmp['x'],tmp['y'],tmp['w'])
-            # plt.xlabel(xlabel)
-            # plt.ylabel(ylabel)
-            # plt.title(str(k))
-            plt.draw()
-            plt.pause(0.1)
-    else:
-        plt.contour(d['x'],d['y'],d['w'])
+    for t in d['t']:
+        tmp = d.isel(t=t)
+        plt.contour(tmp['x'],tmp['y'],tmp['w'])
+        # plt.xlabel(xlabel)
+        # plt.ylabel(ylabel)
+        # plt.title(str(k))
         plt.draw()
+        plt.pause(0.1)
     plt.show()              
      

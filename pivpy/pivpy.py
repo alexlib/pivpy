@@ -77,7 +77,8 @@ class PIVAccessor(object):
     @property
     def average(self):
         " Return the mean flow field ."
-        return self._obj.mean(dim='t')
+        self._average = self._obj.mean(dim='t')
+        return self._average
 
     def pan(self,dx=0.0,dy=0.0):
         """ moves the field by dx,dy in the same units as x,y """

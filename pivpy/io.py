@@ -43,6 +43,51 @@ def load_directory(path,basename=''):
     return combined
 
 
+def create_sample_field(frame = 0):
+    """ creates a sample dataset for the tests """
+
+    x  = np.arange(32,128,32)
+    y = np.arange(16,128,16)
+
+    xm,ym = np.meshgrid(x,y)
+
+    u = np.ones_like(xm.T) + np.arange(0,7)
+    v = np.zeros_like(ym.T)+np.random.rand(3,1)-.5
+
+    # plt.quiver(xm.T,ym.T,u,v)
+
+    chc = np.ones_like(xm.T)
+
+    u = xr.DataArray(u,dims=('x','y'),coords={'x':x,'y':y})
+    v = xr.DataArray(v,dims=('x','y'),coords={'x':x,'y':y})
+    chc = xr.DataArray(chc,dims=('x','y'),coords={'x':x,'y':y})
+    
+    data = xr.Dataset({'u': u, 'v': v,'chc':chc}).expand_dims(dim='t')
+    data = data.assign_coords(t = [frame])
+
+    data.attrs['variables'] = ['x','y','u','v']
+    data.attrs['units'] = ['pix','pix','pix/dt','pix/dt']  
+    data.attrs['dt'] = 1.0
+
+    return data
+
+
+def create_sample_dataset(n = 5):
+    """ using create_sample_field that has random part in it, create
+    a sample dataset of length 'n' """
+
+
+    data = []
+    for i in range(n):
+        data.append(create_sample_field(frame=i))
+           
+    
+    combined = xr.concat(data, dim='t')
+    combined.attrs['variables'] = ['x','y','u','v']
+    combined.attrs['units'] = ['pix','pix','pix/dt','pix/dt']  
+    combined.attrs['dt'] = 1.0
+
+    return combined
         
 
 def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None, frame=0):
@@ -75,7 +120,7 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
     cnc = xr.DataArray(d[:,:,4],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
     
     data = xr.Dataset({'u': u, 'v': v,'cnc':cnc}).expand_dims(dim='t')
-    data = data.assign_coords(t = frame)
+    # data = data.assign_coords(t = frame)
 
     data.attrs['variables'] = variables
     data.attrs['units'] = units  

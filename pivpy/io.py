@@ -54,15 +54,19 @@ def create_sample_field(frame = 0):
     u = np.ones_like(xm.T) + np.arange(0,7)
     v = np.zeros_like(ym.T)+np.random.rand(3,1)-.5
 
+    u = u[:,:,np.newaxis]
+    v = v[:,:,np.newaxis]
+    chc = np.ones_like(u)
+
     # plt.quiver(xm.T,ym.T,u,v)
 
-    chc = np.ones_like(xm.T)
 
-    u = xr.DataArray(u,dims=('x','y'),coords={'x':x,'y':y})
-    v = xr.DataArray(v,dims=('x','y'),coords={'x':x,'y':y})
-    chc = xr.DataArray(chc,dims=('x','y'),coords={'x':x,'y':y})
+
+    u = xr.DataArray(u,dims=('x','y','t'),coords={'x':x,'y':y})
+    v = xr.DataArray(v,dims=('x','y','t'),coords={'x':x,'y':y})
+    chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':x,'y':y})
     
-    data = xr.Dataset({'u': u, 'v': v,'chc':chc}).expand_dims(dim='t')
+    data = xr.Dataset({'u': u, 'v': v,'chc':chc})
     data = data.assign_coords(t = [frame])
 
     data.attrs['variables'] = ['x','y','u','v']

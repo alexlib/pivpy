@@ -58,3 +58,13 @@ def test_load_directory():
 #     from pivpy.pivpy import PIVAccessor
 #     data = io.loadvec(os.path.join(path,fname))
 #     data.piv.average
+
+def test_create_sample_field():
+    data = io.create_sample_field(frame=3)
+    assert data['t'] == 3
+
+def test_create_sample_dataset(n=3):
+    data = io.create_sample_dataset(n=n)
+    assert data.shape[-1] == 3
+
+    

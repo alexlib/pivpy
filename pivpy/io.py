@@ -31,9 +31,9 @@ def create_sample_field(frame = 0):
 
 
 
-    u = xr.DataArray(u,dims=('x','y','t'),coords={'x':x,'y':y,'t':frame})
-    v = xr.DataArray(v,dims=('x','y','t'),coords={'x':x,'y':y,'t':frame})
-    chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':x,'y':y,'t':frame})
+    u = xr.DataArray(u,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    v = xr.DataArray(v,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
     
     data = xr.Dataset({'u': u, 'v': v,'chc':chc})
 

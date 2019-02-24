@@ -10,37 +10,6 @@ from glob import glob
 import os, re
 
 
-def load_directory(path,basename=''):
-    """ 
-    load_directory (path)
-
-    Loads all the .VEC files in the directory into a single
-    xarray dataset with variables and units added as attributes
-
-    Input: 
-        directory : path to the directory with .vec files
-
-    Output:
-        data : xarray DataSet with dimensions: x,y,t and 
-               data arrays of u,v,
-               attributes of variables and units
-
-
-    See more: loadvec
-    """
-    files  = glob(os.path.join(path,basename,'*.vec'))
-    variables, units, rows, cols, dt, frame = parse_header(files[0])
-    
-    data = []
-    for i,f in enumerate(files):
-        data.append(loadvec(f,rows,cols,variables,units,frame+i))
-           
-    
-    combined = xr.concat(data, dim='t')
-    combined.attrs['variables'] = variables
-    combined.attrs['units'] = units
-    combined.attrs['dt'] = dt
-    return combined
 
 
 def create_sample_field(frame = 0):
@@ -62,12 +31,11 @@ def create_sample_field(frame = 0):
 
 
 
-    u = xr.DataArray(u,dims=('x','y','t'),coords={'x':x,'y':y})
-    v = xr.DataArray(v,dims=('x','y','t'),coords={'x':x,'y':y})
-    chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':x,'y':y})
+    u = xr.DataArray(u,dims=('x','y','t'),coords={'x':x,'y':y,'t':frame})
+    v = xr.DataArray(v,dims=('x','y','t'),coords={'x':x,'y':y,'t':frame})
+    chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':x,'y':y,'t':frame})
     
     data = xr.Dataset({'u': u, 'v': v,'chc':chc})
-    data = data.assign_coords(t = [frame])
 
     data.attrs['variables'] = ['x','y','u','v']
     data.attrs['units'] = ['pix','pix','pix/dt','pix/dt']  
@@ -131,7 +99,39 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
     data.attrs['dt'] = dt
     
     return data
+
+def load_directory(path,basename=''):
+    """ 
+    load_directory (path)
+
+    Loads all the .VEC files in the directory into a single
+    xarray dataset with variables and units added as attributes
+
+    Input: 
+        directory : path to the directory with .vec files
+
+    Output:
+        data : xarray DataSet with dimensions: x,y,t and 
+               data arrays of u,v,
+               attributes of variables and units
+
+
+    See more: loadvec
+    """
+    files  = glob(os.path.join(path,basename,'*.vec'))
+    variables, units, rows, cols, dt, frame = parse_header(files[0])
     
+    data = []
+    for i,f in enumerate(files):
+        data.append(loadvec(f,rows,cols,variables,units,frame+i))
+           
+    
+    combined = xr.concat(data, dim='t')
+    combined.attrs['variables'] = variables
+    combined.attrs['units'] = units
+    combined.attrs['dt'] = dt
+    return combined
+
     
 def parse_header(filename):
     """ 

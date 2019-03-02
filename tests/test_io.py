@@ -1,3 +1,4 @@
+import numpy as np
 from pivpy import io, vecplot
 import matplotlib.pyplot as plt
 
@@ -65,6 +66,6 @@ def test_create_sample_field():
 
 def test_create_sample_dataset(n=3):
     data = io.create_sample_dataset(n=n)
-    assert data.shape[-1] == 3
+    assert data.dims['t'] == 3
+    assert np.allclose(data['t'],np.arange(3)) 
 
-    

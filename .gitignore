@@ -5,3 +5,4 @@ examples/data/.ipynb_checkpoints/*
 build/*
 dist/*
 PIVPy.egg-info/*
+tests/PIVPy.egg-info/*

@@ -45,20 +45,15 @@ def test_get_units():
 
 def test_loadvec():
     data = io.loadvec(os.path.join(path,fname))
-    assert data['u'].shape == (63,63)
-    assert data['u'][0,0] == 0.0
-    assert data.coords['x'][0] == 0.31248
-    # assert 't' in data.dims
-    print(data.dims)
+    assert data['u'].shape == (1,63,63)
+    assert data['u'][0,0,0] == 0.0
+    assert np.allclose(data.coords['x'][0],0.31248)
+    assert 't' in data.dims
 
 def test_load_directory():
     data = io.load_directory(path,basename='Run')
-    assert data['t'] == [1,2,3,4,5]
+    assert np.allclose(data['t'],[0,1,2,3,4])
 
-# def test_mean():
-#     from pivpy.pivpy import PIVAccessor
-#     data = io.loadvec(os.path.join(path,fname))
-#     data.piv.average
 
 def test_create_sample_field():
     data = io.create_sample_field(frame=3)

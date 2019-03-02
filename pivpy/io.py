@@ -118,14 +118,13 @@ def load_directory(path,basename=''):
 
     See more: loadvec
     """
-    files  = glob(os.path.join(path,basename,'*.vec'))
+    files  = glob(os.path.join(path,basename+'*.vec'))
     variables, units, rows, cols, dt, frame = parse_header(files[0])
     
     data = []
     for i,f in enumerate(files):
         data.append(loadvec(f,rows,cols,variables,units,frame+i))
            
-    
     combined = xr.concat(data, dim='t')
     combined.attrs['variables'] = variables
     combined.attrs['units'] = units

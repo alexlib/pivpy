@@ -29,3 +29,9 @@ def test_pan():
     assert np.allclose(_c.coords['y'][0], -1.31248)
 
 
+# def test_mean():
+#     from pivpy.pivpy import PIVAccessor
+#     data = io.loadvec(os.path.join(path,fname))
+#     data.piv.average
+
+

@@ -1,6 +1,6 @@
 # test_methods.py
 import xarray as xr
-from pivpy import io
+from pivpy import io, pivpy
 import numpy as np
 
 import os
@@ -29,9 +29,16 @@ def test_pan():
     assert np.allclose(_c.coords['y'][0], -1.31248)
 
 
-# def test_mean():
-#     from pivpy.pivpy import PIVAccessor
-#     data = io.loadvec(os.path.join(path,fname))
-#     data.piv.average
+def test_mean():
+    data = io.create_sample_dataset(10)
+    assert data.piv.average.u.median() == 4.0
 
+def test_vec2scal():
+    data = io.create_sample_dataset()
+    data.piv.vec2scal()
+    assert data['w']
 
+def test_add():
+    data = io.create_sample_dataset()
+    tmp = data + data
+    assert (tmp['u'][0] == 2.0)

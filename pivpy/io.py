@@ -15,12 +15,12 @@ import os, re
 def create_sample_field(frame = 0):
     """ creates a sample dataset for the tests """
 
-    x  = np.arange(32,128,32)
-    y = np.arange(16,128,16)
+    x  = np.arange(32.,128.,32.)
+    y = np.arange(16.,128.,16.)
 
     xm,ym = np.meshgrid(x,y)
 
-    u = np.ones_like(xm.T) + np.arange(0,7)
+    u = np.ones_like(xm.T) + np.arange(0.0,7.0)
     v = np.zeros_like(ym.T)+np.random.rand(3,1)-.5
 
     u = u[:,:,np.newaxis]

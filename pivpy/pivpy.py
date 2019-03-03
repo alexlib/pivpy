@@ -2,9 +2,9 @@
 """
 Created on Sun May 24 22:02:49 2015
 
-@author: Ron
+@author: Ron, Alex
 """
-from numpy import sin, cos, pi, asarray, array, shape, zeros, logical_and
+import numpy as np
 from scipy.stats import norm
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.filters import median_filter
@@ -84,6 +84,61 @@ class PIVAccessor(object):
         """ moves the field by dx,dy in the same units as x,y """
         self._obj['x'] += dx
         self._obj['y'] += dy
+        return self._obj
+
+    @property
+    def filterf(self):
+        """Gaussian filtering of velocity """
+        from scipy.ndimage.filters import gaussian_filter as gf
+        self._obj['u'] = xr.DataArray(gf(self._obj['u'],1),dims=('x','y'))
+        self._obj['v'] = xr.DataArray(gf(self._obj['v'],1),dims=('x','y'))
+        return self._obj
+
+    def __add__(self,other):
+        """ add two datasets means that we sum up the velocities, assume
+        that x,y,t,dt are all identical 
+        """
+        self._obj['u'] += other._obj['u']
+        self._obj['v'] += other._obj['v']
+        return self._obj
+
+    def __sub__(self,other):
+        """ add two datasets means that we sum up the velocities, assume
+        that x,y,t,dt are all identical 
+        """
+        self._obj['u'] -= other._obj['u']
+        self._obj['v'] -= other._obj['v']
+        return self._obj
+
+    def vec2scal(self, property='curl'):
+        """ creates a dataset of scalar values on the same 
+        dimensions and coordinates as the vector dataset
+        Agruments:
+            data : xarray.DataSet with u,v on t,x,y grid
+        Returns:
+            scalar_data : xarray.Dataset w on t,x,y grid
+            'w' represents one of the following properties:
+                - 'curl' or 'rot' - vorticity
+
+        """
+
+        if property is 'curl':
+            #    estimate curl
+            ux,_,_ = np.gradient(self._obj['u'])
+            _,vy,_ = np.gradient(self._obj['v'])
+            self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y', 't'])
+        elif property is 'ken':
+            self._obj['w'] = self._obj['u']**2 + self._obj['v']**2
+        
+        return self._obj
+
+    def __mul__(self,scalar):
+        '''
+        multiplication of a velocity field by a scalar (simple scaling)
+        '''
+        self._obj['u'] *= scalar
+        self._obj['v'] *= scalar
+
         return self._obj
 
     # @property

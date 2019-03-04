@@ -36,9 +36,11 @@ def test_mean():
 def test_vec2scal():
     data = io.create_sample_dataset()
     data.piv.vec2scal()
-    assert data['w']
+    # tests that first data['w'] exists and then 
+    # the first value is 0.0
+    assert data['w'][0,0,0] == 0.0
 
 def test_add():
     data = io.create_sample_dataset()
     tmp = data + data
-    assert (tmp['u'][0] == 2.0)
+    assert tmp['u'][0,0,0] == 2.0

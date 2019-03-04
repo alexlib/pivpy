@@ -50,6 +50,10 @@ def test_loadvec():
     assert np.allclose(data.coords['x'][0],0.31248)
     assert 't' in data.dims
 
+def test_loadopenpivtxt():
+    data = io.loadvec(os.path.join(path,'exp1_001_b.txt'))
+    
+
 def test_load_directory():
     data = io.load_directory(path,basename='Run')
     assert np.allclose(data['t'],[0,1,2,3,4])

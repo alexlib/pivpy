@@ -81,15 +81,17 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
 
     if rows is None: # means no headers
         d = np.loadtxt(filename,usecols=(0,1,2,3,4))
-        rows = np.unique(d[:,0])
-        cols = np.unique(d[:,1])
-        d = d.reshape(rows,cols,5)
+        x = np.unique(d[:,0])
+        y = np.unique(d[:,1])
+        d = d.reshape(len(y),len(x),5).transpose(1,0,2)
     else:
         d = np.loadtxt(filename,skiprows=1,delimiter=',',usecols=(0,1,2,3,4)).reshape(rows,cols,5)
+        x = d[:,:,0][0,:]
+        y = d[:,:,1][:,0]
 
-    u = xr.DataArray(d[:,:,2],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
-    v = xr.DataArray(d[:,:,3],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
-    cnc = xr.DataArray(d[:,:,4],dims=('x','y'),coords={'x':d[:,:,0][0,:],'y':d[:,:,1][:,0]})
+    u = xr.DataArray(d[:,:,2],dims=('x','y'),coords={'x':x,'y':y})
+    v = xr.DataArray(d[:,:,3],dims=('x','y'),coords={'x':x,'y':y})
+    cnc = xr.DataArray(d[:,:,4],dims=('x','y'),coords={'x':x,'y':y})
     
     data = xr.Dataset({'u': u, 'v': v,'cnc':cnc}).expand_dims(dim='t')
     # data = data.assign_coords(t = frame)
@@ -214,24 +216,6 @@ def get_units(filename):
     
     return lUnits, velUnits, tUnits
 
-
-#  part extended by Ron Shnapp 24.5.15
-
-
-    
-# def get_data_openpiv_txt(fname,path):
-#     """this function gathers and retuens the data found in
-#     a single .txt file created by OpenPIV"""
-
-
-    
-#     fname = os.path.join(os.path.abspath(path),fname)
-#     if os.path.isfile(fname) and fname.endswith('.txt'): 
-#         data = genfromtxt(fname,usecols=(0,1,2,3,4))
-#     else:
-#         raise ValueError('Wrong file or file extension')
-
-#     return data
 
 	   
      

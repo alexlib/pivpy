@@ -12,16 +12,6 @@ _a = io.loadvec(os.path.join(path,f1))
 _b = io.loadvec(os.path.join(path,f2))
 
 
-def test_add():
-    """ test add of two fields """
-    # this operation should sum only velocities
-    # xarray provides it out of the box for the variables
-    # and not dimensions
-    _c = _a + _b 
-
-    assert np.allclose(_c.x,_a.x)
-    assert np.allclose(_c.u, _a.u + _b.u)
-
 def test_pan():
     """ test a shift by dx,dy using pan method """
     _c = _a.piv.pan(1.0,-1.0) # note the use of .piv.
@@ -44,3 +34,24 @@ def test_add():
     data = io.create_sample_dataset()
     tmp = data + data
     assert tmp['u'][0,0,0] == 2.0
+
+def test_subtract():
+    """ tests subtraction """
+    data = io.create_sample_dataset()
+    tmp = data - data
+    assert tmp['u'][0,0,0] == 0.0
+
+def test_multiply():
+    """ tests subtraction """
+    data = io.create_sample_dataset()
+    tmp = data * 3.5
+    assert tmp['u'][0,0,0] == 3.5
+
+def test_set_get_dt():
+    """ tests setting the new dt """
+    data = io.create_sample_dataset()
+    assert data.attrs['dt'] == 1.0
+    assert data.piv.get_dt == 1.0
+    data.piv.set_dt(2.0)
+    assert data.attrs['dt'] == 2.0
+   

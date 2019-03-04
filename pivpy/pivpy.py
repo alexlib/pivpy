@@ -141,6 +141,23 @@ class PIVAccessor(object):
 
         return self._obj
 
+    def __div__(self,scalar):
+        '''
+        multiplication of a velocity field by a scalar (simple scaling)
+        '''
+        self._obj['u'] /= scalar
+        self._obj['v'] /= scalar
+
+        return self._obj
+
+    def set_dt(self,dt):
+        self._obj.attrs['dt'] = dt
+
+    @property
+    def get_dt(self):
+        """ receives the dt from the set """
+        return self._obj.attrs['dt']
+
     # @property
     # def vel_units(self):
     #     " Return the geographic center point of this dataset."
@@ -172,63 +189,7 @@ class Vec:
         self.velUnits = lUnits + '/' + tUnits
         self.theta = 0.0 # what is theta ? 
     
-    
-    def __add__(self,other):
-        '''
-        addition of velocity fields. note that only a matching shape of the 
-        data is checked. all the rest is the user's responsibility.
-        '''
-        if self.x.shape == other.x.shape:
-            new_inst = Vec(self.x, self.y, 
-                           self.u + other.u, self.v + other.v,
-                           logical_and(self.chc, other.chc),
-                           self.dt, lUnits= self.lUnits, tUnits= self.tUnits)
-            return new_inst
-        else:
-            raise ValueError('cannot add - vec the shapes dont match')
-    
-    
-    def __sub__(self,other):
-        '''
-        subtraction of velocity fields. note that only a matching shape of the 
-        data is checked. all the rest is the user's responsibility.
-        '''
-        if self.x.shape == other.x.shape:
-            new_inst = Vec(self.x, self.y, 
-                           self.u - other.u, self.v - other.v,
-                           logical_and(self.chc, other.chc),
-                           self.dt, lUnits= self.lUnits, tUnits= self.tUnits)
-            return new_inst
-        else:
-            raise ValueError('cannot add - vec the shapes dont match')
-    
-    
-    def __mul__(self,scalar):
-        '''
-        multiplication of a velocity field by a scalar (simple scaling)
-        '''
-        new_inst = Vec(self.x, self.y, 
-                       self.u * scalar, self.v * scalar, self.chc, self.dt,
-                       lUnits= self.lUnits, tUnits= self.tUnits)
-        return new_inst
-    
-    
-    def __rmul__(self,scalar):
-        '''
-        multiplication of a velocity field by a scalar (simple scaling)
-        '''
-        new_inst = Vec(self.x, self.y, 
-                       self.u * scalar, self.v * scalar, self.chc, self.dt,
-                       lUnits= self.lUnits, tUnits= self.tUnits)
-        return new_inst
-    
-    
-    def __div__(self, scalar):
-        new_inst = Vec(self.x, self.y, 
-                       self.u / scalar, self.v / scalar, self.chc, self.dt,
-                       lUnits= self.lUnits, tUnits= self.tUnits)
-        return new_inst
-        
+ 
     
     def set_dt(self,dt):
         self.dt = dt

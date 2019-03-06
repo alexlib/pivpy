@@ -10,7 +10,7 @@ import xarray as xr
 
 def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1, 
               contourLevels = None, colbar = True, logscale = False,
-              aspectratio='equal', colbar_orient = 'vertical'):
+              aspectratio='equal', colbar_orient = 'vertical', units = None):
     """
     Generates a quiver plot of a 'vec' xarray DataArray object (single frame from a dataset)
     Inputs:
@@ -28,15 +28,24 @@ def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1,
     Usage:
         graphics.quiver(vec, arrScale = 0.2, threshold = Inf, n)
     """
-    
+    x = vec.x
+    y = vec.y
     u = vec.u
     v = vec.v
+    
+    if units is not None:
+        lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
+        velUnits = units[2]
+        tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
+    else:
+        lUnits, velUnits, tUnits = '', '', ''
+    
     
     if threshold is not None:
         u = thresholdArray(u, threshold)
         v = thresholdArray(v, threshold)
         
-    S = np.sqrt(u**2 + v**2)
+    S = np.array(np.sqrt(u**2 + v**2))
     
     fig = plt.get_fignums()
     if len(fig) == 0: # if no figure is open
@@ -49,22 +58,22 @@ def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1,
     else:
         levels = np.linspace(0, contourLevels, 30)
     if logscale:
-        c = ax.contourf(vec.x,vec.y,S,alpha=0.8,
+        c = ax.contourf(x,y,S,alpha=0.8,
                  cmap = plt.get_cmap("Blues"), 
                  levels = levels, norm = colors.LogNorm())
     else:
-        c = ax.contourf(vec.x,vec.y,S,alpha=0.8,
+        c = ax.contourf(x,y,S,alpha=0.8,
                  cmap = plt.get_cmap("Blues"), 
                  levels=levels)
     if colbar:
         cbar = plt.colorbar(c, orientation=colbar_orient)
-        cbar.set_label(r'$\left| \, V \, \right|$ ['+vec.lUnits+' $\cdot$ '+vec.tUnits+'$^{-1}$]')
-    n = nthArr
-    ax.quiver(vec.x[1::n,1::n],vec.y[1::n,1::n],
-               u[1::n,1::n],v[1::n,1::n],units='width',
+        cbar.set_label(r'$\left| \, V \, \right|$ ['+ lUnits +' $\cdot$ '+ tUnits +'$^{-1}$]')
+        
+    ax.quiver(x[::nthArr],y[::nthArr],
+               u[::nthArr,::nthArr],v[::nthArr,::nthArr],units='width',
                scale = np.max(S*arrScale),headwidth=2)
-    ax.set_xlabel('x [' + vec.lUnits + ']')
-    ax.set_ylabel('y [' + vec.lUnits + ']')
+    ax.set_xlabel('x (' + lUnits + ')')
+    ax.set_ylabel('y (' + lUnits + ')')
     ax.set_aspect(aspectratio)       
     return fig,ax
         
@@ -127,3 +136,38 @@ def showscal(data, property='ken'):
         plt.pause(0.1)
     plt.show()              
      
+
+        
+def genVorticityMap(vec, threshold = None, contourLevels = None, 
+                    colbar = True,  logscale = False, aspectration='equal'):
+    """ why do we rotate the vector before taking derivative? """
+    # BUG:
+    dUy = gradient(vec.u)[0]*cos(vec.theta)-gradient(vec.u)[1]*sin(vec.theta)
+    dVx = gradient(vec.v)[1]*cos(vec.theta)+gradient(vec.v)[0]*sin(vec.theta)
+    dx = gradient(vec.x)[1]*cos(vec.theta)+gradient(vec.x)[0]*sin(vec.theta)
+    dy = gradient(vec.y)[0]*cos(vec.theta)-gradient(vec.y)[1]*sin(vec.theta)
+    vorticity = dVx/dy-dUy/dx
+    
+    f,ax = subplots()    
+    
+    if threshold != None:
+        vorticity = thresholdArray(vorticity,threshold)
+    m = amax(abs(vorticity))
+    if contourLevels == None:
+        levels = linspace(-m, m, 30)
+    else:
+        levels = linspace(-contourLevels, contourLevels, 30)
+        
+    if logscale:
+        c = ax.contourf(vec.x,vec.y,np.abs(vorticity), levels=levels,
+                 cmap = get_cmap('RdYlBu'), norm=colors.LogNorm())
+    else:
+        c = ax.contourf(vec.x,vec.y,vorticity, levels=levels,
+                 cmap = get_cmap('RdYlBu'))
+    plt.xlabel('x [' + vec.lUnits + ']')
+    plt.ylabel('y [' + vec.lUnits + ']')
+    if colbar:
+        cbar = colorbar(c)
+        cbar.set_label(r'$\omega$ [s$^{-1}$]')
+    ax.set_aspect(aspectration)
+    return f,ax

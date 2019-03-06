@@ -54,4 +54,10 @@ def test_set_get_dt():
     assert data.piv.get_dt == 1.0
     data.piv.set_dt(2.0)
     assert data.attrs['dt'] == 2.0
-   
+    
+def test_rotate():
+    """ tests rotation """
+
+    data = io.create_sample_dataset()
+    data.piv.rotate(90) # rotate by 90 deg
+    assert data['u'][0,0,0] == 2.1

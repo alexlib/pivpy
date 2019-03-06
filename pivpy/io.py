@@ -78,6 +78,7 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
     """
     if rows is None or cols is None:
         variables,units,rows,cols, dt, frame = parse_header(filename)
+    
 
     if rows is None: # means no headers
         d = np.loadtxt(filename,usecols=(0,1,2,3,4))

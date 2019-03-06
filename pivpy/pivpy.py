@@ -152,7 +152,26 @@ class PIVAccessor(object):
 
     def set_dt(self,dt):
         self._obj.attrs['dt'] = dt
-
+        
+    def set_tUnits(self,tUnits):
+        self._obj.attrs['tUnits'] = tUnits
+        
+    def rotate(self,theta=0.0):
+        """ 
+        use this method in order to rotate the data 
+        by theta degrees in the clockwise direction
+        """
+        
+        theta = theta/360.0*2*pi
+        
+        xi = self._obj.x*cos(theta) + self._obj.y*sin(theta)
+        eta = sself._objelf.y*cos(theta) - self._obj.x*sin(theta)
+        Uxi = self._obj.u*cos(theta) + self._obj.v*sin(theta)
+        Ueta = self._obj.v*cos(theta) - self._obj.u*sin(theta)
+        self._obj.x, self._obj.y = xi, eta
+        self._obj.u, self._obj.v  = Uxi, Ueta
+        self._obj.theta = self._obj.theta + theta # this is not clear what theta defines 
+        
     @property
     def get_dt(self):
         """ receives the dt from the set """
@@ -203,21 +222,7 @@ class Vec:
     def set_tUnits(self,tUnits = 's'):
         self.tUnits = tUnits # default is sec
             
-    def rotate(self,theta=0.0):
-        """ 
-        use this method in order to rotate the data 
-        by theta degrees in the clockwise direction
-        """
-        
-        theta = theta/360.0*2*pi
-        
-        xi = self.x*cos(theta) + self.y*sin(theta)
-        eta = self.y*cos(theta) - self.x*sin(theta)
-        Uxi = self.u*cos(theta) + self.v*sin(theta)
-        Ueta = self.v*cos(theta) - self.u*sin(theta)
-        self.x, self.y = xi, eta
-        self.u, self.v  = Uxi, Ueta
-        self.theta = self.theta + theta # this is not clear what theta defines 
+
         
     def scale(self,resolution):
         """

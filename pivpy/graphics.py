@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
 
-def create_quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1, 
+def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1, 
               contourLevels = None, colbar = True, logscale = False,
               aspectratio='equal', colbar_orient = 'vertical'):
     """
@@ -26,7 +26,7 @@ def create_quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1,
     Outputs:
         none
     Usage:
-        vecplot.genQuiver(vec, arrScale = 0.2, threshold = Inf, n)
+        graphics.quiver(vec, arrScale = 0.2, threshold = Inf, n)
     """
     
     u = vec.u

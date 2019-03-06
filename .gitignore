@@ -1,2 +1,8 @@
 *.pyc
 examples/data/.ipynb_checkpoints/*
+.pytest_cache/*
+.pytest_cache/*
+build/*
+dist/*
+PIVPy.egg-info/*
+tests/PIVPy.egg-info/*

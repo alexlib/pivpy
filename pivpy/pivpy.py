@@ -109,7 +109,31 @@ class PIVAccessor(object):
         self._obj['u'] -= other._obj['u']
         self._obj['v'] -= other._obj['v']
         return self._obj
+    
+    
+    def vorticity(self):
+        """ calculates vorticity of the data array (at one time instance) 
+        
+        Input: 
+            xarray with the variables u,v and dimensions x,y
+        
+        Output:
+            xarray with the estimated vorticity as a scalar field with same dimensions
+        
+        """
+        
+        ux,_ = np.gradient(self._obj['u'],self._obj['x'],self._obj['y'],axis=(0,1))
+        _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
+        # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
+        self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y','t'])
+        return self._obj
 
+        
+    def tke(self):
+        """ estimates turbulent kinetic energy """
+        self._obj['w'] = self._obj['u']**2 + self._obj['v']**2
+        return self._obj
+        
     def vec2scal(self, property='curl'):
         """ creates a dataset of scalar values on the same 
         dimensions and coordinates as the vector dataset
@@ -121,16 +145,19 @@ class PIVAccessor(object):
                 - 'curl' or 'rot' - vorticity
 
         """
-
-        if property is 'curl':
-            #    estimate curl
-            ux,_,_ = np.gradient(self._obj['u'])
-            _,vy,_ = np.gradient(self._obj['v'])
-            self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y', 't'])
-        elif property is 'ken':
-            self._obj['w'] = self._obj['u']**2 + self._obj['v']**2
+        # replace few common names
+        property='vorticity' if property == 'curl' else property
+        property = 'tke' if property == 'ken' else property
         
-        return self._obj
+        method_name = str(property)
+        method = getattr(self, method_name, lambda: "nothing")
+        
+        if len(self._obj.attrs['variables']) == 4: # only x,y,u,v
+            self._obj.attrs['variables'].append(property)
+        else:
+            self._obj.attrs['variables'][-1] = property
+            
+        return method()
 
     def __mul__(self,scalar):
         '''
@@ -162,20 +189,22 @@ class PIVAccessor(object):
         by theta degrees in the clockwise direction
         """
         
-        theta = theta/360.0*2*pi
+        theta = theta/360.0*2*np.pi
         
-        xi = self._obj.x*cos(theta) + self._obj.y*sin(theta)
-        eta = sself._objelf.y*cos(theta) - self._obj.x*sin(theta)
-        Uxi = self._obj.u*cos(theta) + self._obj.v*sin(theta)
-        Ueta = self._obj.v*cos(theta) - self._obj.u*sin(theta)
-        self._obj.x, self._obj.y = xi, eta
-        self._obj.u, self._obj.v  = Uxi, Ueta
-        self._obj.theta = self._obj.theta + theta # this is not clear what theta defines 
+        xi = self._obj.x*np.cos(theta) + self._obj.y*np.sin(theta)
+        eta = self._obj.y*np.cos(theta) - self._obj.x*np.sin(theta)
+        Uxi = self._obj.u*np.cos(theta) + self._obj.v*np.sin(theta)
+        Ueta = self._obj.v*np.cos(theta) - self._obj.u*np.sin(theta)
+        self._obj['x'], self._obj['y'] = xi, eta
+        self._obj['u'], self._obj['v']  = Uxi, Ueta
+        self._obj['theta'] += theta # this is not clear what theta defines 
         
     @property
     def get_dt(self):
         """ receives the dt from the set """
         return self._obj.attrs['dt']
+    
+        
 
     # @property
     # def vel_units(self):

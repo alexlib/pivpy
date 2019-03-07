@@ -60,4 +60,22 @@ def test_rotate():
 
     data = io.create_sample_dataset()
     data.piv.rotate(90) # rotate by 90 deg
-    assert data['u'][0,0,0] == 2.1
+    assert data['u'][0,0,0] == 2.1 # shall fail
+    
+def test_vorticity():
+    """ tests vorticity estimate """
+    
+    data = io.create_sample_field()
+    vort = data.piv.vorticity()
+    assert vort[0,0] == 0.0 # shall fail
+    
+def test_vec2scal():
+    """ tests vec2scal """
+    
+    data = io.create_sample_field()
+    data.piv.vec2scal(property='curl')
+    data.piv.vec2scal(property='ken')
+    data.piv.vec2scal(property='tke')
+    assert len(data.attrs['variables']) == 5
+    assert data.attrs['variables'][-1] == 'tke'
+    

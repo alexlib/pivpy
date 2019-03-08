@@ -127,7 +127,42 @@ class PIVAccessor(object):
         # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
         self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y','t'])
         return self._obj
+    
+    def shear(self):
+        """ calculates shear of the data array (single frame) 
+        
+        Input: 
+            xarray with the variables u,v and dimensions x,y
+        
+        Output:
+            xarray with the estimated shear as a scalar field data['w']
+        
+        """
+        
+        ux,_ = np.gradient(self._obj['u'],self._obj['x'],self._obj['y'],axis=(0,1))
+        _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
+        # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
+        self._obj['w'] = xr.DataArray(vy + ux, dims=['x', 'y','t'])
+        return self._obj
 
+    def acceleration(self):
+        """ calculates material derivative or acceleration of the data array (single frame) 
+        
+        Input: 
+            xarray with the variables u,v and dimensions x,y
+        
+        Output:
+            xarray with the estimated acceleration as a scalar field data['w']
+        
+        """
+        ux,uy = np.gradient(self._obj['u'],self._obj['x'],self._obj['y'],axis=(0,1))
+        vx,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
+        
+        ax = self._obj['u']*ux + self._obj['v']*uy
+        ay = self._obj['u']*vx + self._obj['v']*vy
+
+        self._obj['w'] = xr.DataArray(np.sqrt(ax**2+ay**2), dims=['x', 'y','t'])
+        return self._obj
         
     def tke(self):
         """ estimates turbulent kinetic energy """

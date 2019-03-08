@@ -66,7 +66,14 @@ def test_vorticity():
     
     data = io.create_sample_field()
     data.piv.vorticity()
-    assert data['w'][0,0] == 0.0 # shall fail
+    assert data['w'][0,0] == 0.0
+    
+def test_shear():
+    """ tests shear estimate """
+    
+    data = io.create_sample_field()
+    data.piv.shear()
+    assert data['w'][0,0] == 0.0 
     
 def test_vec2scal():
     """ tests vec2scal """

@@ -150,38 +150,6 @@ def genVorticityMap(vec, threshold = None, contourLevels = None,
     return f,ax
 
 
-def genShearMap(vec, threshold = None, contourLevels = None, logscale = False,
-                colbar = True, aspectratio='equal'):
-    """this function plots a map of the xy strain e_xy"""
-    dUy = gradient(vec.u)[0]*cos(vec.theta)-gradient(vec.u)[1]*sin(vec.theta)
-    dVx = gradient(vec.v)[1]*cos(vec.theta)+gradient(vec.v)[0]*sin(vec.theta)
-    dx = gradient(vec.x)[1]*cos(vec.theta)+gradient(vec.x)[0]*sin(vec.theta)
-    dy = gradient(vec.y)[0]*cos(vec.theta)-gradient(vec.y)[1]*sin(vec.theta)
-    strain = dVx/dy+dUy/dx
-    
-    f, ax = subplots()    
-    
-    if threshold != None:
-        strain = thresholdArray(strain,threshold)
-    m = amax(abs(strain))
-    if contourLevels == None:
-        levels = linspace(-m, m, 30)
-    else:
-        levels = linspace(-contourLevels, contourLevels, 30)
-        
-    if logscale:
-        c = ax.contourf(vec.x,vec.y,np.abs(strain), levels=levels,
-                 cmap = get_cmap('PRGn'), norm = colors.LogNorm())
-    else:
-        c = ax.contourf(vec.x,vec.y,strain, levels=levels,
-                 cmap = get_cmap('PRGn'))
-    plt.xlabel('x [' + vec.lUnits + ']')
-    plt.ylabel('y [' + vec.lUnits + ']')
-    if colbar:
-        cbar = colorbar(c)
-        cbar.set_label(r'$\epsilon_t$ [s$^{-1}$]')
-    ax.set_aspect(aspectratio)
-    return f, ax
 
 
 def genFlowAcceleration(vec, arrScale = 25.0, threshold = None, nthArr = 1,

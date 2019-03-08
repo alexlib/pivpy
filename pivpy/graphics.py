@@ -76,6 +76,54 @@ def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1,
     ax.set_ylabel('y (' + lUnits + ')')
     ax.set_aspect(aspectratio)       
     return fig,ax
+
+
+def contourf(vec, threshold = None, contourLevels = None, 
+                    colbar = True,  logscale = False, aspectration='equal'):
+    """ contourf ajusted for the xarray PIV dataset, creates a 
+        contour map for the data['w'] property. 
+        Input:
+            data : xarray PIV DataArray
+            threshold : a threshold value, default is None (no data clipping)
+            contourLevels : number of contour levels, default is None
+            colbar : boolean (default is True) show/hide colorbar 
+            logscale : boolean (True is default) create in linear/log scale
+            aspectration : string, 'equal' is the default
+        
+    """
+    
+    if units is not None:
+        lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
+        velUnits = units[2]
+        tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
+    else:
+        lUnits, velUnits, tUnits = '', '', ''
+        
+    f,ax = subplots()    
+    
+    if threshold is not None:
+        data['w'] = xr.where(data['w']>threshold, threshold, data['w'])
+        
+    m = np.amax(abs(data['w']))
+    if contourLevels == None:
+        levels = np.linspace(-m, m, 30)
+    else:
+        levels = np.linspace(-contourLevels, contourLevels, 30)
+        
+    if logscale:
+        c = ax.contourf(vec.x,vec.y,np.abs(data['w']), levels=levels,
+                 cmap = get_cmap('RdYlBu'), norm=colors.LogNorm())
+    else:
+        c = ax.contourf(vec.x,vec.y,data['w'], levels=levels,
+                 cmap = get_cmap('RdYlBu'))
+        
+    plt.xlabel('x [' + lUnits + ']')
+    plt.ylabel('y [' + lUnits + ']')
+    if colbar:
+        cbar = colorbar(c)
+        cbar.set_label(r'$\omega$ [s$^{-1}$]')
+    ax.set_aspect(aspectration)
+    return f,ax
         
          
 def showf(data, variables=None, units=None, fig=None):
@@ -123,64 +171,38 @@ def showscal(data, property='ken'):
     # xlabel = (None if var is None else var[0]) + ' [' + (None if units is None else units[0])+']'
     # ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
     
-    d = process.vec2scal(data,property=property)
-
-    plt.figure()
-    for t in d['t']:
-        tmp = d.isel(t=t)
-        plt.contour(tmp['x'],tmp['y'],tmp['w'])
-        # plt.xlabel(xlabel)
-        # plt.ylabel(ylabel)
-        # plt.title(str(k))
-        plt.draw()
-        plt.pause(0.1)
-    plt.show()              
-     
-
-        
-def contourf(vec, threshold = None, contourLevels = None, 
-                    colbar = True,  logscale = False, aspectration='equal'):
-    """ contourf ajusted for the xarray PIV dataset, creates a 
-        contour map for the data['w'] property. 
-        Input:
-            data : xarray PIV DataArray
-            threshold : a threshold value, default is None (no data clipping)
-            contourLevels : number of contour levels, default is None
-            colbar : boolean (default is True) show/hide colorbar 
-            logscale : boolean (True is default) create in linear/log scale
-            aspectration : string, 'equal' is the default
-        
-    """
     
-    if units is not None:
-        lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
-        velUnits = units[2]
-        tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
-    else:
-        lUnits, velUnits, tUnits = '', '', ''
+    data = data.piv.vec2scal(property)
+    graphics.contourf(data)                   
         
-    f,ax = subplots()    
+
+def animateVecList(vecList, arrowscale=1, savepath=None):
+    X, Y = vecList[0].x, vecList[0].y
+    U, V = vecList[0].u, vecList[0].v
+    fig, ax = subplots(1,1)
+    #Q = ax.quiver(X, Y, U, V, units='inches', scale=arrowscale)
+    M = sqrt(pow(U, 2) + pow(V, 2))    
+    Q = ax.quiver(X[::3,::3], Y[::3,::3], 
+                  U[::3,::3], V[::3,::3], M[::3,::3],
+                 units='inches', scale=arrowscale)
+    cb = colorbar(Q)
+    cb.ax.set_ylabel('velocity ['+vecList[0].lUnits+'/'+vecList[0].tUnits+']')
+    text = ax.text(0.2,1.05, '1/'+str(len(vecList)), ha='center', va='center',
+                   transform=ax.transAxes)
+    def update_quiver(num,Q,vecList,text):
+        U,V = vecList[num].u[::3,::3],vecList[num].v[::3,::3]
+        M = sqrt(pow(U, 2) + pow(V, 2))   
+        Q.set_UVC(U,V,M)
+        #Q.set_UVC(vecList[num].u,vecList[num].v)
+        text.set_text(str(num+1)+'/'+str(len(vecList)))
+        return Q,
+    anim = animation.FuncAnimation(fig, update_quiver, fargs=(Q,vecList,text),
+                               frames = len(vecList), blit=False)
+    mywriter = animation.FFMpegWriter()
+    if savepath:
+        p = getcwd()
+        chdir(savepath)
+        anim.save('im.mp4', writer=mywriter)
+        chdir(p)
+    else: anim.save('im.mp4', writer=mywriter)  
     
-    if threshold is not None:
-        data['w'] = xr.where(data['w']>threshold, threshold, data['w'])
-        
-    m = np.amax(abs(data['w']))
-    if contourLevels == None:
-        levels = np.linspace(-m, m, 30)
-    else:
-        levels = np.linspace(-contourLevels, contourLevels, 30)
-        
-    if logscale:
-        c = ax.contourf(vec.x,vec.y,np.abs(data['w']), levels=levels,
-                 cmap = get_cmap('RdYlBu'), norm=colors.LogNorm())
-    else:
-        c = ax.contourf(vec.x,vec.y,data['w'], levels=levels,
-                 cmap = get_cmap('RdYlBu'))
-        
-    plt.xlabel('x [' + lUnits + ']')
-    plt.ylabel('y [' + lUnits + ']')
-    if colbar:
-        cbar = colorbar(c)
-        cbar.set_label(r'$\omega$ [s$^{-1}$]')
-    ax.set_aspect(aspectration)
-    return f,ax

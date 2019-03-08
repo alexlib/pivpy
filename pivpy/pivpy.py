@@ -187,6 +187,9 @@ class PIVAccessor(object):
         """ 
         use this method in order to rotate the data 
         by theta degrees in the clockwise direction
+        in the present form of using xarray with coordinates
+        it can only work for the cases with equal size along
+        x and y 
         """
         
         theta = theta/360.0*2*np.pi
@@ -195,9 +198,19 @@ class PIVAccessor(object):
         eta = self._obj.y*np.cos(theta) - self._obj.x*np.sin(theta)
         Uxi = self._obj.u*np.cos(theta) + self._obj.v*np.sin(theta)
         Ueta = self._obj.v*np.cos(theta) - self._obj.u*np.sin(theta)
-        self._obj['x'], self._obj['y'] = xi, eta
-        self._obj['u'], self._obj['v']  = Uxi, Ueta
-        self._obj['theta'] += theta # this is not clear what theta defines 
+        
+        self._obj['x'] = xi
+        self._obj['y'] = eta
+        self._obj['u'] = Uxi
+        self._obj['v'] = Ueta
+        
+        
+        if 'theta' in self._obj:
+            self._obj['theta'] += theta
+        else:
+            self._obj['theta'] = theta
+            
+        return self._obj
         
     @property
     def get_dt(self):

@@ -42,8 +42,8 @@ def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1,
     
     
     if threshold is not None:
-        u = thresholdArray(u, threshold)
-        v = thresholdArray(v, threshold)
+        data['u'] = xr.where(data['u']>threshold, threshold, data['u'])
+        data['v'] = xr.where(data['v']>threshold, threshold, data['v'])
         
     S = np.array(np.sqrt(u**2 + v**2))
     
@@ -138,34 +138,47 @@ def showscal(data, property='ken'):
      
 
         
-def genVorticityMap(vec, threshold = None, contourLevels = None, 
+def contourf(vec, threshold = None, contourLevels = None, 
                     colbar = True,  logscale = False, aspectration='equal'):
-    """ why do we rotate the vector before taking derivative? """
-    # BUG:
-    dUy = gradient(vec.u)[0]*cos(vec.theta)-gradient(vec.u)[1]*sin(vec.theta)
-    dVx = gradient(vec.v)[1]*cos(vec.theta)+gradient(vec.v)[0]*sin(vec.theta)
-    dx = gradient(vec.x)[1]*cos(vec.theta)+gradient(vec.x)[0]*sin(vec.theta)
-    dy = gradient(vec.y)[0]*cos(vec.theta)-gradient(vec.y)[1]*sin(vec.theta)
-    vorticity = dVx/dy-dUy/dx
+    """ contourf ajusted for the xarray PIV dataset, creates a 
+        contour map for the data['w'] property. 
+        Input:
+            data : xarray PIV DataArray
+            threshold : a threshold value, default is None (no data clipping)
+            contourLevels : number of contour levels, default is None
+            colbar : boolean (default is True) show/hide colorbar 
+            logscale : boolean (True is default) create in linear/log scale
+            aspectration : string, 'equal' is the default
+        
+    """
     
+    if units is not None:
+        lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
+        velUnits = units[2]
+        tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
+    else:
+        lUnits, velUnits, tUnits = '', '', ''
+        
     f,ax = subplots()    
     
-    if threshold != None:
-        vorticity = thresholdArray(vorticity,threshold)
-    m = amax(abs(vorticity))
+    if threshold is not None:
+        data['w'] = xr.where(data['w']>threshold, threshold, data['w'])
+        
+    m = np.amax(abs(data['w']))
     if contourLevels == None:
-        levels = linspace(-m, m, 30)
+        levels = np.linspace(-m, m, 30)
     else:
-        levels = linspace(-contourLevels, contourLevels, 30)
+        levels = np.linspace(-contourLevels, contourLevels, 30)
         
     if logscale:
-        c = ax.contourf(vec.x,vec.y,np.abs(vorticity), levels=levels,
+        c = ax.contourf(vec.x,vec.y,np.abs(data['w']), levels=levels,
                  cmap = get_cmap('RdYlBu'), norm=colors.LogNorm())
     else:
-        c = ax.contourf(vec.x,vec.y,vorticity, levels=levels,
+        c = ax.contourf(vec.x,vec.y,data['w'], levels=levels,
                  cmap = get_cmap('RdYlBu'))
-    plt.xlabel('x [' + vec.lUnits + ']')
-    plt.ylabel('y [' + vec.lUnits + ']')
+        
+    plt.xlabel('x [' + lUnits + ']')
+    plt.ylabel('y [' + lUnits + ']')
     if colbar:
         cbar = colorbar(c)
         cbar.set_label(r'$\omega$ [s$^{-1}$]')

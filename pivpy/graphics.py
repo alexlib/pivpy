@@ -8,13 +8,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
 
-def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1, 
+def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1, 
               contourLevels = None, colbar = True, logscale = False,
               aspectratio='equal', colbar_orient = 'vertical', units = None):
     """
-    Generates a quiver plot of a 'vec' xarray DataArray object (single frame from a dataset)
+    Generates a quiver plot of a 'data' xarray DataArray object (single frame from a dataset)
     Inputs:
-        vec - xarray DataArray of the type defined in pivpy (u,v with coords x,y,t and the attributes)
+        data - xarray DataArray of the type defined in pivpy (u,v with coords x,y,t and the attributes)
         threshold - values above the threshold will be set equal to threshold
         arrScale - use to change arrow scales
         nthArr - use to plot only every nth arrow from the array 
@@ -26,12 +26,12 @@ def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1,
     Outputs:
         none
     Usage:
-        graphics.quiver(vec, arrScale = 0.2, threshold = Inf, n)
+        graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
-    x = vec.x
-    y = vec.y
-    u = vec.u
-    v = vec.v
+    x = data.x
+    y = data.y
+    u = data.u
+    v = data.v
     
     if units is not None:
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
@@ -78,7 +78,7 @@ def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1,
     return fig,ax
 
 
-def contourf(vec, threshold = None, contourLevels = None, 
+def contour_plot(data, threshold = None, contourLevels = None, 
                     colbar = True,  logscale = False, aspectration='equal', units=None):
     """ contourf ajusted for the xarray PIV dataset, creates a 
         contour map for the data['w'] property. 
@@ -111,10 +111,10 @@ def contourf(vec, threshold = None, contourLevels = None,
         levels = np.linspace(-contourLevels, contourLevels, 30)
         
     if logscale:
-        c = ax.contourf(vec.x,vec.y,np.abs(data['w']), levels=levels,
+        c = ax.contourf(data.x,data.y,np.abs(data['w']), levels=levels,
                  cmap = get_cmap('RdYlBu'), norm=colors.LogNorm())
     else:
-        c = ax.contourf(vec.x,vec.y,data['w'], levels=levels,
+        c = ax.contourf(data.x,data.y,data['w'], levels=levels,
                  cmap = get_cmap('RdYlBu'))
         
     plt.xlabel('x [' + lUnits + ']')
@@ -157,7 +157,7 @@ def showf(data, variables=None, units=None, fig=None):
         plt.draw()
         plt.pause(0.1)
         
-    plt.show()  
+    plt.show()
 
 def showscal(data, property='ken'):
     """ 
@@ -172,8 +172,8 @@ def showscal(data, property='ken'):
     # ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
     
     
-    data = data.piv.vec2scal(property)
-    graphics.contourf(data)                   
+    data = data.piv.data2scal(property)
+    graphics.contour_plot(data)                
         
 
 def animate(data, arrowscale=1, savepath=None):

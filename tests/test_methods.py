@@ -12,8 +12,18 @@ _a = io.loadvec(os.path.join(path,f1))
 _b = io.loadvec(os.path.join(path,f2))
 
 
+def test_crop():
+    """ tests crop """
+    _c = _a.piv.crop([.6, 19.,-.6,-19.])
+    assert _c.u.shape == (59,59,1)
+    
+    _c = io.create_sample_dataset()
+    _c = _c.sel(x = slice(30,90),y=slice(60,80))
+    assert _c.u.shape == (2,2,5) # note the last dimension is preserved
+
 def test_pan():
     """ test a shift by dx,dy using pan method """
+    _a = io.loadvec(os.path.join(path,f1))
     _c = _a.piv.pan(1.0,-1.0) # note the use of .piv.
     assert np.allclose(_c.coords['x'][0],1.312480)
     assert np.allclose(_c.coords['y'][0], -1.31248)

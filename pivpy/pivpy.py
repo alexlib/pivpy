@@ -76,9 +76,31 @@ class PIVAccessor(object):
 
     @property
     def average(self):
-        " Return the mean flow field ."
+        """ Return the mean flow field ."""
         self._average = self._obj.mean(dim='t')
         return self._average
+    
+    def crop(self,crop_vector = [None, None, None, None]):
+        """ crop number of rows, cols from either side of the vector fields 
+        Input: 
+            self : xarray Dataset 
+            crop_vector : [xmin,xmax,ymin,ymax] is a list of values crop the data, 
+            defaults are None
+        Return: 
+            same object as the input    
+        """
+        xmin,xmax,ymin,ymax = crop_vector
+        
+        xmin = self._obj.x.min() if xmin is None else xmin
+        xmax = self._obj.x.max() if xmax is None else xmax
+        ymin = self._obj.y.min() if ymin is None else ymin
+        ymax = self._obj.y.max() if ymax is None else ymax        
+        
+        self._obj = self._obj.sel(x=slice(xmin, xmax),y=slice(ymin,ymax))
+
+        return self._obj
+
+        
 
     def pan(self,dx=0.0,dy=0.0):
         """ moves the field by dx,dy in the same units as x,y """
@@ -86,7 +108,6 @@ class PIVAccessor(object):
         self._obj['y'] += dy
         return self._obj
 
-    @property
     def filterf(self):
         """Gaussian filtering of velocity """
         from scipy.ndimage.filters import gaussian_filter as gf
@@ -212,6 +233,7 @@ class PIVAccessor(object):
 
         return self._obj
 
+    
     def set_dt(self,dt):
         self._obj.attrs['dt'] = dt
         

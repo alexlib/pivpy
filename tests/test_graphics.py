@@ -14,10 +14,16 @@ def test_showscal():
 
 def test_quiver():
     graphics.quiver(_d)
+
+
+def test_xarray_plot():
+    _d.piv.vec2scal(property='curl')
+    _d['w'].isel(t=0).plot.pcolormesh()
+
+def test_histogram():
+    graphics.histogram(_d)
+
     
-def test_contourf():
-    _d.piv.vec2scal(property='vorticity')
-    grahics.contourf(_d)
     
     
     

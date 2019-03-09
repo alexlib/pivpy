@@ -79,7 +79,7 @@ def quiver(vec, arrScale = 25.0, threshold = None, nthArr = 1,
 
 
 def contourf(vec, threshold = None, contourLevels = None, 
-                    colbar = True,  logscale = False, aspectration='equal'):
+                    colbar = True,  logscale = False, aspectration='equal', units=None):
     """ contourf ajusted for the xarray PIV dataset, creates a 
         contour map for the data['w'] property. 
         Input:
@@ -176,28 +176,46 @@ def showscal(data, property='ken'):
     graphics.contourf(data)                   
         
 
-def animateVecList(vecList, arrowscale=1, savepath=None):
-    X, Y = vecList[0].x, vecList[0].y
-    U, V = vecList[0].u, vecList[0].v
+def animate(data, arrowscale=1, savepath=None):
+    """ animates the quiver plot for the dataset (multiple frames) 
+    Input:
+        data : xarray PIV type of DataSet
+        arrowscale : [optional] integer, default is 1
+        savepath : [optional] path to save the MP4 animation, default is None
+    
+    Output:
+        if savepath is None, then only an image display of the animation
+        if savepath is an existing path, a file named im.mp4 is saved
+    
+    """
+    X, Y = data.x, data.y
+    U, V = data.u[:,:,0], data.v[:,:,0] # first frame
     fig, ax = subplots(1,1)
-    #Q = ax.quiver(X, Y, U, V, units='inches', scale=arrowscale)
-    M = sqrt(pow(U, 2) + pow(V, 2))    
+    M = np.sqrt(U**2 + V**2)
+    
     Q = ax.quiver(X[::3,::3], Y[::3,::3], 
                   U[::3,::3], V[::3,::3], M[::3,::3],
                  units='inches', scale=arrowscale)
+    
     cb = colorbar(Q)
-    cb.ax.set_ylabel('velocity ['+vecList[0].lUnits+'/'+vecList[0].tUnits+']')
-    text = ax.text(0.2,1.05, '1/'+str(len(vecList)), ha='center', va='center',
+    
+    units = data.attrs['units']
+    
+    cb.ax.set_ylabel('velocity (' + units[2] + ')')
+    
+    text = ax.text(0.2,1.05, '1/'+str(len(data.t)), ha='center', va='center',
                    transform=ax.transAxes)
-    def update_quiver(num,Q,vecList,text):
-        U,V = vecList[num].u[::3,::3],vecList[num].v[::3,::3]
-        M = sqrt(pow(U, 2) + pow(V, 2))   
+    
+    def update_quiver(num,Q,data,text):
+        U,V = data.u[:,:,num],data.v[:,:,num]
+        
+        M = np.sqrt(U[::3,::3]**2 + V[::3,::3]**2)   
         Q.set_UVC(U,V,M)
-        #Q.set_UVC(vecList[num].u,vecList[num].v)
-        text.set_text(str(num+1)+'/'+str(len(vecList)))
-        return Q,
-    anim = animation.FuncAnimation(fig, update_quiver, fargs=(Q,vecList,text),
-                               frames = len(vecList), blit=False)
+        text.set_text(str(num+1)+'/'+str(len(data.t)))
+        return Q
+
+    anim = animation.FuncAnimation(fig, update_quiver, fargs=(Q,data,text),
+                               frames = len(data.t), blit=False)
     mywriter = animation.FFMpegWriter()
     if savepath:
         p = getcwd()
@@ -205,4 +223,5 @@ def animateVecList(vecList, arrowscale=1, savepath=None):
         anim.save('im.mp4', writer=mywriter)
         chdir(p)
     else: anim.save('im.mp4', writer=mywriter)  
+    
     

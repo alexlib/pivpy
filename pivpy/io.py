@@ -40,6 +40,7 @@ def create_sample_field(frame = 0):
     data.attrs['variables'] = ['x','y','u','v']
     data.attrs['units'] = ['pix','pix','pix/dt','pix/dt']  
     data.attrs['dt'] = 1.0
+    data.attrs['files'] = ''
 
     return data
 
@@ -58,6 +59,7 @@ def create_sample_dataset(n = 5):
     combined.attrs['variables'] = ['x','y','u','v']
     combined.attrs['units'] = ['pix','pix','pix/dt','pix/dt']  
     combined.attrs['dt'] = 1.0
+    combined.attrs['files'] = ''
 
     return combined
         
@@ -78,6 +80,7 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
     """
     if rows is None or cols is None:
         variables,units,rows,cols, dt, frame = parse_header(filename)
+    
 
     if rows is None: # means no headers
         d = np.loadtxt(filename,usecols=(0,1,2,3,4))
@@ -88,17 +91,26 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
         d = np.loadtxt(filename,skiprows=1,delimiter=',',usecols=(0,1,2,3,4)).reshape(rows,cols,5)
         x = d[:,:,0][0,:]
         y = d[:,:,1][:,0]
-
-    u = xr.DataArray(d[:,:,2],dims=('x','y'),coords={'x':x,'y':y})
-    v = xr.DataArray(d[:,:,3],dims=('x','y'),coords={'x':x,'y':y})
-    cnc = xr.DataArray(d[:,:,4],dims=('x','y'),coords={'x':x,'y':y})
+        
+    u = d[:,:,2]
+    v = d[:,:,3]
+    chc = d[:,:,4]
     
-    data = xr.Dataset({'u': u, 'v': v,'cnc':cnc}).expand_dims(dim='t')
-    # data = data.assign_coords(t = frame)
+    # extend dimensions
+    u = u[:,:,np.newaxis]
+    v = v[:,:,np.newaxis]
+    chc = chc[:,:,np.newaxis]
+
+    u = xr.DataArray(u,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    v = xr.DataArray(v,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    
+    data = xr.Dataset({'u': u, 'v': v,'chc':chc})
 
     data.attrs['variables'] = variables
     data.attrs['units'] = units  
     data.attrs['dt'] = dt
+    data.attrs['files'] = filename
     
     return data
 
@@ -120,17 +132,18 @@ def load_directory(path,basename=''):
 
     See more: loadvec
     """
-    files  = glob(os.path.join(path,basename+'*.vec'))
+    files  = sorted(glob(os.path.join(path,basename+'*.vec')))
     variables, units, rows, cols, dt, frame = parse_header(files[0])
     
     data = []
     for i,f in enumerate(files):
-        data.append(loadvec(f,rows,cols,variables,units,frame+i))
+        data.append(loadvec(f,rows,cols,variables,units,dt,frame+i-1))
            
     combined = xr.concat(data, dim='t')
     combined.attrs['variables'] = variables
     combined.attrs['units'] = units
     combined.attrs['dt'] = dt
+    combined.attrs['files'] = files
     return combined
 
     
@@ -157,8 +170,6 @@ def parse_header(filename):
         frame = int(re.findall('\d+',fname.split('.')[0])[-1])
     elif '_' in filename[:-4]:
         frame = int(re.findall('\d+',fname.split('_')[1])[-1]) # exp1_001_b.vec, .txt
-
-    print(fname, frame)
 
     with open(filename) as fid:
         header = fid.readline()

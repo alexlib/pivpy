@@ -1,6 +1,26 @@
+import xarray as xr
+from pivpy import io, pivpy, graphics
+import numpy as np
+
+import os
+f1 = 'Run000001.T000.D000.P000.H001.L.vec'
+path = './data/'
+
+_d = io.loadvec(os.path.join(path,f1))
 
 def test_showscal():
-    assert True
-    # graphics.showscal(_a,property='ken')
+    graphics.showscal(_d, property='ken')
+    
+
+def test_quiver():
+    graphics.quiver(_d)
+    
+def test_contourf():
+    _d.piv.vec2scal(property='vorticity')
+    grahics.contourf(_d)
+    
+    
+    
+    
 
 

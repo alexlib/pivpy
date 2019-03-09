@@ -54,4 +54,36 @@ def test_set_get_dt():
     assert data.piv.get_dt == 1.0
     data.piv.set_dt(2.0)
     assert data.attrs['dt'] == 2.0
-   
+    
+# def test_rotate():
+#     """ tests rotation """
+#     data = io.create_sample_dataset()
+#     data.piv.rotate(90) # rotate by 90 deg
+#     assert data['u'][0,0,0] == 2.1 # shall fail
+    
+def test_vorticity():
+    """ tests vorticity estimate """
+    
+    data = io.create_sample_field()
+    data.piv.vorticity()
+    assert data['w'][0,0] == 0.0
+    
+def test_shear():
+    """ tests shear estimate """
+    
+    data = io.create_sample_field()
+    data.piv.shear()
+    assert data['w'][0,0] == 0.0 
+    
+def test_vec2scal():
+    """ tests vec2scal """
+    
+    data = io.create_sample_field()
+    data.piv.vec2scal(property='curl')
+    data.piv.vec2scal(property='ken')
+    data.piv.vec2scal(property='tke')
+    assert len(data.attrs['variables']) == 5
+    assert data.attrs['variables'][-1] == 'tke'
+    
+    _a.piv.vec2scal(property='curl')
+    

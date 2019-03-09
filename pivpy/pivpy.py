@@ -109,7 +109,66 @@ class PIVAccessor(object):
         self._obj['u'] -= other._obj['u']
         self._obj['v'] -= other._obj['v']
         return self._obj
+    
+    
+    def vorticity(self):
+        """ calculates vorticity of the data array (at one time instance) 
+        
+        Input: 
+            xarray with the variables u,v and dimensions x,y
+        
+        Output:
+            xarray with the estimated vorticity as a scalar field with same dimensions
+        
+        """
+        
+        ux,_ = np.gradient(self._obj['u'],self._obj['x'],self._obj['y'],axis=(0,1))
+        _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
+        # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
+        self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y','t'])
+        return self._obj
+    
+    def shear(self):
+        """ calculates shear of the data array (single frame) 
+        
+        Input: 
+            xarray with the variables u,v and dimensions x,y
+        
+        Output:
+            xarray with the estimated shear as a scalar field data['w']
+        
+        """
+        
+        ux,_ = np.gradient(self._obj['u'],self._obj['x'],self._obj['y'],axis=(0,1))
+        _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
+        # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
+        self._obj['w'] = xr.DataArray(vy + ux, dims=['x', 'y','t'])
+        return self._obj
 
+    def acceleration(self):
+        """ calculates material derivative or acceleration of the data array (single frame) 
+        
+        Input: 
+            xarray with the variables u,v and dimensions x,y
+        
+        Output:
+            xarray with the estimated acceleration as a scalar field data['w']
+        
+        """
+        ux,uy = np.gradient(self._obj['u'],self._obj['x'],self._obj['y'],axis=(0,1))
+        vx,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
+        
+        ax = self._obj['u']*ux + self._obj['v']*uy
+        ay = self._obj['u']*vx + self._obj['v']*vy
+
+        self._obj['w'] = xr.DataArray(np.sqrt(ax**2+ay**2), dims=['x', 'y','t'])
+        return self._obj
+        
+    def tke(self):
+        """ estimates turbulent kinetic energy """
+        self._obj['w'] = self._obj['u']**2 + self._obj['v']**2
+        return self._obj
+        
     def vec2scal(self, property='curl'):
         """ creates a dataset of scalar values on the same 
         dimensions and coordinates as the vector dataset
@@ -121,16 +180,19 @@ class PIVAccessor(object):
                 - 'curl' or 'rot' - vorticity
 
         """
-
-        if property is 'curl':
-            #    estimate curl
-            ux,_,_ = np.gradient(self._obj['u'])
-            _,vy,_ = np.gradient(self._obj['v'])
-            self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y', 't'])
-        elif property is 'ken':
-            self._obj['w'] = self._obj['u']**2 + self._obj['v']**2
+        # replace few common names
+        property='vorticity' if property == 'curl' else property
+        property = 'tke' if property == 'ken' else property
         
-        return self._obj
+        method_name = str(property)
+        method = getattr(self, method_name, lambda: "nothing")
+        
+        if len(self._obj.attrs['variables']) == 4: # only x,y,u,v
+            self._obj.attrs['variables'].append(property)
+        else:
+            self._obj.attrs['variables'][-1] = property
+            
+        return method()
 
     def __mul__(self,scalar):
         '''
@@ -152,11 +214,45 @@ class PIVAccessor(object):
 
     def set_dt(self,dt):
         self._obj.attrs['dt'] = dt
-
+        
+    def set_tUnits(self,tUnits):
+        self._obj.attrs['tUnits'] = tUnits
+        
+    def rotate(self,theta=0.0):
+        """ 
+        use this method in order to rotate the data 
+        by theta degrees in the clockwise direction
+        in the present form of using xarray with coordinates
+        it can only work for the cases with equal size along
+        x and y 
+        """
+        
+        theta = theta/360.0*2*np.pi
+        
+        xi = self._obj.x*np.cos(theta) + self._obj.y*np.sin(theta)
+        eta = self._obj.y*np.cos(theta) - self._obj.x*np.sin(theta)
+        Uxi = self._obj.u*np.cos(theta) + self._obj.v*np.sin(theta)
+        Ueta = self._obj.v*np.cos(theta) - self._obj.u*np.sin(theta)
+        
+        self._obj['x'] = xi
+        self._obj['y'] = eta
+        self._obj['u'] = Uxi
+        self._obj['v'] = Ueta
+        
+        
+        if 'theta' in self._obj:
+            self._obj['theta'] += theta
+        else:
+            self._obj['theta'] = theta
+            
+        return self._obj
+        
     @property
     def get_dt(self):
         """ receives the dt from the set """
         return self._obj.attrs['dt']
+    
+        
 
     # @property
     # def vel_units(self):
@@ -203,21 +299,7 @@ class Vec:
     def set_tUnits(self,tUnits = 's'):
         self.tUnits = tUnits # default is sec
             
-    def rotate(self,theta=0.0):
-        """ 
-        use this method in order to rotate the data 
-        by theta degrees in the clockwise direction
-        """
-        
-        theta = theta/360.0*2*pi
-        
-        xi = self.x*cos(theta) + self.y*sin(theta)
-        eta = self.y*cos(theta) - self.x*sin(theta)
-        Uxi = self.u*cos(theta) + self.v*sin(theta)
-        Ueta = self.v*cos(theta) - self.u*sin(theta)
-        self.x, self.y = xi, eta
-        self.u, self.v  = Uxi, Ueta
-        self.theta = self.theta + theta # this is not clear what theta defines 
+
         
     def scale(self,resolution):
         """

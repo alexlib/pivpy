@@ -16,7 +16,8 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
     """
     Generates a quiver plot of a 'data' xarray DataArray object (single frame from a dataset)
     Inputs:
-        data - xarray DataArray of the type defined in pivpy (u,v with coords x,y,t and the attributes)
+        data - xarray DataArray of the type defined in pivpy, one of the frames in the Dataset
+            selected by default using .isel(t=0)
         threshold - values above the threshold will be set equal to threshold
         arrScale - use to change arrow scales
         nthArr - use to plot only every nth arrow from the array 
@@ -31,9 +32,7 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
     
-    if 't' in data.dims:
-        print('Warning: quiver is for a single frame, plot first frame, supply data.isel(t=N)')
-        data = data.isel(t=0)
+    data = dataset_to_array(data)
         
     x = data.x
     y = data.y
@@ -102,11 +101,11 @@ def histogram(data, normed = False):
     units = data.attrs['units']
     f,ax = plt.subplots(2)
     
-    ax[0].hist(u,bins=np.int(np.sqrt(len(u))*0.5),normed=normed)
+    ax[0].hist(u,bins=np.int(np.sqrt(len(u))*0.5),density=normed)
     ax[0].set_xlabel('u ['+units[2]+']')
     
     ax[1] = plt.subplot2grid((2,1),(1,0))
-    ax[1].hist(v,bins=np.int(np.sqrt(len(v)*0.5)),normed=normed)
+    ax[1].hist(v,bins=np.int(np.sqrt(len(v)*0.5)),density=normed)
     ax[1].set_xlabel('v ['+units[2]+']')
     plt.tight_layout()
     return f, ax
@@ -117,7 +116,7 @@ def contour_plot(data, threshold = None, contourLevels = None,
     """ contourf ajusted for the xarray PIV dataset, creates a 
         contour map for the data['w'] property. 
         Input:
-            data : xarray PIV DataArray
+            data : xarray PIV DataArray, converted automatically using .isel(t=0)
             threshold : a threshold value, default is None (no data clipping)
             contourLevels : number of contour levels, default is None
             colbar : boolean (default is True) show/hide colorbar 
@@ -125,6 +124,9 @@ def contour_plot(data, threshold = None, contourLevels = None,
             aspectration : string, 'equal' is the default
         
     """
+
+    data = dataset_to_array(data)
+
     
     if units is not None:
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
@@ -207,7 +209,7 @@ def showscal(data, property='ken'):
     # ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
     
     
-    data = data.piv.data2scal(property)
+    data = data.piv.vec2scal(property=property)
     contour_plot(data)                
         
 
@@ -260,3 +262,10 @@ def animate(data, arrowscale=1, savepath=None):
     else: anim.save('im.mp4', writer=mywriter)  
     
     
+
+def dataset_to_array(data,N=0):
+    """ converts xarray Dataset to array """
+    if 't' in data.dims:
+        print('Warning: function for a single frame, using first frame, supply data.isel(t=N)')
+        data = data.isel(t=N)
+    return data

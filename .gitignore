@@ -6,3 +6,4 @@ build/*
 dist/*
 PIVPy.egg-info/*
 tests/PIVPy.egg-info/*
+.vscode/

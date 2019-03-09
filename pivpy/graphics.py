@@ -6,7 +6,9 @@ Various plots
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 import xarray as xr
+import os
 
 def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1, 
               contourLevels = None, colbar = True, logscale = False,
@@ -28,6 +30,11 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
     Usage:
         graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
+    
+    if 't' in data.dims:
+        print('Warning: quiver is for a single frame, plot first frame, supply data.isel(t=N)')
+        data = data.isel(t=0)
+        
     x = data.x
     y = data.y
     u = data.u
@@ -54,13 +61,14 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         ax = plt.gca()     
     
     if contourLevels is None:
-        levels = np.linspace(0, np.max(S), 30) # default contour levels up to max of S
+        levels = np.linspace(0, np.max(S.flatten()), 30) # default contour levels up to max of S
     else:
         levels = np.linspace(0, contourLevels, 30)
+                
     if logscale:
         c = ax.contourf(x,y,S,alpha=0.8,
                  cmap = plt.get_cmap("Blues"), 
-                 levels = levels, norm = colors.LogNorm())
+                 levels = levels, norm = plt.colors.LogNorm())
     else:
         c = ax.contourf(x,y,S,alpha=0.8,
                  cmap = plt.get_cmap("Blues"), 
@@ -76,6 +84,32 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
     ax.set_ylabel('y (' + lUnits + ')')
     ax.set_aspect(aspectratio)       
     return fig,ax
+
+def histogram(data, normed = False):
+    """
+    this function will plot a normalized histogram of
+    the velocity data.
+    Input:
+        data : xarray DataSet with ['u','v'] attrs['units']
+        normed : (optional) default is False to present normalized
+        histogram
+        
+    """
+    
+    u = np.asarray(data.u).flatten()
+    v = np.asarray(data.v).flatten()
+    
+    units = data.attrs['units']
+    f,ax = plt.subplots(2)
+    
+    ax[0].hist(u,bins=np.int(np.sqrt(len(u))*0.5),normed=normed)
+    ax[0].set_xlabel('u ['+units[2]+']')
+    
+    ax[1] = plt.subplot2grid((2,1),(1,0))
+    ax[1].hist(v,bins=np.int(np.sqrt(len(v)*0.5)),normed=normed)
+    ax[1].set_xlabel('v ['+units[2]+']')
+    plt.tight_layout()
+    return f, ax
 
 
 def contour_plot(data, threshold = None, contourLevels = None, 
@@ -94,12 +128,13 @@ def contour_plot(data, threshold = None, contourLevels = None,
     
     if units is not None:
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
-        velUnits = units[2]
-        tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
+        # velUnits = units[2]
+        # tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
     else:
-        lUnits, velUnits, tUnits = '', '', ''
+        # lUnits, velUnits = '', ''
+        lUnits = ''
         
-    f,ax = subplots()    
+    f,ax = plt.subplots()    
     
     if threshold is not None:
         data['w'] = xr.where(data['w']>threshold, threshold, data['w'])
@@ -112,15 +147,15 @@ def contour_plot(data, threshold = None, contourLevels = None,
         
     if logscale:
         c = ax.contourf(data.x,data.y,np.abs(data['w']), levels=levels,
-                 cmap = get_cmap('RdYlBu'), norm=colors.LogNorm())
+                 cmap = plt.get_cmap('RdYlBu'), norm=plt.colors.LogNorm())
     else:
         c = ax.contourf(data.x,data.y,data['w'], levels=levels,
-                 cmap = get_cmap('RdYlBu'))
+                 cmap = plt.get_cmap('RdYlBu'))
         
     plt.xlabel('x [' + lUnits + ']')
     plt.ylabel('y [' + lUnits + ']')
     if colbar:
-        cbar = colorbar(c)
+        cbar = plt.colorbar(c)
         cbar.set_label(r'$\omega$ [s$^{-1}$]')
     ax.set_aspect(aspectration)
     return f,ax
@@ -173,7 +208,7 @@ def showscal(data, property='ken'):
     
     
     data = data.piv.data2scal(property)
-    graphics.contour_plot(data)                
+    contour_plot(data)                
         
 
 def animate(data, arrowscale=1, savepath=None):
@@ -187,17 +222,17 @@ def animate(data, arrowscale=1, savepath=None):
         if savepath is None, then only an image display of the animation
         if savepath is an existing path, a file named im.mp4 is saved
     
-    """
+    """    
     X, Y = data.x, data.y
     U, V = data.u[:,:,0], data.v[:,:,0] # first frame
-    fig, ax = subplots(1,1)
+    fig, ax = plt.subplots(1,1)
     M = np.sqrt(U**2 + V**2)
     
     Q = ax.quiver(X[::3,::3], Y[::3,::3], 
                   U[::3,::3], V[::3,::3], M[::3,::3],
                  units='inches', scale=arrowscale)
     
-    cb = colorbar(Q)
+    cb = plt.colorbar(Q)
     
     units = data.attrs['units']
     
@@ -214,14 +249,14 @@ def animate(data, arrowscale=1, savepath=None):
         text.set_text(str(num+1)+'/'+str(len(data.t)))
         return Q
 
-    anim = animation.FuncAnimation(fig, update_quiver, fargs=(Q,data,text),
+    anim = FuncAnimation(fig, update_quiver, fargs=(Q,data,text),
                                frames = len(data.t), blit=False)
-    mywriter = animation.FFMpegWriter()
+    mywriter = FFMpegWriter()
     if savepath:
-        p = getcwd()
-        chdir(savepath)
+        p = os.getcwd()
+        os.chdir(savepath)
         anim.save('im.mp4', writer=mywriter)
-        chdir(p)
+        os.chdir(p)
     else: anim.save('im.mp4', writer=mywriter)  
     
     

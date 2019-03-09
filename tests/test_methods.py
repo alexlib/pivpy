@@ -85,3 +85,5 @@ def test_vec2scal():
     assert len(data.attrs['variables']) == 5
     assert data.attrs['variables'][-1] == 'tke'
     
+    _a.piv.vec2scal(property='curl')
+    

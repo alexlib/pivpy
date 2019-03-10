@@ -1,0 +1,20 @@
+!!python/object:__main__.jobfile
+frame_name: B00052
+frames: /Users/User/Documents/University/Masters/Turb_Lab/wind tunnel data/Run10/B00052.im7
+images_path: /Users/User/Documents/University/Masters/Turb_Lab/wind tunnel data/Run10/
+images_type: im7
+pair_or_set: set
+piv_paramters:
+  corr_type: fft
+  dt: 1
+  overlap_per: 50
+  postprocess: [filter_objects, max_mag_outlier]
+  postprocess_parameters:
+    max_mag_outlier: !!python/tuple [20.0, 10.0]
+  preprocess: [wind_tunnel_mask]
+  preprocess_parameters:
+    wind_tunnel_mask:
+      percentile_a: !!python/tuple [30.0, 99.8]
+      percentile_b: !!python/tuple [30.0, 99.8]
+  search_area_size: [128, 128]
+  window_size: [64, 64]

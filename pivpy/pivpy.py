@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Sun May 24 22:02:49 2015
 
@@ -273,7 +272,7 @@ class PIVAccessor(object):
         """ receives the dt from the set """
         return self._obj.attrs['dt']
 
-    def spatial_filter(self, filter = 'median',size=(4,4),sigma=1):
+    def spatial_filter(self, filter = 'median',size=(4,4),sigma=(1,1),mode='reflect'):
         """
         this method passes the velocity vectors U and V
         through a either a 4 x 4 median filter or a gaussian
@@ -282,41 +281,46 @@ class PIVAccessor(object):
             filter : string, 'median' (default), 'gaussian'
             size  : (4,4) default, tuple of integers for 'median'
             sigma : float, for 'gaussian'
-        """
-        if filter == 'median':
-            self._obj['u'] = median_filter(self._obj['u'],size=size)
-            self._obj['v'] = median_filter(self._obj['v'],size=size)
-        elif filter == 'gaussian':
-            self._obj['u'] = gaussian_filter(self._obj['u'],sigma=sigma)
-            self._obj['v'] = gaussian_filter(self._obj['u'],sigma=sigma)
+            mode : 'reflect' - see gaussian_filter for more info
+        """    
+        if filter is 'median':
+            filt = lambda x: median_filter(x, size=size)
+        elif filter is 'gaussian':
+            filt = lambda x: gaussian_filter(x,sigma=sigma,mode=mode)
         else:
             raise ValueError('Wrong filter type: "median" or "gaussian"')
+            
+        for t in self._obj['t']:
+            tmp = self._obj.sel(t=t)
+            tmp['u'] = xr.DataArray(filt(tmp['u']),dims=['x','y'])
+            tmp['v'] = xr.DataArray(filt(tmp['v']),dims=['x','y'])
+            
         return self._obj
     
     def gaussian_smooth(self, scale=5, mask=False, mode='reflect'):
-    """Apply gaussian kernel to convolution. Uses Scipy
-       gaussian_filter method.
-       Parameters:
-       mode (str): {‘reflect’, ‘constant’, ‘nearest’, ‘mirror’, ‘wrap’}
-                   What to do at edges of matrix input. See Scipy docs
-                   for details on what these do.
-    """
-    data = self._obj
-    dims = _get_dims(data)
+        """Apply gaussian kernel to convolution. Uses Scipy
+           gaussian_filter method.
+           Parameters:
+           mode (str): {‘reflect’, ‘constant’, ‘nearest’, ‘mirror’, ‘wrap’}
+                       What to do at edges of matrix input. See Scipy docs
+                       for details on what these do.
+        """
+        data = self._obj
+        dims = _get_dims(data)
 
-    sc_gaussian_nd = lambda data: gaussian_filter(data, scale, mode=mode)
+        sc_gaussian_nd = lambda data: gaussian_filter(data, scale, mode=mode)
 
-    if mask:
-        data_masked = data.where(data[mask_vars[dims]])
-    else:
-        data_masked = data.fillna(0.)
+        if mask:
+            data_masked = data.where(data[mask_vars[dims]])
+        else:
+            data_masked = data.fillna(0.)
 
-    return xr.apply_ufunc(sc_gaussian_nd, data_masked,
-                          vectorize=True,
-                          dask='parallelized',
-                          input_core_dims = [dims],
-                          output_core_dims = [dims],
-                          output_dtypes=[data.dtype])
+        return xr.apply_ufunc(sc_gaussian_nd, data_masked,
+                              vectorize=True,
+                              dask='parallelized',
+                              input_core_dims = [dims],
+                              output_core_dims = [dims],
+                              output_dtypes=[data.dtype])
 
         
 

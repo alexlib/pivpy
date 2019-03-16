@@ -96,4 +96,22 @@ def test_vec2scal():
     assert data.attrs['variables'][-1] == 'tke'
     
     _a.piv.vec2scal(property='curl')
+
+def test_gaussian_smooth():
+    """ tests spatial filter """
+    
+    data = io.create_sample_field()
+    data.piv.gaussian_smooth()
+    assert data['u'][2,2,2] == 0.0 # shall fail first 
+    
+def test_spatial_filter():
+    """ tests spatial filter """
+    
+    data = io.create_sample_field()
+    data.piv.spatial_filter()
+    data.piv.spatial_filter(filter='median')
+    data.piv.spatial_filter(filter='median',size=5)
+    data.piv.spatial_filter(filter='gaussian',sigma=2)
+    _a.piv.spatial_filter(filter='gaussian')
+    assert _a['u'][2,2,2] == 0.0 # shall fail first 
     

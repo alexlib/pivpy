@@ -2,12 +2,11 @@
 """
 Created on Sun May 24 22:02:49 2015
 
-@author: Ron, Alex
+@author: Ron, Tomer, Alex
 """
 import numpy as np
 from scipy.stats import norm
-from scipy.ndimage.filters import gaussian_filter
-from scipy.ndimage.filters import median_filter
+from scipy.ndimage.filters import gaussian_filter, median_filter
 import xarray as xr
 
 """ learn from this example 
@@ -273,7 +272,52 @@ class PIVAccessor(object):
     def get_dt(self):
         """ receives the dt from the set """
         return self._obj.attrs['dt']
+
+    def spatial_filter(self, filter = 'median',size=(4,4),sigma=1):
+        """
+        this method passes the velocity vectors U and V
+        through a either a 4 x 4 median filter or a gaussian
+        filter with sigma = 1
+        Inputs: 
+            filter : string, 'median' (default), 'gaussian'
+            size  : (4,4) default, tuple of integers for 'median'
+            sigma : float, for 'gaussian'
+        """
+        if filter == 'median':
+            self._obj['u'] = median_filter(self._obj['u'],size=size)
+            self._obj['v'] = median_filter(self._obj['v'],size=size)
+        elif filter == 'gaussian':
+            self._obj['u'] = gaussian_filter(self._obj['u'],sigma=sigma)
+            self._obj['v'] = gaussian_filter(self._obj['u'],sigma=sigma)
+        else:
+            raise ValueError('Wrong filter type: "median" or "gaussian"')
+        return self._obj
     
+    def gaussian_smooth(self, scale=5, mask=False, mode='reflect'):
+    """Apply gaussian kernel to convolution. Uses Scipy
+       gaussian_filter method.
+       Parameters:
+       mode (str): {‘reflect’, ‘constant’, ‘nearest’, ‘mirror’, ‘wrap’}
+                   What to do at edges of matrix input. See Scipy docs
+                   for details on what these do.
+    """
+    data = self._obj
+    dims = _get_dims(data)
+
+    sc_gaussian_nd = lambda data: gaussian_filter(data, scale, mode=mode)
+
+    if mask:
+        data_masked = data.where(data[mask_vars[dims]])
+    else:
+        data_masked = data.fillna(0.)
+
+    return xr.apply_ufunc(sc_gaussian_nd, data_masked,
+                          vectorize=True,
+                          dask='parallelized',
+                          input_core_dims = [dims],
+                          output_core_dims = [dims],
+                          output_dtypes=[data.dtype])
+
         
 
     # @property
@@ -411,24 +455,4 @@ class Vec:
         else:
             raise ValueError('Wrong filter. Choose Either "med" or "gauss"')
         
-        
-class vecList(list):
-    def __init__(self):
-        """ creates a list of vector maps"""
     
-    
-    def average(self):
-        """ ensemble average, returns a vector map """
-        if not self:
-            raise("empty list")
-        
-        av = self[0]
-
-        for d in self[1:]:
-            av.u += d.u
-            av.v += d.v
-    
-        av.u /= len(self)
-        av.v /= len(self)
-
-        return av

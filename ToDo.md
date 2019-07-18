@@ -4,3 +4,4 @@
 2. animation of quiver, contour, pcolor
 3. transfer pivmat showvec, showscal, filterf, averf, etc. 
 4. add https://github.com/tomerast/Vecpy
+5. add VC7 reader from Lior

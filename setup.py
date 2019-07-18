@@ -10,9 +10,9 @@ def read(fname):
 
 setup(
     name = "PIVPy",
-    version = "0.0.002",
-    author = "Ron Shnapp, Tomer Ast, Alex Liberzon",
-    author_email = "ronshnapp@gmail.com",
+    version = "0.0.02",
+    author = "Turbulence Structure Laboratory",
+    author_email = "alex.liberzon@gmail.com",
     description = ("Post processing of PIV vector files "
                                    " eventually going into OpenPIV "),
     license = "BSD",

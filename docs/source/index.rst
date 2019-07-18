@@ -1,19 +1,14 @@
-.. PIVPy documentation master file, created by
-   sphinx-quickstart on Fri Jan  3 23:17:24 2014.
+.. pivpy documentation master file, created by
+   sphinx-quickstart on Thu Jul 18 21:51:19 2019.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to PIVPy's documentation!
+Welcome to pivpy's documentation!
 =================================
-
-Contents:
 
 .. toctree::
    :maxdepth: 2
-   
-   includeme
-   intro
-   tutorial
+   :caption: Contents:
 
 
 
@@ -23,4 +18,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-

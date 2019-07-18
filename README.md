@@ -11,8 +11,13 @@ Merging the three packages:
 
 ### How do I get set up? ###
 
-to start working just download the code and run the init.py script file.
-this script imports all the other code needed for running the program properly. also, given a proper path destination and a file name of an example .vec file, this script will generate example plots.    
+Use `pip`:  
+
+    pip install git+https://github.com/alexlib/pivpy
+    
+### How to get started? 
+
+Look into the [getting started Jupyter notebook](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.ipynb)
 
 
 ### How to test? ### 

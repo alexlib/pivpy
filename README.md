@@ -28,7 +28,7 @@ From a command line just use:
     
 ### Documentation on Github:
 
-[PIVPy](http://alexlib.github.io/pivpy)
+[PIVPy on ReadTheDocs](http://pivpy.readthedocs.io)
 
 ### How to help? ###
 

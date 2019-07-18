@@ -1,4 +1,4 @@
-# pivpy
+# PIVPy
 Python based post-processing PIV data analysis, similar to PIVMAT and VecPy
 
 Merging the three packages: 
@@ -26,6 +26,9 @@ From a command line just use:
 
     nosetests
     
+### Documentation on Github:
+
+    [PIVPy](http://alexlib.github.io/pivpy)
 
 ### How to help? ###
 

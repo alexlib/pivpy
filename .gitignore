@@ -8,6 +8,5 @@ PIVPy.egg-info/*
 tests/PIVPy.egg-info/*
 .vscode/
 docs/build/*
-docs/build/doctrees/environment.pickle
-docs/build/doctrees/index.doctree
-docs/build/html/.buildinfo
+docs/build/doctrees/*
+docs/build/html/*

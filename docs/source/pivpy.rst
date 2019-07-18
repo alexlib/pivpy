@@ -20,14 +20,6 @@ pivpy.io module
    :undoc-members:
    :show-inheritance:
 
-pivpy.pivpy module
-------------------
-
-.. automodule:: pivpy.pivpy
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 
 Module contents
 ---------------

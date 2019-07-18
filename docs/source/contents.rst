@@ -1,17 +1,32 @@
-=========================
-PIVPy introduction
-=========================
+PIVPy
+=====
 
-------------
-History and motivation
-------------
+    PIVPy documentation master file, created by
+   sphinx-quickstart on Thu Jul 18 21:51:19 2019.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+Welcome to pivpy's documentation!
+=================================
 
 
-Federic Moisy created wonderful package, called PIVMAT http://www.fast.u-psud.fr/pivmat/ which 
-is simpler than our GUI-based post-processing package, http://www.openpiv.net/openpiv-spatial-analysis-toolbox/
+.. automodule:: pivpy
+    :members:
 
-BUT, it's in Matlab which we decided to abandon and move all our activity to Python. So we also try to 
-translate the PIVMAT into PIVPy. Of course, it won't be one-to-one translation because Python 
-is by far richer language and provides us with some basic programming things that Matlab cannot. We 
-hope that our effort will be useful. 
+.. toctree::
+   :maxdepth: 2
+   :caption:
+   
+   intro
+   tutorial
+   pivpy
+
+
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
 

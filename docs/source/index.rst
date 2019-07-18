@@ -14,7 +14,6 @@ Contents:
    includeme
    intro
    tutorial
-   Geting_Started
 
 
 

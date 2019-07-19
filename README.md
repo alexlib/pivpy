@@ -1,3 +1,6 @@
+[![Documentation Status](https://readthedocs.org/projects/pivpy/badge/?version=latest)](https://pivpy.readthedocs.io/en/latest/?badge=latest)
+
+
 # PIVPy
 Python based post-processing PIV data analysis, similar to PIVMAT and VecPy
 

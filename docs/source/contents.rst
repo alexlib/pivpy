@@ -1,16 +1,14 @@
 PIVPy
 =====
 
-.. automodule:: pivpy
-    :members:
 
 .. toctree::
    :maxdepth: 2
-   :caption:
    
    intro
    tutorial
-   pivpy
+   api_reference
+
 
 
 

@@ -8,6 +8,7 @@ import numpy as np
 import xarray as xr
 from glob import glob
 import os, re
+import ReadIM
 
 
 
@@ -226,3 +227,91 @@ def get_units(filename):
     tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
     
     return lUnits, velUnits, tUnits
+
+def ReadDavis(path, frame=1):
+    """
+    input path for files format from davis tested for im7&vc7
+    out put [X Y U V mask]
+    valid only for 2d piv cases
+    RETURN:   
+     in case of images (image type=0):
+              X = scaled x-coordinates
+              Y = scaled y-coordinates      
+              U = scaled image intensities
+              v=0
+              MASK=0
+            in case of 2D vector fields (A.IType = 1,2 or 3):
+              X = scaled x-coordinates
+               Y = scaled y-coordinates
+               U = scaled vx-components of vectors
+               V = scaled vy-components of vectors
+
+    """
+    #you need to add clear to prevent data leaks
+    buff, vatts   =  ReadIM.extra.get_Buffer_andAttributeList(path)
+    v_array, buff1 = ReadIM.extra.buffer_as_array(buff)
+    nx=buff.nx
+    nz=buff.nz
+    ny=buff.ny
+    #set data range:
+    baseRangeX = np.arange(nx)
+    baseRangeY = np.arange(ny)
+    baseRangeZ = np.arange(nz)
+    lhs1 =(baseRangeX+0.5)*buff.vectorGrid*buff.scaleX.factor+buff.scaleX.offset  # x-range
+    lhs2 =(baseRangeY+0.5)*buff.vectorGrid*buff.scaleY.factor+buff.scaleY.offset #y-range
+    lhs3 =0
+    lhs4 =0
+    mask =0
+    if buff.image_sub_type<=0: #grayvalue image format
+        lhs3 =v_array[frame-1,:,:]
+        # Display image
+#        plt.figure()
+#        plt.imshow(lhs3,extent=[lhs1[0],lhs1[-1],lhs2[-1],lhs2[0]],cmap='gray',vmin=0,vmax=1080)
+#        plt.colorbar()
+    elif buff.image_sub_type==2:# simple 2D vector format: (vx,vy)
+    	# Calculate vector position and components
+        [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
+    #    lhs1=np.transpose(lhs1)
+    #    lhs2=np.transpose(lhs2)
+        lhs3 = v_array[0,:,:]*buff.scaleI.factor+buff.scaleI.offset
+        lhs4 = v_array[1,:,:]*buff.scaleI.factor+buff.scaleI.offset
+        if buff.scaleY.factor<0.0:
+            lhs4 = -lhs4
+#    	plt.quiver(lhs1,lhs2,lhs3,lhs4);
+    elif buff.image_sub_type==3 or buff.image_sub_type==1:
+       #normal 2D vector format + peak: sel+4*(vx,vy) (+peak)
+    	#Calculate vector position and components
+        [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
+        #    lhs1=np.transpose(lhs1)
+        #    lhs2=np.transpose(lhs2)
+        lhs3 = lhs1*0;
+        lhs4 = lhs2*0;
+        # Get choice
+        maskData = v_array[0,:,:]
+        	# Build best vectors from choice field
+        for i in range(5):
+            mask =  maskData ==(i+1) 
+            if (i<4): # get best vectors
+                dat = v_array[2*i+1,:,:]
+                lhs3[mask] = dat[mask]
+                dat = v_array[2*i+2,:,:]
+                lhs4[mask] = dat[mask]		
+            else:    # get interpolated vectors
+                dat =v_array[7,:,:] 
+                lhs3[mask] = dat[mask]
+                dat =v_array[8,:,:] 
+                lhs4[mask] = dat[mask]
+        lhs3 = lhs3*buff.scaleI.factor+buff.scaleI.offset
+        lhs4 = lhs4*buff.scaleI.factor+buff.scaleI.offset
+        #Display vector field
+        if buff.scaleY.factor<0.0:
+            lhs4 = -1*lhs4
+        mask =  maskData ==0
+    #clean memory
+    ReadIM.DestroyBuffer(buff1)
+    del(buff1)
+    ReadIM.DestroyBuffer(buff)
+    del(buff)
+    ReadIM.DestroyAttributeListSafe(vatts)
+    del(vatts)
+    return [lhs1,lhs2,lhs3,lhs4,mask]

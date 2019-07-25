@@ -10,7 +10,7 @@ import os, re
 import ReadIM
 
 
-def ReadDavis(path, frame=1,time=0):
+def ReadDavis(path,time=0):
     """
     input path for files format from davis tested for im7&vc7
     out put [X Y U V mask]
@@ -45,7 +45,10 @@ def ReadDavis(path, frame=1,time=0):
     lhs4 =0
     mask =0
     if buff.image_sub_type<=0: #grayvalue image format
-        lhs3 =v_array[frame-1,:,:]
+        lhs3 =v_array[0,:,:]
+        lhs4=v_array[1,:,:]
+        Im = xr.DataArray(v_array,dims=('frame','z','x'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'frame':[0,1]})
+        data = xr.Dataset({'Im':Im})
         
     elif buff.image_sub_type==2:# simple 2D vector format: (vx,vy)
     	# Calculate vector position and components
@@ -56,6 +59,11 @@ def ReadDavis(path, frame=1,time=0):
         lhs4 = v_array[1,:,:]*buff.scaleI.factor+buff.scaleI.offset
         if buff.scaleY.factor<0.0:
             lhs4 = -lhs4
+        lhs3=lhs3[:,:,np.newaxis]
+        lhs4=lhs4[:,:,np.newaxis]
+        u = xr.DataArray(lhs3,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
+        v = xr.DataArray(lhs4,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
+        data = xr.Dataset({'u': u, 'v': v})
 #    	plt.quiver(lhs1,lhs2,lhs3,lhs4);
     elif buff.image_sub_type==3 or buff.image_sub_type==1:
        #normal 2D vector format + peak: sel+4*(vx,vy) (+peak)
@@ -88,9 +96,12 @@ def ReadDavis(path, frame=1,time=0):
         mask =  maskData ==0
         lhs3=lhs3[:,:,np.newaxis]
         lhs4=lhs4[:,:,np.newaxis]
-        u = xr.DataArray(lhs3,dims=('y','x','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
-        v = xr.DataArray(lhs4,dims=('y','x','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
-    units=[buff.scaleX.unit,buff.scaleX.unit,buff.scaleI.unit,buff.scaleI.unit]
+        maskData=maskData[:,:,np.newaxis]
+        u = xr.DataArray(lhs3,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
+        v = xr.DataArray(lhs4,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
+        chc = xr.DataArray(maskData,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
+        data = xr.Dataset({'u': u, 'v': v,'chc':chc})
+    data.attrs['Info'] =ReadIM.extra.att2dict(vatts)
     #clean memory
     ReadIM.DestroyBuffer(buff1)
     del(buff1)
@@ -98,15 +109,47 @@ def ReadDavis(path, frame=1,time=0):
     del(buff)
     ReadIM.DestroyAttributeListSafe(vatts)
     del(vatts)
-    return [lhs1,lhs2,lhs3,lhs4,mask]
+    return data
+
+def load_directory(path,basename=''):
+    """ 
+    load_directory (path)
+
+    Loads all the .VEC files in the directory into a single
+    xarray dataset with variables and units added as attributes
+
+    Input: 
+        directory : path to the directory with .vec files
+
+    Output:
+        data : xarray DataSet with dimensions: x,y,t and 
+               data arrays of u,v,
+               attributes of variables and units
+
+
+    See more: loadvec
+    """
+    files=[f for f in os.listdir(path) if f.endswith('.vc7')]
+    variables, units, rows, cols, dt, frame = parse_header(files[0])
+    
+    data = []
+    for i,f in enumerate(files):
+        data.append(loadvec(f,rows,cols,variables,units,dt,frame+i-1))
+           
+    combined = xr.concat(data, dim='t')
+    combined.attrs['variables'] = variables
+    combined.attrs['units'] = units
+    combined.attrs['dt'] = dt
+    combined.attrs['files'] = files
+    return combined
 
 path='C:\\Users\\lior\\Documents\\ibrrTau\\timeDependedVecMaps'
 files=[f for f in os.listdir(path) if f.endswith('.vc7')]
-[x,y,u,v,mask]=ReadDavis(path+'\\'+files[-1])
-x =x.flatten()
-y =y.ravel()
-u =u.ravel()
-v =v.ravel()
-plt.quiver(x,y,u,v)
-plt.imshow(u)
-    u = xr.DataArray(u,dims=('y','x'),coords={'x':x[0,:],'y':y[:,0]})
+data=ReadDavis(path+'\\'+files[-1])
+#x =x.flatten()
+#y =y.ravel()
+#u =u.ravel()
+#v =v.ravel()
+#plt.quiver(x,y,u,v)
+#plt.imshow(u)
+#    u = xr.DataArray(u,dims=('y','x'),coords={'x':x[0,:],'y':y[:,0]})

@@ -60,20 +60,17 @@ def test_loadopenpivtxt():
     
 
 def test_load_directory():
-    data = io.load_directory(path,basename='Run')
+    data = io.load_directory(path,basename='Run*',ext='.vec')
     assert np.allclose(data['t'],[0,1,2,3,4])
 
 
 def test_create_sample_field():
     data = io.create_sample_field(frame=3)
     assert data['t'] == 3
-
-def test_create_sample_field_rows_cols(rows=3,cols=7,frame=3):
-    data = io.create_sample_field(frame=3)
-    assert(data.x.shape[0] == rows)
-    assert(data.y.shape[0] == cols)
-    
-    assert data['t'] == 3
+    data = io.create_sample_field(rows=3,cols=7)
+    assert(data.x.shape[0] == 7)
+    assert(data.y.shape[0] == 3)
+    assert data['t'] == 0
 
 def test_create_sample_dataset(n=3):
     data = io.create_sample_dataset(n=n)

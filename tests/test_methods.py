@@ -14,11 +14,11 @@ _b = io.loadvec(os.path.join(path,f2))
 
 def test_crop():
     """ tests crop """
-    _c = _a.piv.crop([.6, 19.,-.6,-19.])
-    assert _c.u.shape == (59,59,1)
+    _c = _a.piv.crop([5, 15,-5,-15])
+    assert _c.u.shape == (32,32,1)
     
     _c = io.create_sample_dataset()
-    _c = _c.sel(x = slice(30,90),y=slice(60,80))
+    _c = _c.sel(x = slice(35,70),y=slice(30,90))
     assert _c.u.shape == (2,2,5) # note the last dimension is preserved
 
 def test_pan():
@@ -31,7 +31,7 @@ def test_pan():
 
 def test_mean():
     data = io.create_sample_dataset(10)
-    assert data.piv.average.u.median() == 4.0
+    assert np.allclose(data.piv.average.u.median(), 4.5)
 
 def test_vec2scal():
     data = io.create_sample_dataset()

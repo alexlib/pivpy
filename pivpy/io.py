@@ -144,9 +144,9 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
     
     return data
 
-def load_directory(path,basename=None,ext='.vec'):
+def load_directory(path,basename='*',ext='.vec'):
     """ 
-    load_directory (path,basename=None, ext='.vec')
+    load_directory (path,basename=None, ext='*.vec')
 
     Loads all the files with the chosen sextension in the directory into a single
     xarray dataset with variables and units added as attributes
@@ -362,3 +362,5 @@ def load_vc7(filename, frame=0):
     # data.attrs['units'] = 'units'  
     # data.attrs['dt'] = 'dt'
     data.attrs['files'] = filename
+    
+    return data

@@ -1,5 +1,5 @@
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
@@ -18,7 +18,9 @@ setup(
     license = "BSD",
     keywords = "example documentation tutorial",
     url = "http://packages.python.org/pivpy",
-    packages=['pivpy', 'tests'],
+    packages=find_packages(),
+    test_suite="tests", 
+    # packages=['pivpy', 'tests'],
     long_description=read('README.md'),
     classifiers=[
         "Development Status :: 3 - Alpha",

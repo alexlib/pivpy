@@ -208,7 +208,7 @@ def parse_header(filename):
     # if the file does not have a header, can be from OpenPIV or elsewhere
     # return None 
     if header[:5] != 'TITLE':
-        return (None,None,None,None,None,frame)
+        return (['x','y','u','v'],None,None,None,None,frame)
 
     header_list = header.replace(',',' ').replace('=',' ').replace('"',' ').split()
     

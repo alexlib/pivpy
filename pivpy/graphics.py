@@ -148,10 +148,10 @@ def contour_plot(data, threshold = None, contourLevels = None,
         levels = np.linspace(-contourLevels, contourLevels, 30)
         
     if logscale:
-        c = ax.contourf(data.x,data.y,np.abs(data['w']), levels=levels,
+        c = ax.contourf(data.x,data.y,np.abs(data['w'].T), levels=levels,
                  cmap = plt.get_cmap('RdYlBu'), norm=plt.colors.LogNorm())
     else:
-        c = ax.contourf(data.x,data.y,data['w'], levels=levels,
+        c = ax.contourf(data.x,data.y,data['w'].T, levels=levels,
                  cmap = plt.get_cmap('RdYlBu'))
         
     plt.xlabel('x [' + lUnits + ']')

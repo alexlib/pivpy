@@ -133,7 +133,8 @@ class PIVAccessor(object):
     
     
     def vorticity(self):
-        """ calculates vorticity of the data array (at one time instance) 
+        """ calculates vorticity of the data array (at one time instance) and 
+        adds it to the attributes
         
         Input: 
             xarray with the variables u,v and dimensions x,y
@@ -208,7 +209,7 @@ class PIVAccessor(object):
         method_name = str(property)
         method = getattr(self, method_name, lambda: "nothing")
         
-        if len(self._obj.attrs['variables']) == 4: # only x,y,u,v
+        if len(self._obj.attrs['variables']) <= 4: # only x,y,u,v
             self._obj.attrs['variables'].append(property)
         else:
             self._obj.attrs['variables'][-1] = property

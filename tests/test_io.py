@@ -50,6 +50,13 @@ def test_loadvec():
     assert np.allclose(data.coords['x'][0],0.31248)
     assert 't' in data.dims
 
+def test_load_davis():
+    data = io.ReadDavis(os.path.join(path,'2D.VC7'))
+    assert data['u'].shape == (63,63,1)
+    assert data['u'][0,0,0] == 0.0
+    assert np.allclose(data.coords['x'][0],0.31248)
+    assert 't' in data.dims
+
 def test_loadopenpivtxt():
     data = io.loadvec(os.path.join(path,'exp1_001_b.txt'))
     
@@ -61,6 +68,13 @@ def test_load_directory():
 
 def test_create_sample_field():
     data = io.create_sample_field(frame=3)
+    assert data['t'] == 3
+
+def test_create_sample_field_rows_cols(rows=3,cols=7,frame=3):
+    data = io.create_sample_field(frame=3)
+    assert(data.x.shape[0] == rows)
+    assert(data.y.shape[0] == cols)
+    
     assert data['t'] == 3
 
 def test_create_sample_dataset(n=3):

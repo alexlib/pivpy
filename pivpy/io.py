@@ -13,16 +13,16 @@ import ReadIM
 
 
 
-def create_sample_field(frame = 0):
+def create_sample_field(rows=5,cols=8,frame = 0):
     """ creates a sample dataset for the tests """
 
-    x  = np.arange(32.,128.,32.)
-    y = np.arange(16.,128.,16.)
+    x  = np.linspace(32.,128.,cols)
+    y = np.linspace(16.,128.,rows)
 
     xm,ym = np.meshgrid(x,y)
 
-    u = np.ones_like(xm.T) + np.arange(0.0,7.0)
-    v = np.zeros_like(ym.T)+np.random.rand(3,1)-.5
+    u = np.ones_like(xm.T) + np.linspace(0.0,7.0,rows)
+    v = np.zeros_like(ym.T) + np.random.rand(cols,1)-.5
 
     u = u[:,:,np.newaxis]
     v = v[:,:,np.newaxis]
@@ -63,6 +63,35 @@ def create_sample_dataset(n = 5):
     combined.attrs['files'] = ''
 
     return combined
+
+def from_arrays(x,y,u,v,mask,frame=0):
+    """
+        from_arrays(x,y,u,v,mask,frame=0)
+        creates an xArray Dataset from 5 numpy arrays of x,y,u,v and mask, default frame number is 0
+        Output:
+            data is a xAarray Dataset, see xarray for help 
+    """
+    rows,cols = x.shape
+    u = xr.DataArray(u[:,:,np.newaxis],dims=('x','y','t'),coords={'x':x[0,:].T,'y':y[:,0].T,'t':[frame]})
+    v = xr.DataArray(v[:,:,np.newaxis],dims=('x','y','t'),coords={'x':x[0,:].T,'y':y[:,0].T,'t':[frame]})
+    
+    # extend dimensions
+    u = u[:,:,np.newaxis]
+    v = v[:,:,np.newaxis]
+    chc = chc[:,:,np.newaxis]
+
+    u = xr.DataArray(u,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    v = xr.DataArray(v,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    
+    data = xr.Dataset({'u': u, 'v': v,'chc':chc})
+
+    data.attrs['variables'] = variables
+    data.attrs['units'] = units  
+    data.attrs['dt'] = dt
+    data.attrs['files'] = filename
+    
+    return data
         
 
 def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None, frame=0):
@@ -115,11 +144,11 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
     
     return data
 
-def load_directory(path,basename=''):
+def load_directory(path,basename=None,ext='.vec'):
     """ 
-    load_directory (path)
+    load_directory (path,basename=None, ext='.vec')
 
-    Loads all the .VEC files in the directory into a single
+    Loads all the files with the chosen sextension in the directory into a single
     xarray dataset with variables and units added as attributes
 
     Input: 
@@ -133,7 +162,7 @@ def load_directory(path,basename=''):
 
     See more: loadvec
     """
-    files  = sorted(glob(os.path.join(path,basename+'*.vec')))
+    files  = sorted(glob(os.path.join(path,basename+ext)))
     variables, units, rows, cols, dt, frame = parse_header(files[0])
     
     data = []

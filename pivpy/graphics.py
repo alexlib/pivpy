@@ -36,8 +36,8 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         
     x = data.x
     y = data.y
-    u = data.u
-    v = data.v
+    u = data.u.T
+    v = data.v.T
     
     if units is not None:
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']

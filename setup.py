@@ -9,8 +9,8 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-    name = "PIVPy",
-    version = "0.0.02",
+    name = "pivpy",
+    version = "0.0.02a",
     author = "Turbulence Structure Laboratory",
     author_email = "alex.liberzon@gmail.com",
     description = ("Post processing of PIV vector files "

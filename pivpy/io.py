@@ -64,32 +64,24 @@ def create_sample_dataset(n = 5):
 
     return combined
 
-def from_arrays(x,y,u,v,mask,frame=0):
+def from_arrays(x,y,u,v,mask):
     """
         from_arrays(x,y,u,v,mask,frame=0)
-        creates an xArray Dataset from 5 numpy arrays of x,y,u,v and mask, default frame number is 0
+        creates an xArray Dataset from 5 two-dimensional Numpy arrays of x,y,u,v and mask
+
+        Input:
+            x,y,u,v,mask = Numpy floating arrays, all the same size
         Output:
             data is a xAarray Dataset, see xarray for help 
     """
-    rows,cols = x.shape
-    u = xr.DataArray(u[:,:,np.newaxis],dims=('x','y','t'),coords={'x':x[0,:].T,'y':y[:,0].T,'t':[frame]})
-    v = xr.DataArray(v[:,:,np.newaxis],dims=('x','y','t'),coords={'x':x[0,:].T,'y':y[:,0].T,'t':[frame]})
-    
-    # extend dimensions
-    u = u[:,:,np.newaxis]
-    v = v[:,:,np.newaxis]
-    chc = chc[:,:,np.newaxis]
-
-    u = xr.DataArray(u,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
-    v = xr.DataArray(v,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
-    chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
-    
-    data = xr.Dataset({'u': u, 'v': v,'chc':chc})
-
-    data.attrs['variables'] = variables
-    data.attrs['units'] = units  
-    data.attrs['dt'] = dt
-    data.attrs['files'] = filename
+    # create data structure of appropriate size
+    data = create_sample_field(rows=x.shape[0],cols=x.shape[1])
+    # assign arrays
+    data['x'] = x[0,:]
+    data['y'] = y[:,0]
+    data['u'] = xr.DataArray(u.T[:,:,np.newaxis],dims=('x','y','t'))
+    data['v'] = xr.DataArray(v.T[:,:,np.newaxis],dims=('x','y','t'))
+    data['chc'] = xr.DataArray(mask.T[:,:,np.newaxis],dims=('x','y','t'))
     
     return data
         
@@ -146,13 +138,13 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
 
 def load_directory(path,basename='*',ext='.vec'):
     """ 
-    load_directory (path,basename=None, ext='*.vec')
+    load_directory (path,basename='*', ext='*.vec')
 
     Loads all the files with the chosen sextension in the directory into a single
-    xarray dataset with variables and units added as attributes
+    xarray Dataset with variables and units added as attributes
 
     Input: 
-        directory : path to the directory with .vec files
+        directory : path to the directory with .vec, .txt or .VC7 files
 
     Output:
         data : xarray DataSet with dimensions: x,y,t and 
@@ -163,18 +155,27 @@ def load_directory(path,basename='*',ext='.vec'):
     See more: loadvec
     """
     files  = sorted(glob(os.path.join(path,basename+ext)))
-    variables, units, rows, cols, dt, frame = parse_header(files[0])
-    
     data = []
-    for i,f in enumerate(files):
-        data.append(loadvec(f,rows,cols,variables,units,dt,frame+i-1))
-           
-    combined = xr.concat(data, dim='t')
-    combined.attrs['variables'] = variables
-    combined.attrs['units'] = units
-    combined.attrs['dt'] = dt
-    combined.attrs['files'] = files
-    return combined
+
+    if ext == '.vec':
+        variables, units, rows, cols, dt, frame = parse_header(files[0])
+
+        for i,f in enumerate(files):
+            data.append(loadvec(f,rows,cols,variables,units,dt,frame+i-1))
+
+    elif ext == '.VC7':
+        frame = 1
+        for i,f in enumerate(files):
+            data.append(load_vc7(f,frame+i-1))
+
+    if len(data) > 0:
+        combined = xr.concat(data, dim='t')
+        combined.attrs['variables'] = data[0].attrs['variables']
+        combined.attrs['units'] = data[0].attrs['units']
+        combined.attrs['dt'] = data[0].attrs['dt']
+        combined.attrs['files'] = files
+
+        return combined
 
     
 def parse_header(filename):
@@ -313,8 +314,8 @@ def ReadDavis(path, frame=1):
         [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
         #    lhs1=np.transpose(lhs1)
         #    lhs2=np.transpose(lhs2)
-        lhs3 = lhs1*0;
-        lhs4 = lhs2*0;
+        lhs3 = lhs1*0
+        lhs4 = lhs2*0
         # Get choice
         maskData = v_array[0,:,:]
         	# Build best vectors from choice field
@@ -346,21 +347,11 @@ def ReadDavis(path, frame=1):
     return [lhs1,lhs2,lhs3,lhs4,mask]
 
 
-def load_vc7(filename, frame=0):
+def load_vc7(filename,frame=0):
     # read the arrays
     x,y,u,v,mask = ReadDavis(filename)
-
-    # create data structure of appropriate size
-    data = create_sample_field(rows=x.shape[0],cols=x.shape[1],frame=frame)
-    # assign arrays
-    data['x'] = x[0,:]
-    data['y'] = y[:,0]
-    data['u'] = xr.DataArray(u.T[:,:,np.newaxis],dims=('x','y','t'))
-    data['v'] = xr.DataArray(v.T[:,:,np.newaxis],dims=('x','y','t'))
-    data['chc'] = xr.DataArray(mask.T[:,:,np.newaxis],dims=('x','y','t'))
-    # data.attrs['variables'] = 'x,y,u,v,mask'
-    # data.attrs['units'] = 'units'  
-    # data.attrs['dt'] = 'dt'
+    data = from_arrays(x,y,u,v,mask)
+    data['t'] = np.atleast_1d(frame)
     data.attrs['files'] = filename
     
     return data

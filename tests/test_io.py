@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 
 import os
 fname = 'Run000001.T000.D000.P000.H001.L.vec'
-path = './data/'
-
+path = os.path.join(os.path.dirname(__file__),'data')
 
 
 # def test_get_dt():
@@ -18,12 +17,12 @@ def test_get_frame():
     """ tests the correct frame number """
     _, _, _, _,_,frame = io.parse_header(os.path.join(path,'day2a005003.T000.D000.P003.H001.L.vec'))
     assert frame == 5003
-    _, _, _, _,_,frame = io.parse_header('./data/Run000002.T000.D000.P000.H001.L.vec')
+    _, _, _, _,_,frame = io.parse_header(os.path.join(path,'Run000002.T000.D000.P000.H001.L.vec'))
     assert frame == 2
-    _, _, _, _,_,frame = io.parse_header('./data/exp1_001_b.vec')
+    _, _, _, _,_,frame = io.parse_header(os.path.join(path,'exp1_001_b.vec'))
     assert frame == 1 
-    _, _, _, _,_,frame = io.parse_header('./data/exp1_001_b.txt')
-    assert frame == 1    
+    _, _, _, _,_,frame = io.parse_header(os.path.join(path,'exp1_001_b.txt'))
+    assert frame == 1   
     
 
 def test_get_units():
@@ -51,7 +50,7 @@ def test_loadvec():
     assert 't' in data.dims
 
 def test_load_davis():
-    data = io.ReadDavis(os.path.join(path,'2D.VC7'))
+    data = io.ReadDavis(os.path.join(path,'2C.VC7'))
     assert data['u'].shape == (63,63,1)
     assert data['u'][0,0,0] == 0.0
     assert np.allclose(data.coords['x'][0],0.31248)

@@ -42,8 +42,8 @@ def test_get_units():
     lUnits,vUnits,tUnits = io.get_units(os.path.join(path,'exp1_001_b.vec') )
     assert lUnits is None
 
-def test_loadvec():
-    data = io.loadvec(os.path.join(path,fname))
+def test_load_vec():
+    data = io.load_vec(os.path.join(path,fname))
     assert data['u'].shape == (63,63,1)
     assert data['u'][0,0,0] == 0.0
     assert np.allclose(data.coords['x'][0],0.31248)
@@ -56,7 +56,7 @@ def test_load_davis():
     assert np.allclose(data.coords['x'][-1],193.313795)
 
 def test_loadopenpivtxt():
-    data = io.loadvec(os.path.join(path,'exp1_001_b.txt'))
+    data = io.load_vec(os.path.join(path,'exp1_001_b.txt'))
     
 
 def test_load_directory():

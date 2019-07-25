@@ -86,9 +86,9 @@ def from_arrays(x,y,u,v,mask):
     return data
         
 
-def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None, frame=0):
+def load_vec(filename, rows=None, cols=None, variables=None, units=None, dt=None, frame=0):
     """
-        loadvec(filename,rows=rows,cols=cols)
+        load_vec(filename,rows=rows,cols=cols)
         Loads the VEC file (TECPLOT format by TSI Inc.), OpenPIV VEC or TXT formats
         Arguments:
             filename : file name, expected to have a header and 5 columns
@@ -152,7 +152,7 @@ def load_directory(path,basename='*',ext='.vec'):
                attributes of variables and units
 
 
-    See more: loadvec
+    See more: load_vec
     """
     files  = sorted(glob(os.path.join(path,basename+ext)))
     data = []
@@ -161,7 +161,7 @@ def load_directory(path,basename='*',ext='.vec'):
         variables, units, rows, cols, dt, frame = parse_header(files[0])
 
         for i,f in enumerate(files):
-            data.append(loadvec(f,rows,cols,variables,units,dt,frame+i-1))
+            data.append(load_vec(f,rows,cols,variables,units,dt,frame+i-1))
 
     elif ext == '.VC7':
         frame = 1

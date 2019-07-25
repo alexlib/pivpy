@@ -344,3 +344,21 @@ def ReadDavis(path, frame=1):
     ReadIM.DestroyAttributeListSafe(vatts)
     del(vatts)
     return [lhs1,lhs2,lhs3,lhs4,mask]
+
+
+def load_vc7(filename, frame=0):
+    # read the arrays
+    x,y,u,v,mask = ReadDavis(filename)
+
+    # create data structure of appropriate size
+    data = create_sample_field(rows=x.shape[0],cols=x.shape[1],frame=frame)
+    # assign arrays
+    data['x'] = x[0,:]
+    data['y'] = y[:,0]
+    data['u'] = xr.DataArray(u.T[:,:,np.newaxis],dims=('x','y','t'))
+    data['v'] = xr.DataArray(v.T[:,:,np.newaxis],dims=('x','y','t'))
+    data['chc'] = xr.DataArray(mask.T[:,:,np.newaxis],dims=('x','y','t'))
+    # data.attrs['variables'] = 'x,y,u,v,mask'
+    # data.attrs['units'] = 'units'  
+    # data.attrs['dt'] = 'dt'
+    data.attrs['files'] = filename

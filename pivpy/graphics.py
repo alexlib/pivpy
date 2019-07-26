@@ -74,7 +74,7 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
                  levels=levels)
     if colbar:
         cbar = plt.colorbar(c, orientation=colbar_orient)
-        cbar.set_label(r'$\left| \, V \, \right|$ ['+ lUnits +' $\cdot$ '+ tUnits +'$^{-1}$]')
+        cbar.set_label(r'$\left| \, V \, \right|$ ['+ lUnits +r' $\cdot$ '+ tUnits +r'$^{-1}$]')
         
     ax.quiver(x[::nthArr],y[::nthArr],
                u[::nthArr,::nthArr],v[::nthArr,::nthArr],units='width',

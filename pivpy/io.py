@@ -13,16 +13,16 @@ import ReadIM
 
 
 
-def create_sample_field(frame = 0):
+def create_sample_field(rows=5,cols=8,frame = 0):
     """ creates a sample dataset for the tests """
 
-    x  = np.arange(32.,128.,32.)
-    y = np.arange(16.,128.,16.)
+    x  = np.linspace(32.,128.,cols)
+    y = np.linspace(16.,128.,rows)
 
     xm,ym = np.meshgrid(x,y)
 
-    u = np.ones_like(xm.T) + np.arange(0.0,7.0)
-    v = np.zeros_like(ym.T)+np.random.rand(3,1)-.5
+    u = np.ones_like(xm.T) + np.linspace(0.0,7.0,rows)
+    v = np.zeros_like(ym.T) + np.random.rand(cols,1)-.5
 
     u = u[:,:,np.newaxis]
     v = v[:,:,np.newaxis]
@@ -63,11 +63,32 @@ def create_sample_dataset(n = 5):
     combined.attrs['files'] = ''
 
     return combined
+
+def from_arrays(x,y,u,v,mask):
+    """
+        from_arrays(x,y,u,v,mask,frame=0)
+        creates an xArray Dataset from 5 two-dimensional Numpy arrays of x,y,u,v and mask
+
+        Input:
+            x,y,u,v,mask = Numpy floating arrays, all the same size
+        Output:
+            data is a xAarray Dataset, see xarray for help 
+    """
+    # create data structure of appropriate size
+    data = create_sample_field(rows=x.shape[0],cols=x.shape[1])
+    # assign arrays
+    data['x'] = x[0,:]
+    data['y'] = y[:,0]
+    data['u'] = xr.DataArray(u.T[:,:,np.newaxis],dims=('x','y','t'))
+    data['v'] = xr.DataArray(v.T[:,:,np.newaxis],dims=('x','y','t'))
+    data['chc'] = xr.DataArray(mask.T[:,:,np.newaxis],dims=('x','y','t'))
+    
+    return data
         
 
-def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None, frame=0):
+def load_vec(filename, rows=None, cols=None, variables=None, units=None, dt=None, frame=0):
     """
-        loadvec(filename,rows=rows,cols=cols)
+        load_vec(filename,rows=rows,cols=cols)
         Loads the VEC file (TECPLOT format by TSI Inc.), OpenPIV VEC or TXT formats
         Arguments:
             filename : file name, expected to have a header and 5 columns
@@ -115,15 +136,15 @@ def loadvec(filename, rows=None, cols=None, variables=None, units=None, dt=None,
     
     return data
 
-def load_directory(path,basename=''):
+def load_directory(path,basename='*',ext='.vec'):
     """ 
-    load_directory (path)
+    load_directory (path,basename='*', ext='*.vec')
 
-    Loads all the .VEC files in the directory into a single
-    xarray dataset with variables and units added as attributes
+    Loads all the files with the chosen sextension in the directory into a single
+    xarray Dataset with variables and units added as attributes
 
     Input: 
-        directory : path to the directory with .vec files
+        directory : path to the directory with .vec, .txt or .VC7 files
 
     Output:
         data : xarray DataSet with dimensions: x,y,t and 
@@ -131,21 +152,30 @@ def load_directory(path,basename=''):
                attributes of variables and units
 
 
-    See more: loadvec
+    See more: load_vec
     """
-    files  = sorted(glob(os.path.join(path,basename+'*.vec')))
-    variables, units, rows, cols, dt, frame = parse_header(files[0])
-    
+    files  = sorted(glob(os.path.join(path,basename+ext)))
     data = []
-    for i,f in enumerate(files):
-        data.append(loadvec(f,rows,cols,variables,units,dt,frame+i-1))
-           
-    combined = xr.concat(data, dim='t')
-    combined.attrs['variables'] = variables
-    combined.attrs['units'] = units
-    combined.attrs['dt'] = dt
-    combined.attrs['files'] = files
-    return combined
+
+    if ext == '.vec':
+        variables, units, rows, cols, dt, frame = parse_header(files[0])
+
+        for i,f in enumerate(files):
+            data.append(load_vec(f,rows,cols,variables,units,dt,frame+i-1))
+
+    elif ext == '.VC7':
+        frame = 1
+        for i,f in enumerate(files):
+            data.append(load_vc7(f,frame+i-1))
+
+    if len(data) > 0:
+        combined = xr.concat(data, dim='t')
+        combined.attrs['variables'] = data[0].attrs['variables']
+        combined.attrs['units'] = data[0].attrs['units']
+        combined.attrs['dt'] = data[0].attrs['dt']
+        combined.attrs['files'] = files
+
+        return combined
 
     
 def parse_header(filename):
@@ -178,7 +208,7 @@ def parse_header(filename):
     # if the file does not have a header, can be from OpenPIV or elsewhere
     # return None 
     if header[:5] != 'TITLE':
-        return (None,None,None,None,None,frame)
+        return (['x','y','u','v'],None,None,None,None,frame)
 
     header_list = header.replace(',',' ').replace('=',' ').replace('"',' ').split()
     
@@ -227,4 +257,104 @@ def get_units(filename):
     tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
     
     return lUnits, velUnits, tUnits
+
+
+def ReadDavis(path, frame=1):
+    """
+    input path for files format from davis tested for im7&vc7
+    out put [X Y U V mask]
+    valid only for 2d piv cases
+    RETURN:   
+     in case of images (image type=0):
+              X = scaled x-coordinates
+              Y = scaled y-coordinates      
+              U = scaled image intensities
+              v=0
+              MASK=0
+            in case of 2D vector fields (A.IType = 1,2 or 3):
+              X = scaled x-coordinates
+               Y = scaled y-coordinates
+               U = scaled vx-components of vectors
+               V = scaled vy-components of vectors
+
+    """
+    #you need to add clear to prevent data leaks
+    buff, vatts   =  ReadIM.extra.get_Buffer_andAttributeList(path)
+    v_array, buff1 = ReadIM.extra.buffer_as_array(buff)
+    nx=buff.nx
+    nz=buff.nz
+    ny=buff.ny
+    #set data range:
+    baseRangeX = np.arange(nx)
+    baseRangeY = np.arange(ny)
+    baseRangeZ = np.arange(nz)
+    lhs1 =(baseRangeX+0.5)*buff.vectorGrid*buff.scaleX.factor+buff.scaleX.offset  # x-range
+    lhs2 =(baseRangeY+0.5)*buff.vectorGrid*buff.scaleY.factor+buff.scaleY.offset #y-range
+    lhs3 =0
+    lhs4 =0
+    mask =0
+    if buff.image_sub_type<=0: #grayvalue image format
+        lhs3 =v_array[frame-1,:,:]
+        # Display image
+#        plt.figure()
+#        plt.imshow(lhs3,extent=[lhs1[0],lhs1[-1],lhs2[-1],lhs2[0]],cmap='gray',vmin=0,vmax=1080)
+#        plt.colorbar()
+    elif buff.image_sub_type==2:# simple 2D vector format: (vx,vy)
+    	# Calculate vector position and components
+        [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
+    #    lhs1=np.transpose(lhs1)
+    #    lhs2=np.transpose(lhs2)
+        lhs3 = v_array[0,:,:]*buff.scaleI.factor+buff.scaleI.offset
+        lhs4 = v_array[1,:,:]*buff.scaleI.factor+buff.scaleI.offset
+        if buff.scaleY.factor<0.0:
+            lhs4 = -lhs4
+#    	plt.quiver(lhs1,lhs2,lhs3,lhs4);
+    elif buff.image_sub_type==3 or buff.image_sub_type==1:
+       #normal 2D vector format + peak: sel+4*(vx,vy) (+peak)
+    	#Calculate vector position and components
+        [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
+        #    lhs1=np.transpose(lhs1)
+        #    lhs2=np.transpose(lhs2)
+        lhs3 = lhs1*0
+        lhs4 = lhs2*0
+        # Get choice
+        maskData = v_array[0,:,:]
+        	# Build best vectors from choice field
+        for i in range(5):
+            mask =  maskData ==(i+1) 
+            if (i<4): # get best vectors
+                dat = v_array[2*i+1,:,:]
+                lhs3[mask] = dat[mask]
+                dat = v_array[2*i+2,:,:]
+                lhs4[mask] = dat[mask]		
+            else:    # get interpolated vectors
+                dat =v_array[7,:,:] 
+                lhs3[mask] = dat[mask]
+                dat =v_array[8,:,:] 
+                lhs4[mask] = dat[mask]
+        lhs3 = lhs3*buff.scaleI.factor+buff.scaleI.offset
+        lhs4 = lhs4*buff.scaleI.factor+buff.scaleI.offset
+        #Display vector field
+        if buff.scaleY.factor<0.0:
+            lhs4 = -1*lhs4
+        mask =  maskData ==0
+    #clean memory
+    ReadIM.DestroyBuffer(buff1)
+    del(buff1)
+    ReadIM.DestroyBuffer(buff)
+    del(buff)
+    ReadIM.DestroyAttributeListSafe(vatts)
+    del(vatts)
+    return [lhs1,lhs2,lhs3,lhs4,mask]
+
+
+def load_vc7(filename,frame=0):
+    # read the arrays
+    x,y,u,v,mask = ReadDavis(filename)
+    data = from_arrays(x,y,u,v,mask)
+    data['t'] = np.atleast_1d(frame)
+    data.attrs['files'] = filename
+    
+    return data
+
 

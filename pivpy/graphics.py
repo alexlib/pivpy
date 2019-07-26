@@ -36,8 +36,8 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         
     x = data.x
     y = data.y
-    u = data.u
-    v = data.v
+    u = data.u.T
+    v = data.v.T
     
     if units is not None:
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
@@ -74,7 +74,7 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
                  levels=levels)
     if colbar:
         cbar = plt.colorbar(c, orientation=colbar_orient)
-        cbar.set_label(r'$\left| \, V \, \right|$ ['+ lUnits +' $\cdot$ '+ tUnits +'$^{-1}$]')
+        cbar.set_label(r'$\left| \, V \, \right|$ ['+ lUnits +r' $\cdot$ '+ tUnits +r'$^{-1}$]')
         
     ax.quiver(x[::nthArr],y[::nthArr],
                u[::nthArr,::nthArr],v[::nthArr,::nthArr],units='width',
@@ -148,10 +148,10 @@ def contour_plot(data, threshold = None, contourLevels = None,
         levels = np.linspace(-contourLevels, contourLevels, 30)
         
     if logscale:
-        c = ax.contourf(data.x,data.y,np.abs(data['w']), levels=levels,
+        c = ax.contourf(data.x,data.y,np.abs(data['w'].T), levels=levels,
                  cmap = plt.get_cmap('RdYlBu'), norm=plt.colors.LogNorm())
     else:
-        c = ax.contourf(data.x,data.y,data['w'], levels=levels,
+        c = ax.contourf(data.x,data.y,data['w'].T, levels=levels,
                  cmap = plt.get_cmap('RdYlBu'))
         
     plt.xlabel('x [' + lUnits + ']')

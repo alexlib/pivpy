@@ -2,3 +2,4 @@ numpy
 scipy
 xarray
 matplotlib
+readim

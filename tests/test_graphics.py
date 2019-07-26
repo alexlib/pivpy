@@ -4,9 +4,10 @@ import numpy as np
 
 import os
 f1 = 'Run000001.T000.D000.P000.H001.L.vec'
-path = './data/'
+path = os.path.join(os.path.dirname(__file__),'data')
 
-_d = io.loadvec(os.path.join(path,f1))
+
+_d = io.load_vec(os.path.join(path,f1))
 
 def test_showscal():
     graphics.showscal(_d, property='ken')

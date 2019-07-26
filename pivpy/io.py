@@ -364,6 +364,12 @@ def load_vc7(path,time=0):
     ReadIM.DestroyAttributeListSafe(vatts)
     del(vatts)
     return data
+path='C:\\Users\\lior\\Documents\\ibrrTau\\timeDependedVecMaps'
+files=[f for f in os.listdir(path) if f.endswith('.vc7')]
+data=[]
+data.append(load_vc7(path+'\\'+files[-1],1))
+data.append(load_vc7(path+'\\'+files[-2],2))
+combined = xr.concat(data, dim='t')
 
 
 

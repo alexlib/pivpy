@@ -145,7 +145,10 @@ def load_directory(path,basename=''):
 
 path='C:\\Users\\lior\\Documents\\ibrrTau\\timeDependedVecMaps'
 files=[f for f in os.listdir(path) if f.endswith('.vc7')]
-data=ReadDavis(path+'\\'+files[-1])
+data=[]
+data.append(ReadDavis(path+'\\'+files[-1],1))
+data.append(ReadDavis(path+'\\'+files[-2],2))
+combined = xr.concat(data, dim='t')
 #x =x.flatten()
 #y =y.ravel()
 #u =u.ravel()

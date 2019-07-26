@@ -49,7 +49,7 @@ def test_load_vec():
     assert np.allclose(data.coords['x'][0],0.31248)
     assert 't' in data.dims
 
-def test_load_davis():
+def test_load_vc7():
     data = io.load_vc7(os.path.join(path,'2Ca.VC7'))
     assert data['u'].shape == (57,43,1)
     assert np.allclose(data.u.values[0,0],-0.04354814)

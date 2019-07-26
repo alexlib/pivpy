@@ -162,20 +162,24 @@ def load_directory(path,basename='*',ext='.vec'):
 
         for i,f in enumerate(files):
             data.append(load_vec(f,rows,cols,variables,units,dt,frame+i-1))
+        if len(data) > 0:
+            combined = xr.concat(data, dim='t')
+            combined.attrs['variables'] = data[0].attrs['variables']
+            combined.attrs['units'] = data[0].attrs['units']
+            combined.attrs['dt'] = data[0].attrs['dt']
+            combined.attrs['files'] = files
 
     elif ext == '.VC7':
         frame = 1
         for i,f in enumerate(files):
-            data.append(load_vc7(f,frame+i-1))
+            time=int(f[1:-4])-1
+            data.append(load_vc7(f,time))
+        if len(data) > 0:
+            combined = xr.concat(data, dim='t')
+            data.attrs['Info']
+            combined.attrs['Info'] = data[-1].attrs['Info']
 
-    if len(data) > 0:
-        combined = xr.concat(data, dim='t')
-        combined.attrs['variables'] = data[0].attrs['variables']
-        combined.attrs['units'] = data[0].attrs['units']
-        combined.attrs['dt'] = data[0].attrs['dt']
-        combined.attrs['files'] = files
-
-        return combined
+    return combined
 
     
 def parse_header(filename):
@@ -360,36 +364,6 @@ def load_vc7(path,time=0):
     ReadIM.DestroyAttributeListSafe(vatts)
     del(vatts)
     return data
-def load_directory_vc7(path,basename=''):
-    """ 
-    load_directory (path)
 
-    Loads all the .VEC files in the directory into a single
-    xarray dataset with variables and units added as attributes
-
-    Input: 
-        directory : path to the directory with .vec files
-
-    Output:
-        data : xarray DataSet with dimensions: x,y,t and 
-               data arrays of u,v,
-               attributes of variables and units
-
-
-    See more: loadvec
-    """
-    files=[f for f in os.listdir(path) if f.endswith('.vc7')]
-    
-    data1 = []
-    for i,f in enumerate(files):
-        time=int(f[1:-4])
-        data1.append(data)(load_vec7(path+'\\'+f,time))
-           
-    combined = xr.concat(data, dim='t')
-    combined.attrs['variables'] = variables
-    combined.attrs['units'] = units
-    combined.attrs['dt'] = dt
-    combined.attrs['files'] = files
-    return combined
 
 

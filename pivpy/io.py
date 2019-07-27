@@ -163,7 +163,7 @@ def load_directory(path,basename='*',ext='.vec'):
         for i,f in enumerate(files):
             data.append(load_vec(f,rows,cols,variables,units,dt,frame+i-1))
 
-    elif ext == '.VC7':
+    elif ext.lower() == '.vc7':
         frame = 1
         for i,f in enumerate(files):
             data.append(load_vc7(f,frame+i-1))

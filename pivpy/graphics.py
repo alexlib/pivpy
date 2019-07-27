@@ -39,12 +39,14 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
     u = data.u.T
     v = data.v.T
     
-    if units is not None:
+    if units is not None: # replace  units
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
         velUnits = units[2]
         tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
     else:
-        lUnits, velUnits, tUnits = '', '', ''
+        lUnits = data.attrs['units'][0]
+        velUnits = data.attrs['units'][2]
+        tUnits = data.attrs['units'][2].split('/')[-1]
     
     
     if threshold is not None:
@@ -74,7 +76,7 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
                  levels=levels)
     if colbar:
         cbar = plt.colorbar(c, orientation=colbar_orient)
-        cbar.set_label(r'$\left| \, V \, \right|$ ['+ lUnits +r' $\cdot$ '+ tUnits +r'$^{-1}$]')
+        cbar.set_label(r'$ V \, (' + velUnits + r')$' )
         
     ax.quiver(x[::nthArr],y[::nthArr],
                u[::nthArr,::nthArr],v[::nthArr,::nthArr],units='width',

@@ -22,6 +22,10 @@ Use `pip`:
 
 Look into the [getting started Jupyter notebook](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.ipynb)
 
+and additional notebooks:
+[Notebooks](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/)
+
+
 
 ### How to test? ### 
 

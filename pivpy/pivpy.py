@@ -54,30 +54,34 @@ class PIVAccessor(object):
     def __init__(self,xarray_obj):
         """
         Arguments:
-            data : 3D numpy array of rows x cols x 5 matrices:
-            [x,y,u,v,chc] 
-            x,y,u,v,chc are numpy float 2D arrays of 
-            the same size rows x cols  
-            into xarray DataSets, such that 
+            data : xarray Dataset:
+            x,y,t are coordinates
             u,v,chs are the data arrays
-            x,y are coordinates and 
-            'x','y' are dimensions
-            'dt' is a float that becomes an attribute
-            'l_units' are units of length, string converted to an 
-            attribute
-            't_units' are time units (either 'dt' or 's'), 
-            str->xr.attr
-            'rows','cols' are additional attributes which are 
-            just data.shape[0,1]
-           
+
+        We add few shortcuts (properties):
+            data.piv.average is the time average (data.mean(dim='t'))
+            data.piv.dt is the shortcut to get $\Delta t$
+            data.piv.vorticity
+            data.piv.tke
+            data.piv.shear
+
+        and a few methods:
+            data.piv.vec2scal()
+            data.piv.pan 
+            data.piv.rotate
+
         """
         self._obj = xarray_obj
-        self._average = None # not initialized
+        self._average = None 
+        self._dt = None
 
     @property
     def average(self):
         """ Return the mean flow field ."""
-        self._average = self._obj.mean(dim='t')
+        if self._average is None: # only first time
+            self._average = self._obj.mean(dim='t')
+            self._average.attrs = self._obj.attrs # we need units in quiver
+
         return self._average
     
     def crop(self,crop_vector = [None, None, None, None]):
@@ -271,9 +275,11 @@ class PIVAccessor(object):
         return self._obj
         
     @property
-    def get_dt(self):
+    def dt(self):
         """ receives the dt from the set """
-        return self._obj.attrs['dt']
+        if self._dt is None:
+            self._dt = self._obj.attrs['dt']
+        return self._dt
     
         
 

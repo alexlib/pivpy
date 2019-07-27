@@ -136,7 +136,7 @@ def contour_plot(data, threshold = None, contourLevels = None,
         # tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
     else:
         # lUnits, velUnits = '', ''
-        lUnits = ''
+        lUnits = data.attrs['units'][0]
         
     f,ax = plt.subplots()    
     
@@ -144,10 +144,11 @@ def contour_plot(data, threshold = None, contourLevels = None,
         data['w'] = xr.where(data['w']>threshold, threshold, data['w'])
         
     m = np.amax(abs(data['w']))
+    n = np.amin(abs(data['w']))
     if contourLevels == None:
-        levels = np.linspace(-m, m, 30)
+        levels = np.linspace(np.min(data['w']),np.max(data['w']), 10)
     else:
-        levels = np.linspace(-contourLevels, contourLevels, 30)
+        levels = contourLevels # vector of levels to set
         
     if logscale:
         c = ax.contourf(data.x,data.y,np.abs(data['w'].T), levels=levels,

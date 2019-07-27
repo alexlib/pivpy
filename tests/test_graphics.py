@@ -10,7 +10,7 @@ path = os.path.join(os.path.dirname(__file__),'data')
 _d = io.load_vec(os.path.join(path,f1))
 
 def test_showscal():
-    graphics.showscal(_d, property='ken')
+    graphics.showscal(_d, property='ke')
     
 
 def test_quiver():

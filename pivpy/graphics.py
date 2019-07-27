@@ -199,7 +199,7 @@ def showf(data, variables=None, units=None, fig=None):
         
     plt.show()
 
-def showscal(data, property='ken'):
+def showscal(data, property='ke'):
     """ 
     showf(data, var, units)
     Arguments:

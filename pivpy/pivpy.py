@@ -190,11 +190,16 @@ class PIVAccessor(object):
         self._obj['w'] = xr.DataArray(np.sqrt(ax**2+ay**2), dims=['x', 'y','t'])
         return self._obj
 
-
-
+    def ke(self):
+        """ estimates turbulent kinetic energy """
+        self._obj['w'] = (self._obj['u'])**2 + (self._obj['v'])**2
+        return self._obj
         
     def tke(self):
         """ estimates turbulent kinetic energy """
+        if len(self._obj.t) < 2:
+            raise ValueError('TKE is not defined for a single vector field, use .piv.ke()')
+
         self._obj['w'] = (self._obj['u'] - self._obj['u'].mean(dim='t'))**2 + \
             (self._obj['v'] - self._obj['v'].mean(dim='t'))**2
         return self._obj

@@ -61,7 +61,7 @@ def test_set_get_dt():
     """ tests setting the new dt """
     data = io.create_sample_dataset()
     assert data.attrs['dt'] == 1.0
-    assert data.piv.get_dt == 1.0
+    assert data.piv.dt == 1.0
     data.piv.set_dt(2.0)
     assert data.attrs['dt'] == 2.0
     
@@ -87,13 +87,17 @@ def test_shear():
     
 def test_vec2scal():
     """ tests vec2scal """
-    
     data = io.create_sample_field()
     data.piv.vec2scal(property='curl')
-    data.piv.vec2scal(property='ken')
-    data.piv.vec2scal(property='tke')
+    data.piv.vec2scal(property='ke')
     assert len(data.attrs['variables']) == 5
+    assert data.attrs['variables'][-1] == 'ke'
+
+    data = io.create_sample_dataset()
+    data.piv.vec2scal(property='ke')
+    data.piv.vec2scal(property='tke') # now defined
     assert data.attrs['variables'][-1] == 'tke'
+
     
     _a.piv.vec2scal(property='curl')
     

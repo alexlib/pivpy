@@ -10,7 +10,7 @@ def read(fname):
 
 setup(
     name = "pivpy",
-    version = "0.0.03",
+    version = "0.0.05",
     author = "Turbulence Structure Laboratory, Tel Aviv University",
     author_email = "alex.liberzon@gmail.com",
     description = ("Post processing of PIV vector files "
@@ -19,7 +19,15 @@ setup(
     keywords = "example documentation tutorial",
     url = "http://packages.python.org/pivpy",
     packages=find_packages(),
-    test_suite="tests", 
+    test_suite="tests",
+    install_requires=[
+        'numpy',
+        'scipy',
+        'xarray',
+        'matplotlib',
+        'readim',
+        'pytest'
+    ], 
     # packages=['pivpy', 'tests'],
     long_description=read('README.md'),
     classifiers=[

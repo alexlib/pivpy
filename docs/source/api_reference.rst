@@ -13,4 +13,9 @@ The ``pivpy.io`` module
 The ``pivpy.graphics`` module
 ----------------------------
 .. automodule:: pivpy.graphics
+    :members:  
+   
+The ``pivpy.pivpy`` module
+----------------------------------
+.. automodule:: pivpy.pivpy
     :members:

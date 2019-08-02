@@ -169,10 +169,10 @@ def load_directory(path,basename='*',ext='.vec'):
             combined.attrs['dt'] = data[0].attrs['dt']
             combined.attrs['files'] = files
 
-    elif ext == '.VC7':
+    elif ext == '.vc7':
         frame = 1
         for i,f in enumerate(files):
-            time=int(f[1:-4])-1
+            time=int(f[-9:-4])-1
             data.append(load_vc7(f,time))
         if len(data) > 0:
             combined = xr.concat(data, dim='t')
@@ -367,12 +367,12 @@ def load_vc7(path,time=0):
     ReadIM.DestroyAttributeListSafe(vatts)
     del(vatts)
     return data
-path='C:\\Users\\lior\\Documents\\ibrrTau\\plane1_00'
-files=[f for f in os.listdir(path) if f.endswith('.vc7')]
-data=[]
-data.append(load_vc7(path+'\\'+files[-1],1))
-data.append(load_vc7(path+'\\'+files[-2],2))
-combined = xr.concat(data, dim='t')
-combined.attrs=data[0].attrs
+#path='C:\\Users\\lior\\Documents\\ibrrTau\\plane1_00'
+#files=[f for f in os.listdir(path) if f.endswith('.vc7')]
+#data=[]
+#data.append(load_vc7(path+'\\'+files[-1],1))
+#data.append(load_vc7(path+'\\'+files[-2],2))
+#combined = xr.concat(data, dim='t')
+#combined.attrs=data[0].attrs
 
 

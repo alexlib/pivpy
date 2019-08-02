@@ -347,12 +347,12 @@ def load_vc7(path,time=0):
         if buff.scaleY.factor<0.0:
             lhs4 = -1*lhs4
         mask =  maskData ==0
-        lhs3=lhs3[:,:,np.newaxis]
-        lhs4=lhs4[:,:,np.newaxis]
-        maskData=maskData[:,:,np.newaxis]
-        u = xr.DataArray(lhs3,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
-        v = xr.DataArray(lhs4,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
-        chc = xr.DataArray(maskData,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
+        lhs3=lhs3.T[:,:,np.newaxis]
+        lhs4=lhs4.T[:,:,np.newaxis]
+        mask=mask.T[:,:,np.newaxis]
+        u = xr.DataArray(lhs3,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
+        v = xr.DataArray(lhs4,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
+        chc = xr.DataArray(mask,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
         data = xr.Dataset({'u': u, 'v': v,'chc':chc})
     data.attrs =ReadIM.extra.att2dict(vatts)
     data.attrs['variables'] = ['x','y','u','v']

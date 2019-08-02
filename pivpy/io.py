@@ -176,8 +176,7 @@ def load_directory(path,basename='*',ext='.vec'):
             data.append(load_vc7(f,time))
         if len(data) > 0:
             combined = xr.concat(data, dim='t')
-            data.attrs['Info']
-            combined.attrs['Info'] = data[-1].attrs['Info']
+            combined.attrs = data[-1].attrs
 
     return combined
 
@@ -355,7 +354,11 @@ def load_vc7(path,time=0):
         v = xr.DataArray(lhs4,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
         chc = xr.DataArray(maskData,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
         data = xr.Dataset({'u': u, 'v': v,'chc':chc})
-    data.attrs['Info'] =ReadIM.extra.att2dict(vatts)
+    data.attrs =ReadIM.extra.att2dict(vatts)
+    data.attrs['variables'] = ['x','y','u','v']
+    data.attrs['units'] = ['mm','mm','m/s','m/s']  
+    data.attrs['dt'] = int(data.attrs['FrameDt0'][:-3])
+    data.attrs['files'] = path
     #clean memory
     ReadIM.DestroyBuffer(buff1)
     del(buff1)
@@ -364,12 +367,12 @@ def load_vc7(path,time=0):
     ReadIM.DestroyAttributeListSafe(vatts)
     del(vatts)
     return data
-path='C:\\Users\\lior\\Documents\\ibrrTau\\timeDependedVecMaps'
+path='C:\\Users\\lior\\Documents\\ibrrTau\\plane1_00'
 files=[f for f in os.listdir(path) if f.endswith('.vc7')]
 data=[]
 data.append(load_vc7(path+'\\'+files[-1],1))
 data.append(load_vc7(path+'\\'+files[-2],2))
 combined = xr.concat(data, dim='t')
-
+combined.attrs=data[0].attrs
 
 

@@ -162,14 +162,14 @@ def load_directory(path,basename='*',ext='.vec'):
 
         for i,f in enumerate(files):
             data.append(load_vec(f,rows,cols,variables,units,dt,frame+i-1))
+
         if len(data) > 0:
             combined = xr.concat(data, dim='t')
             combined.attrs['variables'] = data[0].attrs['variables']
             combined.attrs['units'] = data[0].attrs['units']
             combined.attrs['dt'] = data[0].attrs['dt']
             combined.attrs['files'] = files
-
-    elif ext == '.vc7':
+    elif ext.lower() == '.vc7':
         frame = 1
         for i,f in enumerate(files):
             time=int(f[-9:-4])-1
@@ -201,9 +201,9 @@ def parse_header(filename):
     fname = os.path.basename(filename)
     # get the number in a filename if it's a .vec file from Insight
     if '.' in fname[:-4]: # day2a005003.T000.D000.P003.H001.L.vec
-        frame = int(re.findall('\d+',fname.split('.')[0])[-1])
+        frame = int(re.findall(r'\d+',fname.split('.')[0])[-1])
     elif '_' in filename[:-4]:
-        frame = int(re.findall('\d+',fname.split('_')[1])[-1]) # exp1_001_b.vec, .txt
+        frame = int(re.findall(r'\d+',fname.split('_')[1])[-1]) # exp1_001_b.vec, .txt
 
     with open(filename) as fid:
         header = fid.readline()

@@ -66,6 +66,9 @@ def test_load_directory():
     data = io.load_directory(path,basename='2*',ext='.VC7')
     assert np.allclose(data['t'],[0,1])
 
+    data = io.load_directory(path=os.path.join(path,'urban_canopy'),basename='B*',ext='.vc7')
+    assert np.allclose(data['t'],[0,1,2,3,4])
+
 
 def test_create_sample_field():
     data = io.create_sample_field(frame=3)

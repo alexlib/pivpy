@@ -1,4 +1,6 @@
 [![Documentation Status](https://readthedocs.org/projects/pivpy/badge/?version=latest)](https://pivpy.readthedocs.io/en/latest/?badge=latest)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/alexlib/pivpy/master?filepath=examples%2Fnotebooks%2FGetting_Started.ipynb)
+
 
 
 # PIVPy
@@ -21,6 +23,10 @@ Use `pip`:
 ### How to get started? 
 
 Look into the [getting started Jupyter notebook](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.ipynb)
+
+and additional notebooks:
+[Notebooks](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/)
+
 
 
 ### How to test? ### 

@@ -163,19 +163,22 @@ def load_directory(path,basename='*',ext='.vec'):
         for i,f in enumerate(files):
             data.append(load_vec(f,rows,cols,variables,units,dt,frame+i-1))
 
+        if len(data) > 0:
+            combined = xr.concat(data, dim='t')
+            combined.attrs['variables'] = data[0].attrs['variables']
+            combined.attrs['units'] = data[0].attrs['units']
+            combined.attrs['dt'] = data[0].attrs['dt']
+            combined.attrs['files'] = files
     elif ext.lower() == '.vc7':
         frame = 1
         for i,f in enumerate(files):
-            data.append(load_vc7(f,frame+i-1))
+            time=int(f[-9:-4])-1
+            data.append(load_vc7(f,time))
+        if len(data) > 0:
+            combined = xr.concat(data, dim='t')
+            combined.attrs = data[-1].attrs
 
-    if len(data) > 0:
-        combined = xr.concat(data, dim='t')
-        combined.attrs['variables'] = data[0].attrs['variables']
-        combined.attrs['units'] = data[0].attrs['units']
-        combined.attrs['dt'] = data[0].attrs['dt']
-        combined.attrs['files'] = files
-
-        return combined
+    return combined
 
     
 def parse_header(filename):
@@ -259,7 +262,8 @@ def get_units(filename):
     return lUnits, velUnits, tUnits
 
 
-def ReadDavis(path, frame=1):
+
+def load_vc7(path,time=0):
     """
     input path for files format from davis tested for im7&vc7
     out put [X Y U V mask]
@@ -294,11 +298,11 @@ def ReadDavis(path, frame=1):
     lhs4 =0
     mask =0
     if buff.image_sub_type<=0: #grayvalue image format
-        lhs3 =v_array[frame-1,:,:]
-        # Display image
-#        plt.figure()
-#        plt.imshow(lhs3,extent=[lhs1[0],lhs1[-1],lhs2[-1],lhs2[0]],cmap='gray',vmin=0,vmax=1080)
-#        plt.colorbar()
+        lhs3 =v_array[0,:,:]
+        lhs4=v_array[1,:,:]
+        Im = xr.DataArray(v_array,dims=('frame','z','x'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'frame':[0,1]})
+        data = xr.Dataset({'Im':Im})
+        
     elif buff.image_sub_type==2:# simple 2D vector format: (vx,vy)
     	# Calculate vector position and components
         [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
@@ -308,6 +312,11 @@ def ReadDavis(path, frame=1):
         lhs4 = v_array[1,:,:]*buff.scaleI.factor+buff.scaleI.offset
         if buff.scaleY.factor<0.0:
             lhs4 = -lhs4
+        lhs3=lhs3[:,:,np.newaxis]
+        lhs4=lhs4[:,:,np.newaxis]
+        u = xr.DataArray(lhs3,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
+        v = xr.DataArray(lhs4,dims=('z','x','t'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'t':[time]})
+        data = xr.Dataset({'u': u, 'v': v})
 #    	plt.quiver(lhs1,lhs2,lhs3,lhs4);
     elif buff.image_sub_type==3 or buff.image_sub_type==1:
        #normal 2D vector format + peak: sel+4*(vx,vy) (+peak)
@@ -315,8 +324,8 @@ def ReadDavis(path, frame=1):
         [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
         #    lhs1=np.transpose(lhs1)
         #    lhs2=np.transpose(lhs2)
-        lhs3 = lhs1*0
-        lhs4 = lhs2*0
+        lhs3 = lhs1*0;
+        lhs4 = lhs2*0;
         # Get choice
         maskData = v_array[0,:,:]
         	# Build best vectors from choice field
@@ -338,6 +347,18 @@ def ReadDavis(path, frame=1):
         if buff.scaleY.factor<0.0:
             lhs4 = -1*lhs4
         mask =  maskData ==0
+        lhs3=lhs3.T[:,:,np.newaxis]
+        lhs4=lhs4.T[:,:,np.newaxis]
+        mask=mask.T[:,:,np.newaxis]
+        u = xr.DataArray(lhs3,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
+        v = xr.DataArray(lhs4,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
+        chc = xr.DataArray(mask,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
+        data = xr.Dataset({'u': u, 'v': v,'chc':chc})
+    data.attrs =ReadIM.extra.att2dict(vatts)
+    data.attrs['variables'] = ['x','y','u','v']
+    data.attrs['units'] = ['mm','mm','m/s','m/s']  
+    data.attrs['dt'] = int(data.attrs['FrameDt0'][:-3])
+    data.attrs['files'] = path
     #clean memory
     ReadIM.DestroyBuffer(buff1)
     del(buff1)
@@ -345,16 +366,13 @@ def ReadDavis(path, frame=1):
     del(buff)
     ReadIM.DestroyAttributeListSafe(vatts)
     del(vatts)
-    return [lhs1,lhs2,lhs3,lhs4,mask]
-
-
-def load_vc7(filename,frame=0):
-    # read the arrays
-    x,y,u,v,mask = ReadDavis(filename)
-    data = from_arrays(x,y,u,v,mask)
-    data['t'] = np.atleast_1d(frame)
-    data.attrs['files'] = filename
-    
     return data
+#path='C:\\Users\\lior\\Documents\\ibrrTau\\plane1_00'
+#files=[f for f in os.listdir(path) if f.endswith('.vc7')]
+#data=[]
+#data.append(load_vc7(path+'\\'+files[-1],1))
+#data.append(load_vc7(path+'\\'+files[-2],2))
+#combined = xr.concat(data, dim='t')
+#combined.attrs=data[0].attrs
 
 

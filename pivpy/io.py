@@ -172,7 +172,10 @@ def load_directory(path,basename='*',ext='.vec'):
     elif ext.lower() == '.vc7':
         frame = 1
         for i,f in enumerate(files):
-            time=int(f[-9:-4])-1
+            if basename=='B*':
+                time=int(f[-9:-4])-1
+            else:
+                time=i
             data.append(load_vc7(f,time))
         if len(data) > 0:
             combined = xr.concat(data, dim='t')
@@ -366,6 +369,52 @@ def load_vc7(path,time=0):
     del(buff)
     ReadIM.DestroyAttributeListSafe(vatts)
     del(vatts)
+    return data
+
+def load_txt(filename, rows=None, cols=None, variables=None, units=None, dt=None, frame=0):
+    """
+        load_vec(filename,rows=rows,cols=cols)
+        Loads the VEC file (TECPLOT format by TSI Inc.), OpenPIV VEC or TXT formats
+        Arguments:
+            filename : file name, expected to have a header and 5 columns
+            rows, cols : number of rows and columns of a vector field,
+            if None, None, then parse_header is called to infer the number
+            written in the header
+            dt : time interval (default is None)
+            frame : frame or time marker (default is None)
+        Output:
+            data is a xAarray Dataset, see xarray for help 
+    """
+    if rows is None: # means no headers
+        d = np.loadtxt(filename,usecols=(0,1,2,3,4))
+        x = np.unique(d[:,0])
+        y = np.unique(d[:,1])
+        d = d.reshape(len(y),len(x),5).transpose(1,0,2)
+    else:
+        d = np.loadtxt(filename,skiprows=1,delimiter=',',usecols=(0,1,2,3,4)).reshape(rows,cols,5)
+        x = d[:,:,0][0,:]
+        y = d[:,:,1][:,0]
+        
+    u = d[:,:,2]
+    v = d[:,:,3]
+    chc = d[:,:,4]
+    
+    # extend dimensions
+    u = u[:,:,np.newaxis]
+    v = v[:,:,np.newaxis]
+    chc = chc[:,:,np.newaxis]
+
+    u = xr.DataArray(u,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    v = xr.DataArray(v,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':x,'y':y,'t':[frame]})
+    
+    data = xr.Dataset({'u': u, 'v': v,'chc':chc})
+
+    data.attrs['variables'] = variables
+    data.attrs['units'] = units  
+    data.attrs['dt'] = dt
+    data.attrs['files'] = filename
+    
     return data
 #path='C:\\Users\\lior\\Documents\\ibrrTau\\plane1_00'
 #files=[f for f in os.listdir(path) if f.endswith('.vc7')]

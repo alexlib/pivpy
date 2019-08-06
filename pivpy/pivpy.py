@@ -60,7 +60,7 @@ class PIVAccessor(object):
 
         We add few shortcuts (properties):
             data.piv.average is the time average (data.mean(dim='t'))
-            data.piv.dt is the shortcut to get $\Delta t$
+            data.piv.dt is the shortcut to get $\\Delta t$
             data.piv.vorticity
             data.piv.tke
             data.piv.shear

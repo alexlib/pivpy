@@ -301,6 +301,7 @@ def load_vc7(path,time=0):
     lhs4 =0
     mask =0
     if buff.image_sub_type<=0: #grayvalue image format
+        [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
         lhs3 =v_array[0,:,:]
         lhs4=v_array[1,:,:]
         Im = xr.DataArray(v_array,dims=('frame','z','x'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'frame':[0,1]})

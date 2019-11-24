@@ -167,6 +167,7 @@ def showf(data, property='ke',**kwargs):
         data : xarray.DataSet that contains dimensions of t,x,y
                and variables u,v and maybe w (scalar)
     """
+
     contour_plot(data.piv.vec2scal(property=property))
     quiver(data,**kwargs)
 
@@ -178,10 +179,6 @@ def showscal(data, property='ke'):
         data : xarray.DataSet that contains dimensions of t,x,y
                and a variable w (scalar)
     """
-    # fig = plt.figure(None if fig is None else fig.number)
-    # import pdb; pdb.set_trace()
-    # xlabel = (None if var is None else var[0]) + ' [' + (None if units is None else units[0])+']'
-    # ylabel = (None if var is None else var[1]) + ' [' + (None if units is None else units[1])+']'
     
     contour_plot(data.piv.vec2scal(property=property))                
         
@@ -236,9 +233,9 @@ def animate(data, arrowscale=1, savepath=None):
     
     
 
-def dataset_to_array(data,N=0):
+def dataset_to_array(data,t=0):
     """ converts xarray Dataset to array """
     if 't' in data.dims:
         print('Warning: function for a single frame, using first frame, supply data.isel(t=N)')
-        data = data.isel(t=N)
+        data = data.isel(t=t)
     return data

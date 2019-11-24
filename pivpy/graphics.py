@@ -108,22 +108,25 @@ def histogram(data, normed = False):
 
 
 def contour_plot(data, threshold = None, contourLevels = None, 
-                    colbar = True,  logscale = False, aspectration='equal', units=None):
+                    colbar = None, logscale = False, aspectratio='equal', 
+                    units=None):
     """ contourf ajusted for the xarray PIV dataset, creates a 
         contour map for the data['w'] property. 
         Input:
             data : xarray PIV DataArray, converted automatically using .isel(t=0)
             threshold : a threshold value, default is None (no data clipping)
             contourLevels : number of contour levels, default is None
-            colbar : boolean (default is True) show/hide colorbar 
+            colbar : None (hide), 'horizontal', or 'vertical' 
             logscale : boolean (True is default) create in linear/log scale
             aspectration : string, 'equal' is the default
         
     """
 
+    if 'w' not in data.var():
+        data.piv.vec2scal('ke')
+
     data = dataset_to_array(data)
 
-    
     if units is not None:
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
         # velUnits = units[2]
@@ -131,6 +134,7 @@ def contour_plot(data, threshold = None, contourLevels = None,
     else:
         # lUnits, velUnits = '', ''
         lUnits = data.attrs['units'][0]
+        propUnits = data.attrs['variables'][-1] + data.attrs['units'][-1] # last one is from 'w'
         
     f,ax = plt.subplots()    
     
@@ -140,7 +144,8 @@ def contour_plot(data, threshold = None, contourLevels = None,
     m = np.amax(abs(data['w']))
     n = np.amin(abs(data['w']))
     if contourLevels == None:
-        levels = np.linspace(np.min(data['w']),np.max(data['w']), 10)
+        levels = np.linspace(np.min(data['w'].values), \
+            np.max(data['w'].values), 10)
     else:
         levels = contourLevels # vector of levels to set
         
@@ -151,12 +156,14 @@ def contour_plot(data, threshold = None, contourLevels = None,
         c = ax.contourf(data.x,data.y,data['w'].T, levels=levels,
                  cmap = plt.get_cmap('RdYlBu'))
         
-    plt.xlabel('x [' + lUnits + ']')
-    plt.ylabel('y [' + lUnits + ']')
-    if colbar:
-        cbar = plt.colorbar(c)
-        cbar.set_label(r'$\\omega$ [s$^{-1}$]')
-    ax.set_aspect(aspectration)
+    plt.xlabel(f'x [{lUnits}]')
+    plt.ylabel(f'y [{lUnits}]')
+    if colbar is not None:
+        cbar = plt.colorbar(c,orientation=colbar)
+        cbar.set_label(propUnits)
+
+    ax.set_aspect(aspectratio)
+
     return f,ax
         
          
@@ -167,20 +174,21 @@ def showf(data, property='ke',**kwargs):
         data : xarray.DataSet that contains dimensions of t,x,y
                and variables u,v and maybe w (scalar)
     """
-
-    contour_plot(data.piv.vec2scal(property=property))
+    data.piv.vec2scal(property=property)
+    contour_plot(data)
     quiver(data,**kwargs)
 
 
-def showscal(data, property='ke'):
+def showscal(data, property='ke',**kwargs):
     """ 
     showf(data, var, units)
     Arguments:
         data : xarray.DataSet that contains dimensions of t,x,y
                and a variable w (scalar)
     """
-    
-    contour_plot(data.piv.vec2scal(property=property))                
+    data.piv.vec2scal(property=property)
+    fig, ax = contour_plot(data,**kwargs)
+    return fig, ax
         
 
 def animate(data, arrowscale=1, savepath=None):

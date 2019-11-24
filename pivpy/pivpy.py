@@ -153,7 +153,16 @@ class PIVAccessor(object):
         _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
         # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
         self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y','t'])
-        return self._obj['w'].values
+        
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append('1/dt')
+        else:
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = ('1/dt')
+
+
+        return self._obj
     
     def shear(self):
         """ calculates shear of the data array (single frame) 
@@ -170,7 +179,14 @@ class PIVAccessor(object):
         _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
         # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
         self._obj['w'] = xr.DataArray(vy + ux, dims=['x', 'y','t'])
-        return self._obj['w'].values
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append('1/dt')
+        else:
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = ('1/dt')        
+            
+        return self._obj
 
     def acceleration(self):
         """ calculates material derivative or acceleration of the data array (single frame) 
@@ -189,12 +205,28 @@ class PIVAccessor(object):
         ay = self._obj['u']*vx + self._obj['v']*vy
 
         self._obj['w'] = xr.DataArray(np.sqrt(ax**2+ay**2), dims=['x', 'y','t'])
-        return self._obj['w'].values
+
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append(f'{vel_units}^2')
+        else:
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = (f'{vel_units}^2')
+
+
+        return self._obj
 
     def ke(self):
         """ estimates turbulent kinetic energy """
         self._obj['w'] = (self._obj['u'])**2 + (self._obj['v'])**2
-        return self._obj['w'].values
+
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append(f'({vel_units})^2')
+        else:
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = (f'({vel_units})^2')
+        return self._obj
         
     def tke(self):
         """ estimates turbulent kinetic energy """
@@ -203,7 +235,9 @@ class PIVAccessor(object):
 
         self._obj['w'] = (self._obj['u'] - self._obj['u'].mean(dim='t'))**2 + \
             (self._obj['v'] - self._obj['v'].mean(dim='t'))**2
-        return self._obj['w'].values
+        vel_units = self._obj.attrs['units'][-1]
+        self._obj.attrs['units'].append(f'({vel_units})^2')
+        return self._obj
 
     
     def fluct(self):
@@ -235,6 +269,7 @@ class PIVAccessor(object):
         # replace few common names
         property='vorticity' if property == 'curl' else property
         property = 'tke' if property == 'ken' else property
+        property='vorticity' if property == 'vort' else property
         
         method_name = str(property)
         method = getattr(self, method_name, lambda: "nothing")

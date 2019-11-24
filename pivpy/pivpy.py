@@ -9,6 +9,7 @@ from scipy.stats import norm
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.filters import median_filter
 import xarray as xr
+from pivpy.graphics import quiver
 
 """ learn from this example 
 
@@ -290,7 +291,12 @@ class PIVAccessor(object):
             self._dt = self._obj.attrs['dt']
         return self._dt
     
-        
+
+
+    def quiver(self,**kwargs):
+        """ graphics.quiver() as a property """
+        quiver(self._obj,**kwargs)
+
 
     # @property
     # def vel_units(self):

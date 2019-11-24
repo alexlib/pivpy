@@ -9,7 +9,7 @@ from scipy.stats import norm
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.filters import median_filter
 import xarray as xr
-from pivpy.graphics import quiver
+from pivpy import graphics
 
 """ learn from this example 
 
@@ -153,7 +153,7 @@ class PIVAccessor(object):
         _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
         # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
         self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y','t'])
-        return self._obj
+        return self._obj['w'].values
     
     def shear(self):
         """ calculates shear of the data array (single frame) 
@@ -170,7 +170,7 @@ class PIVAccessor(object):
         _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
         # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
         self._obj['w'] = xr.DataArray(vy + ux, dims=['x', 'y','t'])
-        return self._obj
+        return self._obj['w'].values
 
     def acceleration(self):
         """ calculates material derivative or acceleration of the data array (single frame) 
@@ -189,12 +189,12 @@ class PIVAccessor(object):
         ay = self._obj['u']*vx + self._obj['v']*vy
 
         self._obj['w'] = xr.DataArray(np.sqrt(ax**2+ay**2), dims=['x', 'y','t'])
-        return self._obj
+        return self._obj['w'].values
 
     def ke(self):
         """ estimates turbulent kinetic energy """
         self._obj['w'] = (self._obj['u'])**2 + (self._obj['v'])**2
-        return self._obj
+        return self._obj['w'].values
         
     def tke(self):
         """ estimates turbulent kinetic energy """
@@ -203,7 +203,23 @@ class PIVAccessor(object):
 
         self._obj['w'] = (self._obj['u'] - self._obj['u'].mean(dim='t'))**2 + \
             (self._obj['v'] - self._obj['v'].mean(dim='t'))**2
-        return self._obj
+        return self._obj['w'].values
+
+    
+    def fluct(self):
+        """ returns fluctuations as a new dataset """
+
+        if len(self._obj.t) < 2:
+            raise ValueError('flcutuations cannot be defined for a single vector field, use .piv.ke()')
+
+        new_obj = self._obj.copy()
+        
+        new_obj['u'] =  self._obj['u'] - self._obj['u'].mean(dim='t')
+        new_obj['v'] =  self._obj['v'] - self._obj['v'].mean(dim='t')
+        if 'w' in self._obj.var():
+            new_obj['w'] =  self._obj['w'] - self._obj['w'].mean(dim='t')
+        return new_obj
+
         
     def vec2scal(self, property='curl'):
         """ creates a dataset of scalar values on the same 
@@ -295,7 +311,21 @@ class PIVAccessor(object):
 
     def quiver(self,**kwargs):
         """ graphics.quiver() as a property """
-        quiver(self._obj,**kwargs)
+        graphics.quiver(self._obj,**kwargs)
+
+    
+    def streamplot(self, **kwargs):
+        """ graphics.quiver(streamlines=True) """
+        graphics.quiver(self._obj, streamlines=True,**kwargs)
+
+    def showf(self, **kwargs):
+        """ method for graphics.showf """
+        graphics.showf(self._obj, **kwargs)
+
+    def showscal(self, **kwargs):
+        """ method for graphics.showscal """
+        graphics.showscal(self._obj, **kwargs)
+    
 
 
     # @property

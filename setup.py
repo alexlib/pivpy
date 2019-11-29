@@ -18,9 +18,9 @@ setup(
     license = "BSD",
     keywords = "example documentation tutorial",
     url = "http://packages.python.org/pivpy",
-    packages=find_packages(),
-    include_package_data=True,
-    package_data={'pivpy': ['tests/*','tests/data/*','tests/data/urban_canopy/*']},
+    packages=['pivpy'],
+    package_dir={'mypkg': 'src/mypkg'},
+    package_data={'pivpy': ['tests/data/*.*]},
     test_suite="tests",
     install_requires=[
         'numpy',

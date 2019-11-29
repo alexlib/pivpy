@@ -19,6 +19,7 @@ setup(
     keywords = "example documentation tutorial",
     url = "http://packages.python.org/pivpy",
     packages=find_packages(),
+    include_package_data=True,
     test_suite="tests",
     install_requires=[
         'numpy',

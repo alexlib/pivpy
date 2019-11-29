@@ -1,3 +1,2 @@
-include tests/*
-include tests/data/*
-include tests/data/urban_canopy/*
+include requirements.txt
+recursive-include pivpy/data *

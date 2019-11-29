@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 import os
 fname = 'Run000001.T000.D000.P000.H001.L.vec'
-path = os.path.join(os.path.dirname(__file__),'data')
+path = os.path.join(os.path.dirname(__file__),'../pivpy/data')
 
 
 # def test_get_dt():

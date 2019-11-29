@@ -18,7 +18,7 @@ setup(
     license = "BSD",
     keywords = "example documentation tutorial",
     url = "http://packages.python.org/pivpy",
-    packages=['pivpy'],
+    packages=find_packages(),
     include_package_data=True,
     test_suite="tests",
     install_requires=[

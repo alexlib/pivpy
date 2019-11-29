@@ -19,7 +19,7 @@ setup(
     keywords = "example documentation tutorial",
     url = "http://packages.python.org/pivpy",
     packages=['pivpy'],
-    package_data={'pivpy': ['tests/d*.*','tests/]},
+    include_package_data=True,
     test_suite="tests",
     install_requires=[
         'numpy',

@@ -20,6 +20,7 @@ setup(
     url = "http://packages.python.org/pivpy",
     packages=find_packages(),
     include_package_data=True,
+    package_data={'pivpy': ['tests/*','tests/data/*','tests/data/urban_canopy/*']},
     test_suite="tests",
     install_requires=[
         'numpy',

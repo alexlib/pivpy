@@ -19,7 +19,6 @@ setup(
     keywords = "example documentation tutorial",
     url = "http://packages.python.org/pivpy",
     packages=['pivpy'],
-    package_dir={'mypkg': 'src/mypkg'},
     package_data={'pivpy': ['tests/data/*.*]},
     test_suite="tests",
     install_requires=[
@@ -30,7 +29,6 @@ setup(
         'readim',
         'pytest'
     ], 
-    # packages=['pivpy', 'tests'],
     long_description=read('README.md'),
     classifiers=[
         "Development Status :: 3 - Alpha",

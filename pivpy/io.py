@@ -200,6 +200,9 @@ def parse_header(filename):
         dt   : time interval between the two PIV frames in microseconds
     """
 
+    #defaults
+    frame = 0
+    
     # split path from the filename
     fname = os.path.basename(filename)
     # get the number in a filename if it's a .vec file from Insight

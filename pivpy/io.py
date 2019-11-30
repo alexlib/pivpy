@@ -214,7 +214,7 @@ def parse_header(filename):
     # if the file does not have a header, can be from OpenPIV or elsewhere
     # return None 
     if header[:5] != 'TITLE':
-        return (['x','y','u','v'],None,None,None,None,frame)
+        return (['x','y','u','v'],['pix','pix','pix/dt','pix/dt'],None,None,None,frame)
 
     header_list = header.replace(',',' ').replace('=',' ').replace('"',' ').split()
     
@@ -247,12 +247,12 @@ def get_units(filename):
 
     """
 
-    lUnits, velUnits, tUnits = None, None, None
+    # lUnits, velUnits, tUnits = 'pixel', 'pixel', 'dt'
 
     _, units, _, _, _, _ = parse_header(filename)
 
-    if units is None:
-        return lUnits, velUnits, tUnits
+    if units == '':
+        return 'pix', 'pix', 'dt'
 
     lUnits = units[0]
     velUnits = units[2]

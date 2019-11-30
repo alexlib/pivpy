@@ -41,8 +41,8 @@ def test_get_units():
 
     # test OpenPIV vec 
     lUnits,vUnits,tUnits = io.get_units(os.path.join(path,'openpiv/exp1_001_b.vec') )
-    assert lUnits is None
-
+    assert lUnits == 'pix'
+    
 def test_load_vec():
     fname = 'Run000001.T000.D000.P000.H001.L.vec'
     data = io.load_vec(os.path.join(path,'Insight',fname))

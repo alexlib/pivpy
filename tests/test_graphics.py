@@ -30,6 +30,13 @@ def test_histogram():
 def test_showf():
     graphics.showf(_d)
 
+
+def test_quiver_openpiv_vec():
+    filename = pkg.resource_filename('pivpy','data/openpiv/exp1_001_b.vec')
+    # load data 
+    _d = io.load_vec(filename)
+    _d.piv.quiver()
+
     
     
     

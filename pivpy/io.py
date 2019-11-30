@@ -294,7 +294,7 @@ def load_vc7(path,time=0):
     #set data range:
     baseRangeX = np.arange(nx)
     baseRangeY = np.arange(ny)
-    baseRangeZ = np.arange(nz)
+    # baseRangeZ = np.arange(nz)
     lhs1 =(baseRangeX+0.5)*buff.vectorGrid*buff.scaleX.factor+buff.scaleX.offset  # x-range
     lhs2 =(baseRangeY+0.5)*buff.vectorGrid*buff.scaleY.factor+buff.scaleY.offset #y-range
     lhs3 =0
@@ -327,8 +327,8 @@ def load_vc7(path,time=0):
         [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
         #    lhs1=np.transpose(lhs1)
         #    lhs2=np.transpose(lhs2)
-        lhs3 = lhs1*0;
-        lhs4 = lhs2*0;
+        lhs3 = lhs1*0
+        lhs4 = lhs2*0
         # Get choice
         maskData = v_array[0,:,:]
         	# Build best vectors from choice field

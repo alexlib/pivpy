@@ -77,7 +77,7 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
     ax.set_xlabel('x (' + lUnits + ')')
     ax.set_ylabel('y (' + lUnits + ')')
     ax.set_aspect(aspectratio)
-
+ 
     return fig,ax
 
 def histogram(data, normed = False):

@@ -244,6 +244,6 @@ def animate(data, arrowscale=1, savepath=None):
 def dataset_to_array(data,t=0):
     """ converts xarray Dataset to array """
     if 't' in data.dims:
-        print('Warning: function for a single frame, using first frame, supply data.isel(t=N)')
+        print('Warning: function for a single frame, using the first frame, supply data.isel(t=N)')
         data = data.isel(t=t)
     return data

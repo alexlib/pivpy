@@ -3,24 +3,19 @@ Tutorial
 ===================
 
 
-1. Download the package from the Github repository::
+1. Install `pivpy` from PYPI::
 
-	git clone git@github.com:alexliberzonlab/pivpy.git
+	pip install pivy
 
-2. From the command line run the ``tmp.py``::
+2. In Python command shell::
 
-	% python tmp.py
-		
-or use the following code from your Python environment::
+	from pivpy import io, pivpy, graphics
+	import matplotlib.pyplot as plt
 
-	from pivpy.io import load_vec_dir
-	from pivpy.process import averf
-	from pivpy.graphics import showf
-
-	test_dir = "./examples/data"
-	data, var, units = load_vec_dir(test_dir)
-	mean = averf(data)
-	showf(mean,var,units) 
+	df = io.create_sample_dataset()
+	df.piv.average
+	graphics.quiver(df.piv.average,streamlines=True)
+	plt.show()
 	
 	
 And the result should look like: 

@@ -18,7 +18,7 @@ Merging the three packages:
 
 Use `pip`:  
 
-    pip install git+https://github.com/alexlib/pivpy
+    pip install pivpy
     
 ### How to get started? 
 

@@ -9,6 +9,7 @@ from scipy.stats import norm
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.filters import median_filter
 import xarray as xr
+from pivpy import graphics
 
 """ learn from this example 
 
@@ -60,7 +61,7 @@ class PIVAccessor(object):
 
         We add few shortcuts (properties):
             data.piv.average is the time average (data.mean(dim='t'))
-            data.piv.dt is the shortcut to get $\Delta t$
+            data.piv.dt is the shortcut to get $\\Delta t$
             data.piv.vorticity
             data.piv.tke
             data.piv.shear
@@ -152,6 +153,15 @@ class PIVAccessor(object):
         _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
         # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
         self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y','t'])
+        
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append('1/dt')
+        else:
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = ('1/dt')
+
+
         return self._obj
     
     def shear(self):
@@ -169,6 +179,13 @@ class PIVAccessor(object):
         _,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
         # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
         self._obj['w'] = xr.DataArray(vy + ux, dims=['x', 'y','t'])
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append('1/dt')
+        else:
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = ('1/dt')        
+            
         return self._obj
 
     def acceleration(self):
@@ -188,11 +205,27 @@ class PIVAccessor(object):
         ay = self._obj['u']*vx + self._obj['v']*vy
 
         self._obj['w'] = xr.DataArray(np.sqrt(ax**2+ay**2), dims=['x', 'y','t'])
+
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append(f'{vel_units}^2')
+        else:
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = (f'{vel_units}^2')
+
+
         return self._obj
 
     def ke(self):
         """ estimates turbulent kinetic energy """
         self._obj['w'] = (self._obj['u'])**2 + (self._obj['v'])**2
+
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append(f'({vel_units})^2')
+        else:
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = (f'({vel_units})^2')
         return self._obj
         
     def tke(self):
@@ -202,7 +235,25 @@ class PIVAccessor(object):
 
         self._obj['w'] = (self._obj['u'] - self._obj['u'].mean(dim='t'))**2 + \
             (self._obj['v'] - self._obj['v'].mean(dim='t'))**2
+        vel_units = self._obj.attrs['units'][-1]
+        self._obj.attrs['units'].append(f'({vel_units})^2')
         return self._obj
+
+    
+    def fluct(self):
+        """ returns fluctuations as a new dataset """
+
+        if len(self._obj.t) < 2:
+            raise ValueError('flcutuations cannot be defined for a single vector field, use .piv.ke()')
+
+        new_obj = self._obj.copy()
+        
+        new_obj['u'] =  self._obj['u'] - self._obj['u'].mean(dim='t')
+        new_obj['v'] =  self._obj['v'] - self._obj['v'].mean(dim='t')
+        if 'w' in self._obj.var():
+            new_obj['w'] =  self._obj['w'] - self._obj['w'].mean(dim='t')
+        return new_obj
+
         
     def vec2scal(self, property='curl'):
         """ creates a dataset of scalar values on the same 
@@ -218,6 +269,7 @@ class PIVAccessor(object):
         # replace few common names
         property='vorticity' if property == 'curl' else property
         property = 'tke' if property == 'ken' else property
+        property='vorticity' if property == 'vort' else property
         
         method_name = str(property)
         method = getattr(self, method_name, lambda: "nothing")
@@ -290,7 +342,26 @@ class PIVAccessor(object):
             self._dt = self._obj.attrs['dt']
         return self._dt
     
-        
+
+
+    def quiver(self,**kwargs):
+        """ graphics.quiver() as a property """
+        graphics.quiver(self._obj,**kwargs)
+
+    
+    def streamplot(self, **kwargs):
+        """ graphics.quiver(streamlines=True) """
+        graphics.quiver(self._obj, streamlines=True,**kwargs)
+
+    def showf(self, **kwargs):
+        """ method for graphics.showf """
+        graphics.showf(self._obj, **kwargs)
+
+    def showscal(self, **kwargs):
+        """ method for graphics.showscal """
+        graphics.showscal(self._obj, **kwargs)
+    
+
 
     # @property
     # def vel_units(self):

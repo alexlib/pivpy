@@ -2,11 +2,12 @@
 import xarray as xr
 from pivpy import io, pivpy
 import numpy as np
+import pkg_resources as pkg 
 
 import os
 f1 = 'Run000001.T000.D000.P000.H001.L.vec'
 f2 = 'Run000002.T000.D000.P000.H001.L.vec'
-path = os.path.join(os.path.dirname(__file__),'data')
+path = pkg.resource_filename('pivpy','data/Insight')
 
 _a = io.load_vec(os.path.join(path,f1))
 _b = io.load_vec(os.path.join(path,f2))
@@ -36,9 +37,10 @@ def test_mean():
 def test_vec2scal():
     data = io.create_sample_dataset()
     data.piv.vec2scal()
-    # tests that first data['w'] exists and then 
-    # the first value is 0.0
-    assert data['w'][0,0,0] == 0.0
+    data.piv.vec2scal(property='curl')
+    data.piv.vec2scal(property='ke')
+    assert len(data.attrs['variables']) == 5
+    assert data.attrs['variables'][-1] == 'ke'
 
 def test_add():
     data = io.create_sample_dataset()
@@ -85,14 +87,6 @@ def test_shear():
     data.piv.shear()
     assert data['w'][0,0] == 0.0 
     
-def test_vec2scal():
-    """ tests vec2scal """
-    data = io.create_sample_field()
-    data.piv.vec2scal(property='curl')
-    data.piv.vec2scal(property='ke')
-    assert len(data.attrs['variables']) == 5
-    assert data.attrs['variables'][-1] == 'ke'
-
     data = io.create_sample_dataset()
     data.piv.vec2scal(property='ke')
     data.piv.vec2scal(property='tke') # now defined

@@ -71,8 +71,8 @@ def ReadDavis(path,time=0):
         [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
         #    lhs1=np.transpose(lhs1)
         #    lhs2=np.transpose(lhs2)
-        lhs3 = lhs1*0;
-        lhs4 = lhs2*0;
+        lhs3 = lhs1*0
+        lhs4 = lhs2*0
         # Get choice
         maskData = v_array[0,:,:]
         	# Build best vectors from choice field

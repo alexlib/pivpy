@@ -200,6 +200,9 @@ def parse_header(filename):
         dt   : time interval between the two PIV frames in microseconds
     """
 
+    #defaults
+    frame = 0
+    
     # split path from the filename
     fname = os.path.basename(filename)
     # get the number in a filename if it's a .vec file from Insight
@@ -214,7 +217,7 @@ def parse_header(filename):
     # if the file does not have a header, can be from OpenPIV or elsewhere
     # return None 
     if header[:5] != 'TITLE':
-        return (['x','y','u','v'],None,None,None,None,frame)
+        return (['x','y','u','v'],['pix','pix','pix/dt','pix/dt'],None,None,None,frame)
 
     header_list = header.replace(',',' ').replace('=',' ').replace('"',' ').split()
     
@@ -247,12 +250,12 @@ def get_units(filename):
 
     """
 
-    lUnits, velUnits, tUnits = None, None, None
+    # lUnits, velUnits, tUnits = 'pixel', 'pixel', 'dt'
 
     _, units, _, _, _, _ = parse_header(filename)
 
-    if units is None:
-        return lUnits, velUnits, tUnits
+    if units == '':
+        return 'pix', 'pix', 'dt'
 
     lUnits = units[0]
     velUnits = units[2]
@@ -294,7 +297,7 @@ def load_vc7(path,time=0):
     #set data range:
     baseRangeX = np.arange(nx)
     baseRangeY = np.arange(ny)
-    baseRangeZ = np.arange(nz)
+    # baseRangeZ = np.arange(nz)
     lhs1 =(baseRangeX+0.5)*buff.vectorGrid*buff.scaleX.factor+buff.scaleX.offset  # x-range
     lhs2 =(baseRangeY+0.5)*buff.vectorGrid*buff.scaleY.factor+buff.scaleY.offset #y-range
     lhs3 =0
@@ -328,8 +331,8 @@ def load_vc7(path,time=0):
         [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
         #    lhs1=np.transpose(lhs1)
         #    lhs2=np.transpose(lhs2)
-        lhs3 = lhs1*0;
-        lhs4 = lhs2*0;
+        lhs3 = lhs1*0
+        lhs4 = lhs2*0
         # Get choice
         maskData = v_array[0,:,:]
         	# Build best vectors from choice field

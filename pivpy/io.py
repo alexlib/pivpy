@@ -304,6 +304,7 @@ def load_vc7(path,time=0):
     lhs4 =0
     mask =0
     if buff.image_sub_type<=0: #grayvalue image format
+        [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
         lhs3 =v_array[0,:,:]
         lhs4=v_array[1,:,:]
         Im = xr.DataArray(v_array,dims=('frame','z','x'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'frame':[0,1]})
@@ -360,11 +361,12 @@ def load_vc7(path,time=0):
         v = xr.DataArray(lhs4,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
         chc = xr.DataArray(mask,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
         data = xr.Dataset({'u': u, 'v': v,'chc':chc})
-    data.attrs =ReadIM.extra.att2dict(vatts)
-    data.attrs['variables'] = ['x','y','u','v']
-    data.attrs['units'] = ['mm','mm','m/s','m/s']  
-    data.attrs['dt'] = int(data.attrs['FrameDt0'][:-3])
-    data.attrs['files'] = path
+    if buff.image_sub_type>0:
+        data.attrs =ReadIM.extra.att2dict(vatts)
+        data.attrs['variables'] = ['x','y','u','v']
+        data.attrs['units'] = ['mm','mm','m/s','m/s']  
+        data.attrs['dt'] = int(data.attrs['FrameDt0'][:-3])
+        data.attrs['files'] = path
     #clean memory
     ReadIM.DestroyBuffer(buff1)
     del(buff1)

@@ -31,13 +31,15 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
     Usage:
         graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
-    
-    data = dataset_to_array(data)
-        
-    x = data.x.values[::nthArr]
-    y = data.y.values[::nthArr]
-    u = data.u.values[::nthArr,::nthArr].T
-    v = data.v.values[::nthArr,::nthArr].T
+
+    if 'z' in data.dims:
+        print('Warning: using first z cordinate')
+        data = data.sel(z=0)   
+    x = data.x
+    y = data.y
+    u = data.u.T
+    v = data.v.T
+
     
     if units is not None: # replace  units
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
@@ -203,7 +205,9 @@ def animate(data, arrowscale=1, savepath=None):
         if savepath is an existing path, a file named im.mp4 is saved
     
     """    
-    X, Y = data.x, data.y
+    X, Y = np.meshgrid(data.x, data.y)
+    X=X.T
+    Y=Y.T
     U, V = data.u[:,:,0], data.v[:,:,0] # first frame
     fig, ax = plt.subplots(1,1)
     M = np.sqrt(U**2 + V**2)
@@ -225,7 +229,7 @@ def animate(data, arrowscale=1, savepath=None):
         U,V = data.u[:,:,num],data.v[:,:,num]
         
         M = np.sqrt(U[::3,::3]**2 + V[::3,::3]**2)   
-        Q.set_UVC(U,V,M)
+        Q.set_UVC(U[::3,::3],V[::3,::3],M[::3,::3])
         text.set_text(str(num+1)+'/'+str(len(data.t)))
         return Q
 

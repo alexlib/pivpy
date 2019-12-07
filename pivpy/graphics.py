@@ -64,7 +64,7 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         ax = plt.gca() 
 
     # quiver itself
-    ax.quiver(x,y,u,v,units='width',
+    ax.quiver(x[::nthArr],y[::nthArr],u[::nthArr,::nthArr],v[::nthArr,::nthArr],units='width',
             scale = np.max(S*arrScale),headwidth=2)    
     
     if streamlines == True: # contours or streamlines

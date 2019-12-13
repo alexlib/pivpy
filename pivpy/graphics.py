@@ -34,7 +34,7 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
 
     if 'z' in data.dims:
         print('Warning: using first z cordinate')
-        data = data.sel(z=0)   
+        data = data.isel(z=0)   
     x = data.x
     y = data.y
     u = data.u.T
@@ -64,8 +64,7 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         ax = plt.gca() 
 
     # quiver itself
-    ax.quiver(x,y,u,v,units='width',
-            scale = np.max(S*arrScale),headwidth=2)    
+    ax.quiver(x,y,u,v,units='width',scale = np.max(S*arrScale),headwidth=2)    
     
     if streamlines == True: # contours or streamlines
         speed = np.sqrt(u**2 + v**2)
@@ -76,8 +75,8 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
             cbar.set_label(r'$ V \, (' + velUnits + r')$' )
         
     
-    ax.set_xlabel('x (' + lUnits + ')')
-    ax.set_ylabel('y (' + lUnits + ')')
+    ax.set_xlabel(f'x({lUnits})')
+    ax.set_ylabel(f'y ({lUnits})')
     ax.set_aspect(aspectratio)
  
     return fig,ax

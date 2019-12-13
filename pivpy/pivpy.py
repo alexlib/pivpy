@@ -346,7 +346,8 @@ class PIVAccessor(object):
 
     def quiver(self,**kwargs):
         """ graphics.quiver() as a property """
-        graphics.quiver(self._obj,**kwargs)
+        fig, ax = graphics.quiver(self._obj,**kwargs)
+        return fig, ax
 
     
     def streamplot(self, **kwargs):

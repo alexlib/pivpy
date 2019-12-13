@@ -76,7 +76,11 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         ax = plt.gca() 
 
     # quiver itself
-    ax.quiver(x,y,u,v,units='width',scale = np.max(S*arrScale),headwidth=2)
+    if colbar:
+        Q = ax.quiver(x,y,u,v,S,units='width',scale = np.max(S*arrScale),headwidth=2)
+        cbar = fig.colorbar(Q,shrink=0.9,orientation=colbar_orient)
+    else:
+        ax.quiver(x,y,u,v,units='width',scale = np.max(S*arrScale),headwidth=2)
     
     if lUnits == 'pix':
         ax.invert_yaxis()
@@ -87,7 +91,7 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         strm = ax.streamplot(x,y,u,v,color=speed,cmap=plt.get_cmap('hot'),linewidth=4) 
 
         if colbar:
-            cbar = fig.colorbar(strm.lines, orientation=colbar_orient)
+            cbar = fig.colorbar(strm.lines, orientation=colbar_orient,fraction=0.1)
             cbar.set_label(r'$ V \, (' + velUnits + r')$' )
         
     

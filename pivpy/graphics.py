@@ -31,13 +31,18 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
     Usage:
         graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
-    
+   
     data = dataset_to_array(data)
-        
-    x = data.x.values[::nthArr]
-    y = data.y.values[::nthArr]
-    u = data.u.values[::nthArr,::nthArr].T
-    v = data.v.values[::nthArr,::nthArr].T
+
+    # by construction, u and v are rows x columns so need to be rotated 90 deg
+    # prior to plotting
+    
+    x = data.x
+    y = data.y
+    u = data.u.T
+    v = data.v.T
+    
+
     
     if units is not None: # replace  units
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
@@ -47,6 +52,15 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         lUnits = data.attrs['units'][0]
         velUnits = data.attrs['units'][2]
         # tUnits = data.attrs['units'][2].split('/')[-1]
+        
+    # in addition, if the x,y units are pixels,
+    # we should plot it in the image coordinate system
+    # with 0,0 at the top left corner
+    # and so v should be negative
+    # and axis inverted
+    
+    if lUnits == 'pix':
+        v = -1*v # only for graphics, we do not change data
     
     
     if threshold is not None:
@@ -62,20 +76,27 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         ax = plt.gca() 
 
     # quiver itself
-    ax.quiver(x,y,u,v,units='width',
-            scale = np.max(S*arrScale),headwidth=2)    
+    if colbar:
+        Q = ax.quiver(x,y,u,v,S,units='width',scale = np.max(S*arrScale),headwidth=2)
+        cbar = fig.colorbar(Q,shrink=0.9,orientation=colbar_orient)
+    else:
+        ax.quiver(x,y,u,v,units='width',scale = np.max(S*arrScale),headwidth=2)
+    
+    if lUnits == 'pix':
+        ax.invert_yaxis()
+    
     
     if streamlines == True: # contours or streamlines
         speed = np.sqrt(u**2 + v**2)
         strm = ax.streamplot(x,y,u,v,color=speed,cmap=plt.get_cmap('hot'),linewidth=4) 
 
         if colbar:
-            cbar = fig.colorbar(strm.lines, orientation=colbar_orient)
+            cbar = fig.colorbar(strm.lines, orientation=colbar_orient,fraction=0.1)
             cbar.set_label(r'$ V \, (' + velUnits + r')$' )
         
     
-    ax.set_xlabel('x (' + lUnits + ')')
-    ax.set_ylabel('y (' + lUnits + ')')
+    ax.set_xlabel(f'x({lUnits})')
+    ax.set_ylabel(f'y ({lUnits})')
     ax.set_aspect(aspectratio)
  
     return fig,ax
@@ -122,10 +143,11 @@ def contour_plot(data, threshold = None, contourLevels = None,
         
     """
 
+    data = dataset_to_array(data)
+    
     if 'w' not in data.var():
         data.piv.vec2scal('ke')
 
-    data = dataset_to_array(data)
 
     if units is not None:
         lUnits = units[0] # ['m' 'm' 'mm/s' 'mm/s']
@@ -203,7 +225,9 @@ def animate(data, arrowscale=1, savepath=None):
         if savepath is an existing path, a file named im.mp4 is saved
     
     """    
-    X, Y = data.x, data.y
+    X, Y = np.meshgrid(data.x, data.y)
+    X=X.T
+    Y=Y.T
     U, V = data.u[:,:,0], data.v[:,:,0] # first frame
     fig, ax = plt.subplots(1,1)
     M = np.sqrt(U**2 + V**2)
@@ -225,7 +249,7 @@ def animate(data, arrowscale=1, savepath=None):
         U,V = data.u[:,:,num],data.v[:,:,num]
         
         M = np.sqrt(U[::3,::3]**2 + V[::3,::3]**2)   
-        Q.set_UVC(U,V,M)
+        Q.set_UVC(U[::3,::3],V[::3,::3],M[::3,::3])
         text.set_text(str(num+1)+'/'+str(len(data.t)))
         return Q
 
@@ -246,4 +270,8 @@ def dataset_to_array(data,t=0):
     if 't' in data.dims:
         print('Warning: function for a single frame, using the first frame, supply data.isel(t=N)')
         data = data.isel(t=t)
+    
+    if 'z' in data.dims:
+        print('Warning: using first z cordinate, use data.isel(z=0)')
+        data = data.isel(z=0)
     return data

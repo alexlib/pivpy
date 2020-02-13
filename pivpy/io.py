@@ -20,7 +20,6 @@ def create_sample_field(rows=5,cols=8,frame = 0):
     y = np.linspace(16.,128.,rows)
 
     xm,ym = np.meshgrid(x,y)
-
     u = np.ones_like(xm.T) + np.linspace(0.0,7.0,rows)
     v = np.zeros_like(ym.T) + np.linspace(0.0,1.0,rows) + np.random.rand(cols,1)-.5
 
@@ -144,7 +143,7 @@ def load_directory(path,basename='*',ext='.vec'):
     xarray Dataset with variables and units added as attributes
 
     Input: 
-        directory : path to the directory with .vec, .txt or .VC7 files
+        directory : path to the directory with .vec, .txt or .VC7 files, . can be dropped
 
     Output:
         data : xarray DataSet with dimensions: x,y,t and 
@@ -157,7 +156,7 @@ def load_directory(path,basename='*',ext='.vec'):
     files  = sorted(glob(os.path.join(path,basename+ext)))
     data = []
 
-    if ext == '.vec':
+    if ext.lower().endswith('vec'):
         variables, units, rows, cols, dt, frame = parse_header(files[0])
 
         for i,f in enumerate(files):
@@ -169,13 +168,13 @@ def load_directory(path,basename='*',ext='.vec'):
             combined.attrs['units'] = data[0].attrs['units']
             combined.attrs['dt'] = data[0].attrs['dt']
             combined.attrs['files'] = files
-    elif ext.lower() == '.vc7':
+    elif ext.lower().endswith('vc7'):
         frame = 1
         for i,f in enumerate(files):
-            if basename=='B*':
-                time=int(f[-9:-4])-1
+            if basename == 'B*': # quite strange to have a specific name? 
+                time = int(f[-9:-4])-1
             else:
-                time=i
+                time = i
             data.append(load_vc7(f,time))
         if len(data) > 0:
             combined = xr.concat(data, dim='t')
@@ -291,19 +290,20 @@ def load_vc7(path,time=0):
     #you need to add clear to prevent data leaks
     buff, vatts   =  ReadIM.extra.get_Buffer_andAttributeList(path)
     v_array, buff1 = ReadIM.extra.buffer_as_array(buff)
-    nx=buff.nx
-    nz=buff.nz
-    ny=buff.ny
+    nx = buff.nx
+    nz = buff.nz
+    ny = buff.ny
     #set data range:
     baseRangeX = np.arange(nx)
     baseRangeY = np.arange(ny)
     # baseRangeZ = np.arange(nz)
-    lhs1 =(baseRangeX+0.5)*buff.vectorGrid*buff.scaleX.factor+buff.scaleX.offset  # x-range
-    lhs2 =(baseRangeY+0.5)*buff.vectorGrid*buff.scaleY.factor+buff.scaleY.offset #y-range
-    lhs3 =0
-    lhs4 =0
-    mask =0
+    lhs1 = (baseRangeX+0.5)*buff.vectorGrid*buff.scaleX.factor+buff.scaleX.offset  # x-range
+    lhs2 = (baseRangeY+0.5)*buff.vectorGrid*buff.scaleY.factor+buff.scaleY.offset #y-range
+    lhs3 = 0
+    lhs4 = 0
+    mask = 0
     if buff.image_sub_type<=0: #grayvalue image format
+        [lhs1,lhs2] = np.meshgrid(lhs1,lhs2)
         lhs3 =v_array[0,:,:]
         lhs4=v_array[1,:,:]
         Im = xr.DataArray(v_array,dims=('frame','z','x'),coords={'x':lhs1[0,:],'z':lhs2[:,0],'frame':[0,1]})
@@ -360,11 +360,12 @@ def load_vc7(path,time=0):
         v = xr.DataArray(lhs4,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
         chc = xr.DataArray(mask,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
         data = xr.Dataset({'u': u, 'v': v,'chc':chc})
-    data.attrs =ReadIM.extra.att2dict(vatts)
-    data.attrs['variables'] = ['x','y','u','v']
-    data.attrs['units'] = ['mm','mm','m/s','m/s']  
-    data.attrs['dt'] = int(data.attrs['FrameDt0'][:-3])
-    data.attrs['files'] = path
+    if buff.image_sub_type>0:
+        data.attrs =ReadIM.extra.att2dict(vatts)
+        data.attrs['variables'] = ['x','y','u','v']
+        data.attrs['units'] = ['mm','mm','m/s','m/s']  
+        data.attrs['dt'] = int(data.attrs['FrameDt0'][:-3])
+        data.attrs['files'] = path
     #clean memory
     ReadIM.DestroyBuffer(buff1)
     del(buff1)

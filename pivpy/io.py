@@ -22,7 +22,7 @@ def create_sample_field(rows=5,cols=8,frame = 0):
     xm,ym = np.meshgrid(x,y)
 
     u = np.ones_like(xm.T) + np.linspace(0.0,7.0,rows)
-    v = np.zeros_like(ym.T) + np.random.rand(cols,1)-.5
+    v = np.zeros_like(ym.T) + np.linspace(0.0,1.0,rows) + np.random.rand(cols,1)-.5
 
     u = u[:,:,np.newaxis]
     v = v[:,:,np.newaxis]

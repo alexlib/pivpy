@@ -31,14 +31,17 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
     Usage:
         graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
+   
+    data = dataset_to_array(data)
 
-    if 'z' in data.dims:
-        print('Warning: using first z cordinate')
-        data = data.sel(z=0)   
+    # by construction, u and v are rows x columns so need to be rotated 90 deg
+    # prior to plotting
+    
     x = data.x
     y = data.y
     u = data.u.T
     v = data.v.T
+    
 
     
     if units is not None: # replace  units
@@ -49,6 +52,15 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         lUnits = data.attrs['units'][0]
         velUnits = data.attrs['units'][2]
         # tUnits = data.attrs['units'][2].split('/')[-1]
+        
+    # in addition, if the x,y units are pixels,
+    # we should plot it in the image coordinate system
+    # with 0,0 at the top left corner
+    # and so v should be negative
+    # and axis inverted
+    
+    if lUnits == 'pix':
+        v = -1*v # only for graphics, we do not change data
     
     
     if threshold is not None:
@@ -64,20 +76,27 @@ def quiver(data, arrScale = 25.0, threshold = None, nthArr = 1,
         ax = plt.gca() 
 
     # quiver itself
-    ax.quiver(x[::nthArr],y[::nthArr],u[::nthArr,::nthArr],v[::nthArr,::nthArr],units='width',
-            scale = np.max(S*arrScale),headwidth=2)    
+    if colbar:
+        Q = ax.quiver(x,y,u,v,S,units='width',scale = np.max(S*arrScale),headwidth=2)
+        cbar = fig.colorbar(Q,shrink=0.9,orientation=colbar_orient)
+    else:
+        ax.quiver(x,y,u,v,units='width',scale = np.max(S*arrScale),headwidth=2)
+    
+    if lUnits == 'pix':
+        ax.invert_yaxis()
+    
     
     if streamlines == True: # contours or streamlines
         speed = np.sqrt(u**2 + v**2)
         strm = ax.streamplot(x,y,u,v,color=speed,cmap=plt.get_cmap('hot'),linewidth=4) 
 
         if colbar:
-            cbar = fig.colorbar(strm.lines, orientation=colbar_orient)
+            cbar = fig.colorbar(strm.lines, orientation=colbar_orient,fraction=0.1)
             cbar.set_label(r'$ V \, (' + velUnits + r')$' )
         
     
-    ax.set_xlabel('x (' + lUnits + ')')
-    ax.set_ylabel('y (' + lUnits + ')')
+    ax.set_xlabel(f'x({lUnits})')
+    ax.set_ylabel(f'y ({lUnits})')
     ax.set_aspect(aspectratio)
  
     return fig,ax

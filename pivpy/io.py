@@ -333,7 +333,7 @@ def load_vc7(path,time=0):
         lhs3 = lhs1*0
         lhs4 = lhs2*0
         # Get choice
-        maskData = v_array[0,:,:]
+        maskData = np.int8(v_array[0,:,:])
         	# Build best vectors from choice field
         for i in range(5):
             mask =  maskData ==(i+1) 
@@ -352,13 +352,12 @@ def load_vc7(path,time=0):
         #Display vector field
         if buff.scaleY.factor<0.0:
             lhs4 = -1*lhs4
-        mask =  maskData ==0
         lhs3=lhs3.T[:,:,np.newaxis]
         lhs4=lhs4.T[:,:,np.newaxis]
-        mask=mask.T[:,:,np.newaxis]
+        chc=maskData.T[:,:,np.newaxis]
         u = xr.DataArray(lhs3,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
         v = xr.DataArray(lhs4,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
-        chc = xr.DataArray(mask,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
+        chc = xr.DataArray(chc,dims=('x','y','t'),coords={'x':lhs1[0,:],'y':lhs2[:,0],'t':[time]})
         data = xr.Dataset({'u': u, 'v': v,'chc':chc})
     if buff.image_sub_type>0:
         data.attrs =ReadIM.extra.att2dict(vatts)
@@ -374,7 +373,6 @@ def load_vc7(path,time=0):
     ReadIM.DestroyAttributeListSafe(vatts)
     del(vatts)
     return data
-
 def load_txt(filename, rows=None, cols=None, variables=None, units=None, dt=None, frame=0):
     """
         load_vec(filename,rows=rows,cols=cols)

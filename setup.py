@@ -10,7 +10,7 @@ def read(fname):
 
 setup(
     name = "pivpy",
-    version = "0.0.07",
+    version = "0.0.08",
     author = "Turbulence Structure Laboratory, Tel Aviv University",
     author_email = "alex.liberzon@gmail.com",
     description = ("Post processing of PIV vector files "

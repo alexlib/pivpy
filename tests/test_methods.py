@@ -7,16 +7,16 @@ import pkg_resources as pkg
 import os
 f1 = 'Run000001.T000.D000.P000.H001.L.vec'
 f2 = 'Run000002.T000.D000.P000.H001.L.vec'
-path = pkg.resource_filename('pivpy','data/Insight')
+path = pkg.resource_filename('pivpy', 'data/Insight')
 
-_a = io.load_vec(os.path.join(path,f1))
-_b = io.load_vec(os.path.join(path,f2))
+_a = io.load_vec(os.path.join(path, f1))
+_b = io.load_vec(os.path.join(path, f2))
 
 
 def test_crop():
     """ tests crop """
-    _c = _a.piv.crop([5, 15,-5,-15])
-    assert _c.u.shape == (32,32,1)
+    _c = _a.piv.crop([5, 15, -5, -15])
+    assert _c.u.shape == (32, 32, 1)
     
     _c = io.create_sample_dataset()
     _c = _c.sel(x = slice(35,70),y=slice(30,90))
@@ -24,15 +24,16 @@ def test_crop():
 
 def test_pan():
     """ test a shift by dx,dy using pan method """
-    _a = io.load_vec(os.path.join(path,f1))
-    _c = _a.piv.pan(1.0,-1.0) # note the use of .piv.
-    assert np.allclose(_c.coords['x'][0],1.312480)
+    _a = io.load_vec(os.path.join(path, f1))
+    _c = _a.piv.pan(1.0,-1.0)  # note the use of .piv.
+    assert np.allclose(_c.coords['x'][0], 1.312480)
     assert np.allclose(_c.coords['y'][0], -1.31248)
 
 
 def test_mean():
     data = io.create_sample_dataset(10)
     assert np.allclose(data.piv.average.u.median(), 4.5)
+
 
 def test_vec2scal():
     data = io.create_sample_dataset()

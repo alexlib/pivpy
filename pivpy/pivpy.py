@@ -107,12 +107,12 @@ class PIVAccessor(object):
 
         return self._obj
 
-        
-
     def pan(self, dx=0.0, dy=0.0):
         """ moves the field by dx,dy in the same units as x,y """
-        self._obj['x'] += dx
-        self._obj['y'] += dy
+        self._obj = self._obj.assign_coords({"x": self._obj.x+dx,
+                                "y": self._obj.y+dy})
+        # self._obj['x'] += dx
+        # self._obj['y'] += dy
         return self._obj
 
     def filterf(self):
@@ -151,39 +151,37 @@ class PIVAccessor(object):
         
         """
         
-        ux,_ = np.gradient(self._obj['u'], self._obj['x'],
-                            self._obj['y'], axis=(0, 1))
-        _,vy = np.gradient(self._obj['v'], self._obj['x'],
-                            self._obj['y'], axis=(0, 1))
+        ux, _ = np.gradient(self._obj['u'], self._obj['x'],
+                           self._obj['y'], axis=(0, 1))
+        _, vy = np.gradient(self._obj['v'], self._obj['x'],
+                           self._obj['y'], axis=(0, 1))
         # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
-        self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y','t'])
+        # _w = xr.DataArray(vy - ux, dims=['x', 'y', 't'])
+        self._obj["w"] = (("x", "y", "t"), vy - ux)
+        # self._obj = self._obj.assign(w=_w)
+        # self._obj.assign(w=vy-ux)
         
         if len(self._obj.attrs['units']) == 4:
-            vel_units = self._obj.attrs['units'][-1]
+            # vel_units = self._obj.attrs['units'][-1]
             self._obj.attrs['units'].append('1/dt')
         else:
-            vel_units = self._obj.attrs['units'][-2]
+            # vel_units = self._obj.attrs['units'][-2]
             self._obj.attrs['units'][-1] = ('1/dt')
 
         return self._obj
     
     def shear(self):
         """ calculates shear of the data array (single frame) 
-        
-        Input: 
+        Input:
             xarray with the variables u,v and dimensions x,y
-        
         Output:
             xarray with the estimated shear as a scalar field data['w']
-        
         """
-        
         ux, _ = np.gradient(self._obj['u'], self._obj['x'],
                             self._obj['y'], axis=(0, 1))
         _, vy = np.gradient(self._obj['v'], self._obj['x'],
-                            self._obj['y'], axis=(0, 1))
-        # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
-        self._obj['w'] = xr.DataArray(vy + ux, dims=['x', 'y', 't'])
+                            self._obj['y'], axis=(0, 1))       
+        self._obj["w"] = (("x", "y", "t"), vy + ux)
         if len(self._obj.attrs['units']) == 4:
             # vel_units = self._obj.attrs['units'][-1]
             self._obj.attrs['units'].append('1/dt')

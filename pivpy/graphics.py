@@ -46,10 +46,10 @@ def quiver(
     # by construction, u and v are rows x columns so need to be rotated 90 deg
     # prior to plotting
 
-    x = data.x
-    y = data.y
-    u = data.u.T
-    v = data.v.T
+    x = data.x.values
+    y = data.y.values
+    u = data.u.values.T
+    v = data.v.values.T
 
     if units is not None:  # replace  units
         lUnits = units[0]  # ['m' 'm' 'mm/s' 'mm/s']

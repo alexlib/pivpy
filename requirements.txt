@@ -1,6 +1,7 @@
 numpy
 scipy
 xarray
+netcdf4
 matplotlib
 readim
 pytest

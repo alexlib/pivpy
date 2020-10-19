@@ -2,9 +2,9 @@
 PIVPy introduction
 =========================
 
-------------
+----------------------
 History and motivation
-------------
+----------------------
 
 
 Federic Moisy created wonderful package, called PIVMAT http://www.fast.u-psud.fr/pivmat/ which 

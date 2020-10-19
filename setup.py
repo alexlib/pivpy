@@ -8,28 +8,31 @@ from setuptools import setup, find_packages
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
+
 setup(
-    name = "pivpy",
-    version = "0.0.08",
-    author = "Turbulence Structure Laboratory, Tel Aviv University",
-    author_email = "alex.liberzon@gmail.com",
-    description = ("Post processing of PIV vector files "
-                                   " eventually going into OpenPIV "),
-    license = "BSD",
-    keywords = "example documentation tutorial",
-    url = "http://packages.python.org/pivpy",
+    name="pivpy",
+    version="0.0.08",
+    author="Turbulence Structure Laboratory, Tel Aviv University",
+    author_email="alex.liberzon@gmail.com",
+    description=(
+        "Post processing of PIV vector files "
+        " eventually going into OpenPIV "
+    ),
+    license="BSD",
+    keywords="example documentation tutorial",
+    url="http://packages.python.org/pivpy",
     packages=find_packages(),
     include_package_data=True,
     test_suite="tests",
     install_requires=[
-        'numpy',
-        'scipy',
-        'xarray',
-        'matplotlib',
-        'readim',
-        'pytest'
-    ], 
-    long_description=read('README.md'),
+        "numpy",
+        "scipy",
+        "xarray",
+        "matplotlib",
+        "readim",
+        "pytest",
+    ],
+    long_description=read("README.md"),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Topic :: Utilities",

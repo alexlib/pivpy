@@ -15,3 +15,13 @@ translate the PIVMAT into PIVPy. Of course, it won't be one-to-one translation b
 is by far richer language and provides us with some basic programming things that Matlab cannot. We 
 hope that our effort will be useful. 
 
+
+
+-------------
+PIV data structure
+-------------
+
+Particle Image Velocimetry (PIV) data can be easily presented as a list of Numpy arrays, 
+where each array has the datatype of `x,y,u,v,mask,quality`, where `x,y` are coordinates, 
+'u,v' (and if data is 3D `x,y,z,u,v,w`, then also `w`)  
+

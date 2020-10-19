@@ -18,10 +18,7 @@ import sys
 
 sys.path.append(os.path.abspath("sphinxext"))
 
-extensions = ["recommonmark", 
-    # Auto-generate section labels.
-    'sphinx.ext.autosectionlabel',
-]
+extensions = ["recommonmark", 'sphinx.ext.autosectionlabel']
 
 # -- Project information -----------------------------------------------------
 

@@ -6,6 +6,7 @@ PIVPy
    :maxdepth: 2
    
    intro
+   basics
    tutorial
    api_reference
 

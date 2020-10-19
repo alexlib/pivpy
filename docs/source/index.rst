@@ -7,6 +7,7 @@ PIVPy
    
    intro
    basics
+   notebook
    tutorial
    api_reference
 

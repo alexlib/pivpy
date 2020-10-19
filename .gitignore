@@ -10,3 +10,4 @@ tests/PIVPy.egg-info/*
 docs/build/*
 docs/build/doctrees/*
 docs/build/html/*
+docs/source/.ipynb_checkpoints/

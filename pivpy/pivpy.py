@@ -5,7 +5,6 @@ Created on Sun May 24 22:02:49 2015
 @author: Ron, Alex
 """
 import numpy as np
-
 # from scipy.stats import norm
 # from scipy.ndimage.filters import gaussian_filter
 # from scipy.ndimage.filters import median_filter
@@ -53,7 +52,7 @@ Out[3]: 'plotting!'
 """
 
 
-@xr.register_dataset_accessor("piv")
+@xr.register_dataset_accessor('piv')
 class PIVAccessor(object):
     def __init__(self, xarray_obj):
         """
@@ -76,18 +75,19 @@ class PIVAccessor(object):
 
         """
         self._obj = xarray_obj
-        self._average = None
+        self._average = None 
         self._dt = None
 
     @property
     def average(self):
         """ Return the mean flow field ."""
         if self._average is None:  # only first time
-            self._average = self._obj.mean(dim="t")
+            self._average = self._obj.mean(dim='t')
             self._average.attrs = self._obj.attrs  # we need units in quiver
+            self._average.assign_coords({"t":0})
 
         return self._average
-
+    
     def crop(self, crop_vector=[None, None, None, None]):
         """ crop number of rows, cols from either side of the vector fields
         Input: 
@@ -98,21 +98,20 @@ class PIVAccessor(object):
             same object as the input    
         """
         xmin, xmax, ymin, ymax = crop_vector
-
+        
         xmin = self._obj.x.min() if xmin is None else xmin
         xmax = self._obj.x.max() if xmax is None else xmax
         ymin = self._obj.y.min() if ymin is None else ymin
-        ymax = self._obj.y.max() if ymax is None else ymax
-
+        ymax = self._obj.y.max() if ymax is None else ymax        
+        
         self._obj = self._obj.sel(x=slice(xmin, xmax), y=slice(ymin, ymax))
 
         return self._obj
 
     def pan(self, dx=0.0, dy=0.0):
         """ moves the field by dx,dy in the same units as x,y """
-        self._obj = self._obj.assign_coords(
-            {"x": self._obj.x + dx, "y": self._obj.y + dy}
-        )
+        self._obj = self._obj.assign_coords({"x": self._obj.x+dx,
+                                "y": self._obj.y+dy})
         # self._obj['x'] += dx
         # self._obj['y'] += dy
         return self._obj
@@ -120,25 +119,24 @@ class PIVAccessor(object):
     def filterf(self):
         """Gaussian filtering of velocity """
         from scipy.ndimage.filters import gaussian_filter as gf
-
-        self._obj["u"] = xr.DataArray(gf(self._obj["u"], 1), dims=("x", "y"))
-        self._obj["v"] = xr.DataArray(gf(self._obj["v"], 1), dims=("x", "y"))
+        self._obj['u'] = xr.DataArray(gf(self._obj['u'],1),dims=('x','y'))
+        self._obj['v'] = xr.DataArray(gf(self._obj['v'],1),dims=('x','y'))
         return self._obj
 
     def __add__(self, other):
         """ add two datasets means that we sum up the velocities, assume
         that x,y,t,dt are all identical
         """
-        self._obj["u"] += other._obj["u"]
-        self._obj["v"] += other._obj["v"]
+        self._obj['u'] += other._obj['u']
+        self._obj['v'] += other._obj['v']
         return self._obj
 
     def __sub__(self, other):
         """ add two datasets means that we sum up the velocities, assume
         that x,y,t,dt are all identical 
         """
-        self._obj["u"] -= other._obj["u"]
-        self._obj["v"] -= other._obj["v"]
+        self._obj['u'] -= other._obj['u']
+        self._obj['v'] -= other._obj['v']
         return self._obj
 
     def vorticity(self):
@@ -153,49 +151,79 @@ class PIVAccessor(object):
             same dimensions
         
         """
-
-        ux, _ = np.gradient(
-            self._obj["u"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
-        _, vy = np.gradient(
-            self._obj["v"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
+        
+        ux, uy = np.gradient(self._obj['u'], self._obj['x'],
+                           self._obj['y'], axis=(0, 1))
+        vx, vy = np.gradient(self._obj['v'], self._obj['x'],
+                           self._obj['y'], axis=(0, 1))
         # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
         # _w = xr.DataArray(vy - ux, dims=['x', 'y', 't'])
-        self._obj["w"] = (("x", "y", "t"), vy - ux)
+        if 't' in self._obj.coords:
+            self._obj["w"] = (("x", "y", "t"), vx - uy)
+        else:
+            self._obj["w"] = (("x", "y"), vx - uy)
         # self._obj = self._obj.assign(w=_w)
         # self._obj.assign(w=vy-ux)
-
-        if len(self._obj.attrs["units"]) == 4:
+        
+        if len(self._obj.attrs['units']) == 4:
             # vel_units = self._obj.attrs['units'][-1]
-            self._obj.attrs["units"].append("1/dt")
+            self._obj.attrs['units'].append('1/dt')
         else:
             # vel_units = self._obj.attrs['units'][-2]
-            self._obj.attrs["units"][-1] = "1/dt"
+            self._obj.attrs['units'][-1] = ('1/dt')
 
         return self._obj
-
-    def shear(self):
+    
+    def strain(self):
         """ calculates shear of the data array (single frame) 
         Input:
             xarray with the variables u,v and dimensions x,y
         Output:
             xarray with the estimated shear as a scalar field data['w']
         """
-        ux, _ = np.gradient(
-            self._obj["u"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
-        _, vy = np.gradient(
-            self._obj["v"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
-        self._obj["w"] = (("x", "y", "t"), vy + ux)
-        if len(self._obj.attrs["units"]) == 4:
+        ux, uy = np.gradient(self._obj['u'], self._obj['x'],
+                            self._obj['y'], axis=(0, 1))
+        vx, vy = np.gradient(self._obj['v'], self._obj['x'],
+                            self._obj['y'], axis=(0, 1))  
+
+        if 't' in self._obj.coords:     
+            self._obj["w"] = (("x", "y", "t"), (ux**2 + vy**2)+0.5*(uy+vx)**2)
+        else:
+            self._obj["w"] = (("x", "y"), (ux**2 + vy**2)+0.5*(uy+vx)**2)
+
+        if len(self._obj.attrs['units']) == 4:
             # vel_units = self._obj.attrs['units'][-1]
-            self._obj.attrs["units"].append("1/dt")
+            self._obj.attrs['units'].append('1/dt')
         else:
             # vel_units = self._obj.attrs['units'][-2]
-            self._obj.attrs["units"][-1] = "1/dt"
+            self._obj.attrs['units'][-1] = ('1/dt')        
+            
+        return self._obj
 
+    def divergence(self):
+        """ calculates shear of the data array (single frame) 
+        Input:
+            xarray with the variables u,v and dimensions x,y
+        Output:
+            xarray with the estimated shear as a scalar field data['w']
+        """
+        ux, _ = np.gradient(self._obj['u'], self._obj['x'],
+                            self._obj['y'], axis=(0, 1))
+        _, vy = np.gradient(self._obj['v'], self._obj['x'],
+                            self._obj['y'], axis=(0, 1))  
+
+        if 't' in self._obj.coords:     
+            self._obj["w"] = (("x", "y", "t"), vy + ux)
+        else:
+            self._obj["w"] = (("x", "y"), vy + ux)
+
+        if len(self._obj.attrs['units']) == 4:
+            # vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append('1/dt')
+        else:
+            # vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = ('1/dt')        
+            
         return self._obj
 
     def acceleration(self):
@@ -208,72 +236,64 @@ class PIVAccessor(object):
             xarray with the estimated acceleration as a scalar field data['w']
         
         """
-        ux, uy = np.gradient(
-            self._obj["u"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
-        vx, vy = np.gradient(
-            self._obj["v"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
+        ux,uy = np.gradient(self._obj['u'],self._obj['x'],self._obj['y'],axis=(0,1))
+        vx,vy = np.gradient(self._obj['v'],self._obj['x'],self._obj['y'],axis=(0,1))
+        
+        ax = self._obj['u']*ux + self._obj['v']*uy
+        ay = self._obj['u']*vx + self._obj['v']*vy
 
-        ax = self._obj["u"] * ux + self._obj["v"] * uy
-        ay = self._obj["u"] * vx + self._obj["v"] * vy
+        self._obj['w'] = xr.DataArray(np.sqrt(ax**2+ay**2), dims=['x', 'y','t'])
 
-        self._obj["w"] = xr.DataArray(
-            np.sqrt(ax ** 2 + ay ** 2), dims=["x", "y", "t"]
-        )
-
-        if len(self._obj.attrs["units"]) == 4:
-            vel_units = self._obj.attrs["units"][-1]
-            self._obj.attrs["units"].append(f"{vel_units}^2")
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append(f'{vel_units}^2')
         else:
-            vel_units = self._obj.attrs["units"][-2]
-            self._obj.attrs["units"][-1] = f"{vel_units}^2"
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = (f'{vel_units}^2')
+
 
         return self._obj
 
     def ke(self):
         """ estimates turbulent kinetic energy """
-        self._obj["w"] = (self._obj["u"]) ** 2 + (self._obj["v"]) ** 2
+        self._obj['w'] = (self._obj['u'])**2 + (self._obj['v'])**2
 
-        if len(self._obj.attrs["units"]) == 4:
-            vel_units = self._obj.attrs["units"][-1]
-            self._obj.attrs["units"].append(f"({vel_units})^2")
+        if len(self._obj.attrs['units']) == 4:
+            vel_units = self._obj.attrs['units'][-1]
+            self._obj.attrs['units'].append(f'({vel_units})^2')
         else:
-            vel_units = self._obj.attrs["units"][-2]
-            self._obj.attrs["units"][-1] = f"({vel_units})^2"
+            vel_units = self._obj.attrs['units'][-2]
+            self._obj.attrs['units'][-1] = (f'({vel_units})^2')
         return self._obj
-
+        
     def tke(self):
         """ estimates turbulent kinetic energy """
         if len(self._obj.t) < 2:
-            raise ValueError(
-                "TKE is not defined for a single vector field, use .piv.ke()"
-            )
+            raise ValueError('TKE is not defined for a single vector field, use .piv.ke()')
 
-        self._obj["w"] = (
-            self._obj["u"] - self._obj["u"].mean(dim="t")
-        ) ** 2 + (self._obj["v"] - self._obj["v"].mean(dim="t")) ** 2
-        vel_units = self._obj.attrs["units"][-1]
-        self._obj.attrs["units"].append(f"({vel_units})^2")
+        self._obj['w'] = (self._obj['u'] - self._obj['u'].mean(dim='t'))**2 + \
+            (self._obj['v'] - self._obj['v'].mean(dim='t'))**2
+        vel_units = self._obj.attrs['units'][-1]
+        self._obj.attrs['units'].append(f'({vel_units})^2')
         return self._obj
 
+    
     def fluct(self):
         """ returns fluctuations as a new dataset """
 
         if len(self._obj.t) < 2:
-            raise ValueError(
-                "flcutuations cannot be defined for a single vector field, use .piv.ke()"
-            )
+            raise ValueError('flcutuations cannot be defined for a single vector field, use .piv.ke()')
 
         new_obj = self._obj.copy()
-
-        new_obj["u"] = self._obj["u"] - self._obj["u"].mean(dim="t")
-        new_obj["v"] = self._obj["v"] - self._obj["v"].mean(dim="t")
-        if "w" in self._obj.var():
-            new_obj["w"] = self._obj["w"] - self._obj["w"].mean(dim="t")
+        
+        new_obj['u'] =  self._obj['u'] - self._obj['u'].mean(dim='t')
+        new_obj['v'] =  self._obj['v'] - self._obj['v'].mean(dim='t')
+        if 'w' in self._obj.var():
+            new_obj['w'] =  self._obj['w'] - self._obj['w'].mean(dim='t')
         return new_obj
 
-    def vec2scal(self, property="curl"):
+        
+    def vec2scal(self, property='curl'):
         """ creates a dataset of scalar values on the same 
         dimensions and coordinates as the vector dataset
         Agruments:
@@ -285,45 +305,46 @@ class PIVAccessor(object):
 
         """
         # replace few common names
-        property = "vorticity" if property == "curl" else property
-        property = "tke" if property == "ken" else property
-        property = "vorticity" if property == "vort" else property
-
+        property = 'vorticity' if property == 'curl' else property
+        property = 'tke' if property == 'ken' else property
+        property = 'vorticity' if property == 'vort' else property
+        
         method_name = str(property)
         method = getattr(self, method_name, lambda: "nothing")
-
-        if len(self._obj.attrs["variables"]) <= 4:  # only x,y,u,v
-            self._obj.attrs["variables"].append(property)
+        
+        if len(self._obj.attrs['variables']) <= 4:  # only x,y,u,v
+            self._obj.attrs['variables'].append(property)
         else:
-            self._obj.attrs["variables"][-1] = property
+            self._obj.attrs['variables'][-1] = property
+            
+        return self._obj, method()
 
-        return method()
-
-    def __mul__(self, scalar):
-        """
+    def __mul__(self,scalar):
+        '''
         multiplication of a velocity field by a scalar (simple scaling)
-        """
-        self._obj["u"] *= scalar
-        self._obj["v"] *= scalar
+        '''
+        self._obj['u'] *= scalar
+        self._obj['v'] *= scalar
 
         return self._obj
 
-    def __div__(self, scalar):
-        """
+    def __div__(self,scalar):
+        '''
         multiplication of a velocity field by a scalar (simple scaling)
-        """
-        self._obj["u"] /= scalar
-        self._obj["v"] /= scalar
+        '''
+        self._obj['u'] /= scalar
+        self._obj['v'] /= scalar
 
         return self._obj
 
-    def set_dt(self, dt):
-        self._obj.attrs["dt"] = dt
-
-    def set_tUnits(self, tUnits):
-        self._obj.attrs["tUnits"] = tUnits
-
-    def rotate(self, theta=0.0):
+    
+    def set_dt(self,dt):
+        self._obj.attrs['dt'] = dt
+        
+    def set_tUnits(self,tUnits):
+        self._obj.attrs['tUnits'] = tUnits
+        
+    def rotate(self,theta=0.0):
         """ 
         use this method in order to rotate the data 
         by theta degrees in the clockwise direction
@@ -331,41 +352,45 @@ class PIVAccessor(object):
         it can only work for the cases with equal size along
         x and y 
         """
-
-        theta = theta / 360.0 * 2 * np.pi
-
-        xi = self._obj.x * np.cos(theta) + self._obj.y * np.sin(theta)
-        eta = self._obj.y * np.cos(theta) - self._obj.x * np.sin(theta)
-        Uxi = self._obj.u * np.cos(theta) + self._obj.v * np.sin(theta)
-        Ueta = self._obj.v * np.cos(theta) - self._obj.u * np.sin(theta)
-
-        self._obj["x"] = xi
-        self._obj["y"] = eta
-        self._obj["u"] = Uxi
-        self._obj["v"] = Ueta
-
-        if "theta" in self._obj:
-            self._obj["theta"] += theta
+        
+        theta = theta/360.0*2*np.pi
+        
+        xi = self._obj.x*np.cos(theta) + self._obj.y*np.sin(theta)
+        eta = self._obj.y*np.cos(theta) - self._obj.x*np.sin(theta)
+        Uxi = self._obj.u*np.cos(theta) + self._obj.v*np.sin(theta)
+        Ueta = self._obj.v*np.cos(theta) - self._obj.u*np.sin(theta)
+        
+        self._obj['x'] = xi
+        self._obj['y'] = eta
+        self._obj['u'] = Uxi
+        self._obj['v'] = Ueta
+        
+        
+        if 'theta' in self._obj:
+            self._obj['theta'] += theta
         else:
-            self._obj["theta"] = theta
-
+            self._obj['theta'] = theta
+            
         return self._obj
-
+        
     @property
     def dt(self):
         """ receives the dt from the set """
         if self._dt is None:
-            self._dt = self._obj.attrs["dt"]
+            self._dt = self._obj.attrs['dt']
         return self._dt
+    
 
-    def quiver(self, **kwargs):
+
+    def quiver(self,**kwargs):
         """ graphics.quiver() as a property """
-        fig, ax = graphics.quiver(self._obj, **kwargs)
+        fig, ax = graphics.quiver(self._obj,**kwargs)
         return fig, ax
 
+    
     def streamplot(self, **kwargs):
         """ graphics.quiver(streamlines=True) """
-        graphics.quiver(self._obj, streamlines=True, **kwargs)
+        graphics.quiver(self._obj, streamlines=True,**kwargs)
 
     def showf(self, **kwargs):
         """ method for graphics.showf """
@@ -374,10 +399,13 @@ class PIVAccessor(object):
     def showscal(self, **kwargs):
         """ method for graphics.showscal """
         graphics.showscal(self._obj, **kwargs)
+    
+
 
     # @property
     # def vel_units(self):
     #     " Return the geographic center point of this dataset."
     #     if self._vel_units is None:
-    #         self._vel_units = self._obj.attrs.l_units + '/' + self._obj.attrs.t_units
+    #         self._vel_units = self._obj.attrs.l_units + '/' + self._obj.attrs.t_units 
     #     return self._vel_units
+        

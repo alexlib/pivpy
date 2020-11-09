@@ -207,6 +207,20 @@ def load_directory(path, basename="*", ext=".vec"):
         if len(data) > 0:
             combined = xr.concat(data, dim="t")
             combined.attrs = data[-1].attrs
+    elif ext.lower() == 'txt':
+        variables, units, rows, cols, dt, frame = parse_header(files[0])
+
+        for i,f in enumerate(files):
+            data.append(load_txt(f, rows, cols, variables, units, dt, frame+i-1))
+
+        if len(data) > 0:
+            combined = xr.concat(data, dim='t')
+            combined.attrs['variables'] = data[0].attrs['variables']
+            combined.attrs['units'] = data[0].attrs['units']
+            combined.attrs['dt'] = data[0].attrs['dt']
+            combined.attrs['files'] = files
+
+
 
     return combined
 

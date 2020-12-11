@@ -11,6 +11,9 @@ import os
 import re
 import ReadIM
 
+default_units = ['pix', 'pix', 'pix/dt', 'pix/dt']
+default_variables = ['x', 'y', 'u', 'v', 's2n']
+
 
 def create_sample_field(rows=5, cols=8, frame=0):
     """ creates a sample dataset for the tests """
@@ -97,9 +100,9 @@ def load_vec(
     filename,
     rows=None,
     cols=None,
-    variables=None,
-    units=None,
-    dt=None,
+    variables=default_variables,
+    units=default_units,
+    dt=1.0,
     frame=0,
 ):
     """
@@ -180,7 +183,13 @@ def load_directory(path, basename="*", ext=".vec"):
     See more: load_vec
     """
     files = sorted(glob(os.path.join(path, basename + ext)))
+    if len(files) == 0:
+        raise IOError(f'No files {basename+ext} in the directory {path} ')
+    else:
+        print(f'found {len(files)} files')
+
     data = []
+    combined = []
 
     if ext.lower().endswith("vec"):
         variables, units, rows, cols, dt, frame = parse_header(files[0])
@@ -207,20 +216,20 @@ def load_directory(path, basename="*", ext=".vec"):
         if len(data) > 0:
             combined = xr.concat(data, dim="t")
             combined.attrs = data[-1].attrs
-    elif ext.lower() == 'txt':
+    elif ext.lower().endswith('txt'):
         variables, units, rows, cols, dt, frame = parse_header(files[0])
 
-        for i,f in enumerate(files):
-            data.append(load_txt(f, rows, cols, variables, units, dt, frame+i-1))
-
+        for i, f in enumerate(files):
+            data.append(load_txt(f, rows, cols, variables, units, dt,
+                                 frame+i-1))
         if len(data) > 0:
             combined = xr.concat(data, dim='t')
             combined.attrs['variables'] = data[0].attrs['variables']
             combined.attrs['units'] = data[0].attrs['units']
             combined.attrs['dt'] = data[0].attrs['dt']
             combined.attrs['files'] = files
-
-
+        else:
+            raise IOError('Could not read the files')
 
     return combined
 
@@ -457,9 +466,9 @@ def load_txt(
     filename,
     rows=None,
     cols=None,
-    variables=None,
-    units=None,
-    dt=None,
+    variables=default_variables,
+    units=default_units,
+    dt=1.0,
     frame=0,
 ):
     """

@@ -84,7 +84,7 @@ class PIVAccessor(object):
         if self._average is None:  # only first time
             self._average = self._obj.mean(dim='t')
             self._average.attrs = self._obj.attrs  # we need units in quiver
-            self._average.assign_coords({"t":0})
+            self._average.assign_coords({"t": 0})
 
         return self._average
     
@@ -92,18 +92,18 @@ class PIVAccessor(object):
         """ crop number of rows, cols from either side of the vector fields
         Input: 
             self : xarray Dataset
-            crop_vector : [xmin,xmax,ymin,ymax] is a list of values crop 
+            crop_vector : [xmin,xmax,ymin,ymax] is a list of values crop
                             the data, defaults are None
-        Return: 
-            same object as the input    
+        Return:
+            same object as the input
         """
         xmin, xmax, ymin, ymax = crop_vector
-        
+
         xmin = self._obj.x.min() if xmin is None else xmin
         xmax = self._obj.x.max() if xmax is None else xmax
         ymin = self._obj.y.min() if ymin is None else ymin
-        ymax = self._obj.y.max() if ymax is None else ymax        
-        
+        ymax = self._obj.y.max() if ymax is None else ymax
+
         self._obj = self._obj.sel(x=slice(xmin, xmax), y=slice(ymin, ymax))
 
         return self._obj

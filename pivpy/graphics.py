@@ -66,8 +66,8 @@ def quiver(
     # and so v should be negative
     # and axis inverted
 
-    if lUnits == "pix":
-        v = -1 * v  # only for graphics, we do not change data
+    # if lUnits == "pix":
+    #     v = -1 * v  # only for graphics, we do not change data
 
     if threshold is not None:
         data["u"] = xr.where(data["u"] > threshold, threshold, data["u"])
@@ -99,8 +99,9 @@ def quiver(
             x, y, u, v, units="width", scale=np.max(S * arrScale), headwidth=2
         )
 
-    if lUnits == "pix":
-        ax.invert_yaxis()
+    # print(f'lUnits = {lUnits}')
+    # if lUnits == "pix":
+    #     ax.invert_yaxis()
 
     if streamlines == True:  # contours or streamlines
         speed = np.sqrt(u ** 2 + v ** 2)
@@ -117,6 +118,7 @@ def quiver(
     ax.set_xlabel(f"x({lUnits})")
     ax.set_ylabel(f"y ({lUnits})")
     ax.set_aspect(aspectratio)
+    ax.invert_yaxis()
 
     return fig, ax
 

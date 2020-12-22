@@ -124,8 +124,8 @@ def load_vec(
 
     if rows is None:  # means no headers
         d = np.loadtxt(filename, usecols=(0, 1, 2, 3, 4))
-        x = np.unique(d[:, 0])
-        y = np.unique(d[:, 1])
+        x = unique(d[:, 0])
+        y = unique(d[:, 1])
         d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
     else:
         d = np.loadtxt(
@@ -487,8 +487,8 @@ def load_txt(
     """
     if rows is None:  # means no headers
         d = np.loadtxt(filename, usecols=(0, 1, 2, 3, 4))
-        x = np.unique(d[:, 0])
-        y = np.unique(d[:, 1])
+        x = unique(d[:, 0])
+        y = unique(d[:, 1])
         d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
     else:
         d = np.loadtxt(
@@ -526,10 +526,7 @@ def load_txt(
     return data
 
 
-# path='C:\\Users\\lior\\Documents\\ibrrTau\\plane1_00'
-# files=[f for f in os.listdir(path) if f.endswith('.vc7')]
-# data=[]
-# data.append(load_vc7(path+'\\'+files[-1],1))
-# data.append(load_vc7(path+'\\'+files[-2],2))
-# combined = xr.concat(data, dim='t')
-# combined.attrs=data[0].attrs
+def unique(array):
+    """ Returns not sorted unique """
+    uniq, index = np.unique(array, return_index=True)
+    return uniq[index.argsort()]

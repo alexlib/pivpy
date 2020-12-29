@@ -11,8 +11,8 @@ import os
 import re
 import ReadIM
 
-default_units = ['pix', 'pix', 'pix/dt', 'pix/dt']
-default_variables = ['x', 'y', 'u', 'v', 's2n']
+default_units = ["pix", "pix", "pix/dt", "pix/dt"]
+default_variables = ["x", "y", "u", "v", "s2n"]
 
 
 def create_sample_field(rows=5, cols=8, frame=0):
@@ -128,9 +128,12 @@ def load_vec(
         y = unique(d[:, 1])
         d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
     else:
+        # d = np.loadtxt(
+        #     filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
+        # ).reshape(rows, cols, 5)
         d = np.loadtxt(
             filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
-        ).reshape(rows, cols, 5)
+        ).reshape(cols, rows, 5)
         x = d[:, :, 0][0, :]
         y = d[:, :, 1][:, 0]
 
@@ -144,13 +147,13 @@ def load_vec(
     chc = chc[:, :, np.newaxis]
 
     u = xr.DataArray(
-        u, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
+        u, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
     )
     v = xr.DataArray(
-        v, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
+        v, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
     )
     chc = xr.DataArray(
-        chc, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
+        chc, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
     )
 
     data = xr.Dataset({"u": u, "v": v, "chc": chc})
@@ -184,9 +187,9 @@ def load_directory(path, basename="*", ext=".vec"):
     """
     files = sorted(glob(os.path.join(path, basename + ext)))
     if len(files) == 0:
-        raise IOError(f'No files {basename+ext} in the directory {path} ')
+        raise IOError(f"No files {basename+ext} in the directory {path} ")
     else:
-        print(f'found {len(files)} files')
+        print(f"found {len(files)} files")
 
     data = []
     combined = []
@@ -216,20 +219,21 @@ def load_directory(path, basename="*", ext=".vec"):
         if len(data) > 0:
             combined = xr.concat(data, dim="t")
             combined.attrs = data[-1].attrs
-    elif ext.lower().endswith('txt'):
+    elif ext.lower().endswith("txt"):
         variables, units, rows, cols, dt, frame = parse_header(files[0])
 
         for i, f in enumerate(files):
-            data.append(load_txt(f, rows, cols, variables, units, dt,
-                                 frame+i-1))
+            data.append(
+                load_txt(f, rows, cols, variables, units, dt, frame + i - 1)
+            )
         if len(data) > 0:
-            combined = xr.concat(data, dim='t')
-            combined.attrs['variables'] = data[0].attrs['variables']
-            combined.attrs['units'] = data[0].attrs['units']
-            combined.attrs['dt'] = data[0].attrs['dt']
-            combined.attrs['files'] = files
+            combined = xr.concat(data, dim="t")
+            combined.attrs["variables"] = data[0].attrs["variables"]
+            combined.attrs["units"] = data[0].attrs["units"]
+            combined.attrs["dt"] = data[0].attrs["dt"]
+            combined.attrs["files"] = files
         else:
-            raise IOError('Could not read the files')
+            raise IOError("Could not read the files")
 
     return combined
 

@@ -1,8 +1,4 @@
-import xarray as xr
-from pivpy import io, pivpy, graphics
-import numpy as np
-
-import os
+from pivpy import io, graphics, pivpy
 import pkg_resources as pkg
 
 # f1 = 'Run000001.T000.D000.P000.H001.L.vec'

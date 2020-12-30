@@ -15,35 +15,32 @@ default_units = ["pix", "pix", "pix/dt", "pix/dt"]
 default_variables = ["x", "y", "u", "v", "s2n"]
 
 
-def create_sample_field(rows=5, cols=8, frame=0):
+def create_sample_field(rows=5, cols=8, frame=0, noise_sigma=1.0):
     """ creates a sample dataset for the tests """
 
-    x = np.linspace(32.0, 128.0, cols)
-    y = np.linspace(16.0, 128.0, rows)
+    x = np.arange(32.0, (cols + 1) * 32.0, 32.0)
+    y = np.arange(16.0, (rows + 1) * 16.0, 16.0)
 
     xm, ym = np.meshgrid(x, y)
-    u = np.ones_like(xm.T) + np.linspace(0.0, 7.0, rows)
+    u = np.ones_like(xm) + np.linspace(0.0, 10.0, cols)
     v = (
-        np.zeros_like(ym.T)
-        + np.linspace(0.0, 1.0, rows)
-        + np.random.rand(cols, 1)
-        - 0.5
+        np.zeros_like(ym)
+        + np.linspace(0.0, 1.0, rows).reshape(rows, 1)
+        + noise_sigma * np.random.randn(rows, 1)
     )
 
     u = u[:, :, np.newaxis]
     v = v[:, :, np.newaxis]
     chc = np.ones_like(u)
 
-    # plt.quiver(xm.T,ym.T,u,v)
-
     u = xr.DataArray(
-        u, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
+        u, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
     )
     v = xr.DataArray(
-        v, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
+        v, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
     )
     chc = xr.DataArray(
-        chc, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
+        chc, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
     )
 
     data = xr.Dataset({"u": u, "v": v, "chc": chc})
@@ -126,7 +123,7 @@ def load_vec(
         d = np.loadtxt(filename, usecols=(0, 1, 2, 3, 4))
         x = unique(d[:, 0])
         y = unique(d[:, 1])
-        d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
+        d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
     else:
         # d = np.loadtxt(
         #     filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)

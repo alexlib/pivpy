@@ -11,6 +11,7 @@ import numpy as np
 # from scipy.ndimage.filters import median_filter
 import xarray as xr
 from pivpy import graphics
+from scipy.ndimage.filters import gaussian_filter as gf
 
 """ learn from this example
 
@@ -120,10 +121,14 @@ class PIVAccessor(object):
 
     def filterf(self):
         """Gaussian filtering of velocity """
-        from scipy.ndimage.filters import gaussian_filter as gf
 
-        self._obj["u"] = xr.DataArray(gf(self._obj["u"], 1), dims=("x", "y"))
-        self._obj["v"] = xr.DataArray(gf(self._obj["v"], 1), dims=("x", "y"))
+        self._obj["u"] = xr.DataArray(
+            gf(self._obj["u"].values, [1, 1, 0]), dims=("x", "y", "t")
+        )
+        self._obj["v"] = xr.DataArray(
+            gf(self._obj["v"].values, [1, 1, 0]), dims=("x", "y", "t")
+        )
+
         return self._obj
 
     def __add__(self, other):
@@ -187,23 +192,12 @@ class PIVAccessor(object):
         Output:
             xarray with the estimated shear as a scalar field data['w']
         """
-        ux, uy = np.gradient(
-            self._obj["u"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
-        vx, vy = np.gradient(
-            self._obj["v"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
+        ux = self._obj.differentiate("x")["u"]
+        uy = self._obj.differentiate("y")["u"]
+        vx = self._obj.differentiate("x")["v"]
+        vy = self._obj.differentiate("y")["v"]
 
-        if "t" in self._obj.coords:
-            self._obj["w"] = (
-                ("x", "y", "t"),
-                (ux ** 2 + vy ** 2) + 0.5 * (uy + vx) ** 2,
-            )
-        else:
-            self._obj["w"] = (
-                ("x", "y"),
-                (ux ** 2 + vy ** 2) + 0.5 * (uy + vx) ** 2,
-            )
+        self._obj["w"] = ux ** 2 + vy ** 2 + 0.5 * (uy + vx) ** 2
 
         if len(self._obj.attrs["units"]) == 4:
             # vel_units = self._obj.attrs['units'][-1]
@@ -311,11 +305,21 @@ class PIVAccessor(object):
             )
 
         new_obj = self._obj.copy()
+        new_obj -= new_obj.mean(dim="t")
+        return new_obj
 
-        new_obj["u"] = self._obj["u"] - self._obj["u"].mean(dim="t")
-        new_obj["v"] = self._obj["v"] - self._obj["v"].mean(dim="t")
-        if "w" in self._obj.var():
-            new_obj["w"] = self._obj["w"] - self._obj["w"].mean(dim="t")
+    def reynolds_stress(self):
+        """ returns fluctuations as a new dataset """
+
+        if len(self._obj.t) < 2:
+            raise ValueError(
+                "fluctuations cannot be defined for a \
+                              single vector field, use .piv.ke()"
+            )
+
+        new_obj = self._obj.copy()
+        new_obj -= new_obj.mean(dim="t")
+        new_obj["w"] = new_obj["u"] * new_obj["v"]
         return new_obj
 
     def vec2scal(self, property="curl"):

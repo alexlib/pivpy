@@ -10,6 +10,8 @@ tests/PIVPy.egg-info/*
 docs/build/*
 docs/build/doctrees/*
 docs/build/html/*
-docs/source/.ipynb_checkpoints/
-examples/notebooks/.ipynb_checkpoints/*.ipynb
+docs/source/.ipynb_checkpoints/*
+examples/notebooks/.ipynb_checkpoints/*
 pivpy.egg-info/PKG-INFO
+pivpy/data/openpiv/.ipynb_checkpoints/*
+.ipynb_checkpoints/*

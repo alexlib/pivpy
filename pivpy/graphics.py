@@ -23,18 +23,21 @@ def quiver(
     streamlines=False,
 ):
     """
-    Generates a quiver plot of a 'data' xarray DataArray object (single frame from a dataset)
+    Generates a quiver plot of a 'data' xarray DataArray object (single frame
+    from a dataset)
     Inputs:
-        data - xarray DataArray of the type defined in pivpy, one of the frames in the Dataset
+        data - xarray DataArray of the type defined in pivpy, one of the
+        frames in the Dataset
             selected by default using .isel(t=0)
         threshold - values above the threshold will be set equal to threshold
         arrScale - use to change arrow scales
-        nthArr - use to plot only every nth arrow from the array 
-        contourLevels - use to specify the maximum value (abs) of contour plots 
+        nthArr - use to plot only every nth arrow from the array
+        contourLevels - use to specify the maximum value (abs) of contour plots
         colbar - True/False wether to generate a colorbar or not
         logscale - if true then colorbar is on log scale
         aspectratio - set auto or equal for the plot's apearence
-        colbar_orient - 'horizontal' or 'vertical' orientation of the colorbar (if colbar is True)
+        colbar_orient - 'horizontal' or 'vertical' orientation of the colorbar
+        (if colbar is True)
     Outputs:
         none
     Usage:
@@ -48,8 +51,8 @@ def quiver(
 
     x = data.x.values
     y = data.y.values
-    u = data.u.values.T
-    v = data.v.values.T
+    u = data.u.values
+    v = data.v.values
 
     if units is not None:  # replace  units
         lUnits = units[0]  # ['m' 'm' 'mm/s' 'mm/s']
@@ -103,7 +106,7 @@ def quiver(
     # if lUnits == "pix":
     #     ax.invert_yaxis()
 
-    if streamlines == True:  # contours or streamlines
+    if streamlines is True:  # contours or streamlines
         speed = np.sqrt(u ** 2 + v ** 2)
         strm = ax.streamplot(
             x, y, u, v, color=speed, cmap=plt.get_cmap("hot"), linewidth=4
@@ -118,7 +121,7 @@ def quiver(
     ax.set_xlabel(f"x({lUnits})")
     ax.set_ylabel(f"y ({lUnits})")
     ax.set_aspect(aspectratio)
-    ax.invert_yaxis()
+    # ax.invert_yaxis()
 
     return fig, ax
 
@@ -131,7 +134,6 @@ def histogram(data, normed=False):
         data : xarray DataSet with ['u','v'] attrs['units']
         normed : (optional) default is False to present normalized
         histogram
-        
     """
 
     u = np.asarray(data.u).flatten()
@@ -159,16 +161,16 @@ def contour_plot(
     aspectratio="equal",
     units=None,
 ):
-    """ contourf ajusted for the xarray PIV dataset, creates a 
-        contour map for the data['w'] property. 
+    """ contourf ajusted for the xarray PIV dataset, creates a
+        contour map for the data['w'] property.
         Input:
-            data : xarray PIV DataArray, converted automatically using .isel(t=0)
+            data : xarray PIV DataArray, converted automatically using
+            .isel(t=0)
             threshold : a threshold value, default is None (no data clipping)
             contourLevels : number of contour levels, default is None
-            colbar : None (hide), 'horizontal', or 'vertical' 
+            colbar : None (hide), 'horizontal', or 'vertical'
             logscale : boolean (True is default) create in linear/log scale
             aspectration : string, 'equal' is the default
-        
     """
 
     data = dataset_to_array(data)
@@ -192,9 +194,9 @@ def contour_plot(
     if threshold is not None:
         data["w"] = xr.where(data["w"] > threshold, threshold, data["w"])
 
-    m = np.amax(abs(data["w"]))
-    n = np.amin(abs(data["w"]))
-    if contourLevels == None:
+    # m = np.amax(abs(data["w"]))
+    # n = np.amin(abs(data["w"]))
+    if contourLevels is None:
         levels = np.linspace(
             np.min(data["w"].values), np.max(data["w"].values), 10
         )
@@ -231,7 +233,7 @@ def contour_plot(
 
 
 def showf(data, property="ke", **kwargs):
-    """ 
+    """
     showf(data, var, units)
     Arguments:
         data : xarray.DataSet that contains dimensions of t,x,y
@@ -243,7 +245,7 @@ def showf(data, property="ke", **kwargs):
 
 
 def showscal(data, property="ke", **kwargs):
-    """ 
+    """
     showf(data, var, units)
     Arguments:
         data : xarray.DataSet that contains dimensions of t,x,y
@@ -255,16 +257,16 @@ def showscal(data, property="ke", **kwargs):
 
 
 def animate(data, arrowscale=1, savepath=None):
-    """ animates the quiver plot for the dataset (multiple frames) 
+    """ animates the quiver plot for the dataset (multiple frames)
     Input:
         data : xarray PIV type of DataSet
         arrowscale : [optional] integer, default is 1
         savepath : [optional] path to save the MP4 animation, default is None
-    
+
     Output:
         if savepath is None, then only an image display of the animation
         if savepath is an existing path, a file named im.mp4 is saved
-    
+
     """
     X, Y = np.meshgrid(data.x, data.y)
     X = X.T
@@ -326,9 +328,8 @@ def animate(data, arrowscale=1, savepath=None):
 def dataset_to_array(data, t=0):
     """ converts xarray Dataset to array """
     if "t" in data.dims:
-        print(
-            "Warning: function for a single frame, using the first frame, supply data.isel(t=N)"
-        )
+        print("Warning: function for a single frame, using the first \
+               frame, supply data.isel(t=N)")
         data = data.isel(t=t)
 
     if "z" in data.dims:

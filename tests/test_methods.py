@@ -1,6 +1,5 @@
 # test_methods.py
-import xarray as xr
-from pivpy import io, pivpy
+from pivpy import io
 import numpy as np
 import pkg_resources as pkg
 
@@ -81,22 +80,35 @@ def test_set_get_dt():
 #     data.piv.rotate(90) # rotate by 90 deg
 #     assert data['u'][0,0,0] == 2.1 # shall fail
 
+def test_fluctuations():
+    data = io.create_sample_field()
+    data.piv.fluct()
+    assert np.allclose(data['u'], 0.0)
+
+
+def test_reynolds_stress():
+    data = io.create_sample_field()
+    tmp = data.piv.reynolds_stress()
+    assert np.allclose(tmp['w'], 0.0)
+
 
 def test_vorticity():
     """ tests vorticity estimate """
     data = io.create_sample_field()
     data.piv.vorticity()
-    assert np.allclose(data["w"][0, 0], 0.00892857)
+    print(data['w'][0, 0])
+    assert np.allclose(data["w"][0, 0], -0.09266766)
 
 
-def test_shear():
+def test_strain():
     """ tests shear estimate """
 
     data = io.create_sample_field()
-    data.piv.shear()
+    data.piv.strain()
+    print(data['w'][0, 0])
     # this is homogeneous case in which the only derivative is
     # vy so both shear and vorticity are equal
-    assert np.allclose(data["w"][0, 0], 0.00892857)
+    assert np.allclose(data["w"][0, 0], 0.00332788)
 
 
 def test_tke():

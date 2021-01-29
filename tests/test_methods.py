@@ -1,5 +1,5 @@
 # test_methods.py
-from pivpy import io
+from pivpy import io, pivpy
 import numpy as np
 import pkg_resources as pkg
 

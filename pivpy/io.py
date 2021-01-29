@@ -129,7 +129,7 @@ def load_vec(
         #     filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
         # ).reshape(rows, cols, 5)
         d = np.genfromtxt(
-            filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
+            filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
         ).reshape(cols, rows, 5)
         x = d[:, :, 0][0, :]
         y = d[:, :, 1][:, 0]
@@ -493,7 +493,7 @@ def load_txt(
         d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
     else:
         d = np.genfromtxt(
-            filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
+            filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
         ).reshape(rows, cols, 5)
         x = d[:, :, 0][0, :]
         y = d[:, :, 1][:, 0]

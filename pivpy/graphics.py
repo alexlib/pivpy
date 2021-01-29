@@ -207,7 +207,7 @@ def contour_plot(
         c = ax.contourf(
             data.x,
             data.y,
-            np.abs(data["w"].T),
+            np.abs(data["w"]),
             levels=levels,
             cmap=plt.get_cmap("RdYlBu"),
             norm=plt.colors.LogNorm(),
@@ -216,7 +216,7 @@ def contour_plot(
         c = ax.contourf(
             data.x,
             data.y,
-            data["w"].T,
+            data["w"],
             levels=levels,
             cmap=plt.get_cmap("RdYlBu"),
         )

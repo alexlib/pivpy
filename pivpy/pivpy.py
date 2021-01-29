@@ -270,7 +270,7 @@ class PIVAccessor(object):
 
     def ke(self):
         """ estimates turbulent kinetic energy """
-        self._obj["w"] = (self._obj["u"]) ** 2 + (self._obj["v"]) ** 2
+        self._obj["w"] = self._obj["u"] ** 2 + self._obj["v"] ** 2
 
         if len(self._obj.attrs["units"]) == 4:
             vel_units = self._obj.attrs["units"][-1]

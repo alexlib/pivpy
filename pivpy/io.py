@@ -120,15 +120,15 @@ def load_vec(
         variables, units, rows, cols, dt, frame = parse_header(filename)
 
     if rows is None:  # means no headers
-        d = np.loadtxt(filename, usecols=(0, 1, 2, 3, 4))
+        d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
         x = unique(d[:, 0])
         y = unique(d[:, 1])
         d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
     else:
-        # d = np.loadtxt(
+        # d = np.genfromtxt(
         #     filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
         # ).reshape(rows, cols, 5)
-        d = np.loadtxt(
+        d = np.genfromtxt(
             filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
         ).reshape(cols, rows, 5)
         x = d[:, :, 0][0, :]
@@ -487,12 +487,12 @@ def load_txt(
             data is a xAarray Dataset, see xarray for help
     """
     if rows is None:  # means no headers
-        d = np.loadtxt(filename, usecols=(0, 1, 2, 3, 4))
+        d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
         x = unique(d[:, 0])
         y = unique(d[:, 1])
         d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
     else:
-        d = np.loadtxt(
+        d = np.genfromtxt(
             filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
         ).reshape(rows, cols, 5)
         x = d[:, :, 0][0, :]

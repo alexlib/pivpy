@@ -176,12 +176,14 @@ class PIVAccessor(object):
         # self._obj = self._obj.assign(w=_w)
         # self._obj.assign(w=vy-ux)
 
-        if len(self._obj.attrs["units"]) == 4:
+        if len(self._obj.attrs["units"]) < 5:
             # vel_units = self._obj.attrs['units'][-1]
             self._obj.attrs["units"].append("1/dt")
+            self._obj.attrs['variables'].append('vorticity')
         else:
             # vel_units = self._obj.attrs['units'][-2]
             self._obj.attrs["units"][-1] = "1/dt"
+            self._obj.attrs['variables'][-1] = 'vorticity'
 
         return self._obj
 
@@ -199,12 +201,14 @@ class PIVAccessor(object):
 
         self._obj["w"] = ux ** 2 + vy ** 2 + 0.5 * (uy + vx) ** 2
 
-        if len(self._obj.attrs["units"]) == 4:
+        if len(self._obj.attrs["units"]) < 5:
             # vel_units = self._obj.attrs['units'][-1]
             self._obj.attrs["units"].append("1/dt")
+            self._obj.attrs['variables'].append('strain')
         else:
             # vel_units = self._obj.attrs['units'][-2]
             self._obj.attrs["units"][-1] = "1/dt"
+            self._obj.attrs['variables'][1] = 'strain'
 
         return self._obj
 
@@ -230,9 +234,11 @@ class PIVAccessor(object):
         if len(self._obj.attrs["units"]) == 4:
             # vel_units = self._obj.attrs['units'][-1]
             self._obj.attrs["units"].append("1/dt")
+            self._obj.attrs['variables'].append('divergence')
         else:
             # vel_units = self._obj.attrs['units'][-2]
             self._obj.attrs["units"][-1] = "1/dt"
+            self._obj.attrs['variables'][-1] = 'divergence'
 
         return self._obj
 
@@ -262,9 +268,11 @@ class PIVAccessor(object):
         if len(self._obj.attrs["units"]) == 4:
             vel_units = self._obj.attrs["units"][-1]
             self._obj.attrs["units"].append(f"{vel_units}^2")
+            self._obj.attrs['variables'].append('acceleration')
         else:
             vel_units = self._obj.attrs["units"][-2]
             self._obj.attrs["units"][-1] = f"{vel_units}^2"
+            self._obj.attrs['variables'][-1] = 'acceleration'
 
         return self._obj
 
@@ -275,9 +283,11 @@ class PIVAccessor(object):
         if len(self._obj.attrs["units"]) == 4:
             vel_units = self._obj.attrs["units"][-1]
             self._obj.attrs["units"].append(f"({vel_units})^2")
+            self._obj.attrs['variables'].append('ke')
         else:
             vel_units = self._obj.attrs["units"][-2]
             self._obj.attrs["units"][-1] = f"({vel_units})^2"
+            self._obj.attrs['variables'][-1] = 'ke'
         return self._obj
 
     def tke(self):
@@ -292,7 +302,12 @@ class PIVAccessor(object):
             self._obj["u"] - self._obj["u"].mean(dim="t")
         ) ** 2 + (self._obj["v"] - self._obj["v"].mean(dim="t")) ** 2
         vel_units = self._obj.attrs["units"][-1]
-        self._obj.attrs["units"].append(f"({vel_units})^2")
+        if len(self._obj.attrs['units']) < 5:
+            self._obj.attrs["units"].append(f"({vel_units})^2")
+            self._obj.attrs["variables"].append("tke")
+        else:
+            self._obj.attrs["units"][-1]  = (f"({vel_units})^2")
+            self._obj.attrs["variables"][-1] = "tke"
         return self._obj
 
     def fluct(self):
@@ -320,6 +335,7 @@ class PIVAccessor(object):
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
         new_obj["w"] = new_obj["u"] * new_obj["v"]
+
         return new_obj
 
     def vec2scal(self, property="curl"):
@@ -341,10 +357,10 @@ class PIVAccessor(object):
         method_name = str(property)
         method = getattr(self, method_name, lambda: "nothing")
 
-        if len(self._obj.attrs["variables"]) <= 4:  # only x,y,u,v
-            self._obj.attrs["variables"].append(property)
-        else:
-            self._obj.attrs["variables"][-1] = property
+        # if len(self._obj.attrs["variables"]) < 5:  # only x,y,u,v
+        #     self._obj.attrs["variables"].append(property)
+        # else:
+        #     self._obj.attrs["variables"][-1] = property
 
         return self._obj, method()
 

@@ -105,10 +105,9 @@ def test_strain():
 
     data = io.create_sample_field()
     data.piv.strain()
-    print(data['w'][0, 0])
     # this is homogeneous case in which the only derivative is
     # vy so both shear and vorticity are equal
-    assert np.allclose(data["w"][0, 0], 0.00332788)
+    assert np.allclose(np.unique(data.w.values.flatten().round(decimals=6)),np.array([0.001998, 0.002063, 0.002211, 0.002629, 0.00268 ]))
 
 
 def test_tke():

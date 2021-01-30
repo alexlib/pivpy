@@ -54,6 +54,10 @@ def quiver(
     u = data.u.values
     v = data.v.values
 
+    if u.shape[0]  == x.shape[0]:
+        u = u.T
+        v = v.T
+
     if units is not None:  # replace  units
         lUnits = units[0]  # ['m' 'm' 'mm/s' 'mm/s']
         velUnits = units[2]

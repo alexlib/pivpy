@@ -92,6 +92,60 @@ def from_arrays(x, y, u, v, mask):
 
     return data
 
+def from_df(df, frame=0, dt=1.0, filename=''):
+    """
+        from_df(x,y,u,v,mask,frame=0)
+        creates an xArray Dataset from pandas dataframe with 5 columns
+
+        Read the .txt files faster with pandas read_csv()
+
+        %%time
+        df = pd.read_csv(files_list[-1],delimiter='\t', 
+                        names = ['x','y','u','v','mask'],header=0)
+        from_df(df,filename=files_list[-1])
+
+        is 3 times faster than the load_txt
+
+
+        Input:
+            x,y,u,v,mask = Numpy floating arrays, all the same size
+        Output:
+            data is a xAarray Dataset, see xarray for help
+    """
+    d = df.to_numpy()
+
+    x = np.unique(d[:, 0])
+    y = np.unique(d[:, 1])
+    d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
+
+    u = d[:, :, 2]
+    v = d[:, :, 3]
+    chc = d[:, :, 4]
+
+    # extend dimensions
+    u = u[:, :, np.newaxis]
+    v = v[:, :, np.newaxis]
+    chc = chc[:, :, np.newaxis]
+
+
+    u = xr.DataArray(
+        u, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
+    )
+    v = xr.DataArray(
+        v, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
+    )
+    chc = xr.DataArray(
+        chc, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
+    )
+
+    data = xr.Dataset({"u": u, "v": v, "chc": chc})
+
+    data.attrs["variables"] = df.columns.to_list()
+    data.attrs["units"] = ['pix','pix','pix/dt','pix/dt']
+    data.attrs["dt"] = dt
+    data.attrs["files"] = filename
+
+    return data
 
 def load_vec(
     filename,

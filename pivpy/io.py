@@ -463,7 +463,7 @@ def load_vc7(path, time=0):
         lhs3 = lhs1 * 0
         lhs4 = lhs2 * 0
         # Get choice
-        maskData = np.int8(v_array[0, :, :])
+        maskData = int(v_array[0, :, :])
         # Build best vectors from choice field
         for i in range(5):
             mask = maskData == (i + 1)

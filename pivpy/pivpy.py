@@ -160,30 +160,13 @@ class PIVAccessor(object):
 
         """
 
-        # ux, uy = np.gradient(self._obj['u'], self._obj['x'],
-        #                    self._obj['y'], axis=(0, 1))
-        # vx, vy = np.gradient(self._obj['v'], self._obj['x'],
-        #                    self._obj['y'], axis=(0, 1))
-        # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
-        # _w = xr.DataArray(vy - ux, dims=['x', 'y', 't'])
-        # if 't' in self._obj.coords:
         self._obj["w"] = (
             self._obj.differentiate("x")["v"]
             - self._obj.differentiate("y")["u"]
         )
-        # else:
-        #     self._obj["w"] = (("x", "y"), vx - uy)
-        # self._obj = self._obj.assign(w=_w)
-        # self._obj.assign(w=vy-ux)
 
-        if len(self._obj.attrs["units"]) < 5:
-            # vel_units = self._obj.attrs['units'][-1]
-            self._obj.attrs["units"].append("1/dt")
-            self._obj.attrs['variables'].append('vorticity')
-        else:
-            # vel_units = self._obj.attrs['units'][-2]
-            self._obj.attrs["units"][-1] = "1/dt"
-            self._obj.attrs['variables'][-1] = 'vorticity'
+        self._obj['w'].attrs['units'] = "1/dt"
+        self._obj['w'].attrs['label'] = 'vorticity'
 
         return self._obj
 

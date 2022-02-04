@@ -1,11 +1,8 @@
 *.pyc
 examples/data/.ipynb_checkpoints/*
 .pytest_cache/*
-.pytest_cache/*
 build/*
 dist/*
-PIVPy.egg-info/*
-tests/PIVPy.egg-info/*
 .vscode/
 docs/build/*
 docs/build/doctrees/*
@@ -15,3 +12,4 @@ examples/notebooks/.ipynb_checkpoints/*
 pivpy.egg-info/PKG-INFO
 pivpy/data/openpiv/.ipynb_checkpoints/*
 .ipynb_checkpoints/*
+pivpy.egg-info/**

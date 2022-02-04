@@ -6,10 +6,11 @@ Contains functions for reading flow fields in various formats
 
 import numpy as np
 import xarray as xr
+import pandas as pd
 from glob import glob
 import os
 import re
-import ReadIM
+
 
 default_units = ["pix", "pix", "pix/dt", "pix/dt"]
 default_variables = ["x", "y", "u", "v", "s2n"]
@@ -45,10 +46,13 @@ def create_sample_field(rows=5, cols=8, frame=0, noise_sigma=1.0):
 
     data = xr.Dataset({"u": u, "v": v, "chc": chc})
 
-    data.attrs["variables"] = ["x", "y", "u", "v"]
-    data.attrs["units"] = ["pix", "pix", "pix/dt", "pix/dt"]
+    # data.attrs["variables"] = ["x", "y", "u", "v"]
+    data.x.attrs["units"] = "pix"]
+    data.y.attrs["units"] = "pix"
+    data.u.attras["units"] = "pix/dt"
+    data.v.attrs["units"] = "pix/dt"
     data.attrs["dt"] = 1.0
-    data.attrs["files"] = ""
+    data.attrs["files"] = None
 
     return data
 
@@ -61,11 +65,12 @@ def create_sample_dataset(n=5):
     for i in range(n):
         data.append(create_sample_field(frame=i))
 
-    combined = xr.concat(data, dim="t")
-    combined.attrs["variables"] = ["x", "y", "u", "v"]
-    combined.attrs["units"] = ["pix", "pix", "pix/dt", "pix/dt"]
-    combined.attrs["dt"] = 1.0
-    combined.attrs["files"] = ""
+    combined = xr.concat(data, dim="t",keep_attrs=True)
+
+    # combined.attrs["variables"] = ["x", "y", "u", "v"]
+    # combined.attrs["units"] = ["pix", "pix", "pix/dt", "pix/dt"]
+    # ombined.attrs["dt"] = 1.0
+    # combined.attrs["files"] = ""
 
     return combined
 
@@ -146,6 +151,23 @@ def from_df(df, frame=0, dt=1.0, filename=''):
     data.attrs["files"] = filename
 
     return data
+
+
+def load_vec_pandas(    
+    filename,
+    rows=None,
+    cols=None,
+    variables=default_variables,
+    units=default_units,
+    dt=1.0,
+    frame=0,
+):
+    """ Using Pandas read_csv """
+
+    df = pd.read_csv(filename, header=None, delim_whitespace=1, names=['x','y','u','v','chc'])
+    data1 = df.set_index(['y','x']).to_xarray()
+    data1 = data1.expand_dims('t',axis=2).assign_coords(coords={'t':[frame]})
+    data1.attrs["units"] = ["pix","pix",'pix/dt','pix/dt']
 
 def load_vec(
     filename,
@@ -401,6 +423,8 @@ def load_vc7(path, time=0):
                V = scaled vy-components of vectors
 
     """
+    import ReadIM
+    
     # you need to add clear to prevent data leaks
     buff, vatts = ReadIM.extra.get_Buffer_andAttributeList(path)
     v_array, buff1 = ReadIM.extra.buffer_as_array(buff)

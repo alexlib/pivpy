@@ -12,8 +12,7 @@ import os
 import re
 
 
-default_units = ["pix", "pix", "pix/dt", "pix/dt"]
-default_variables = ["x", "y", "u", "v", "s2n"]
+default_units = ["pix", "pix/dt"]
 
 
 def create_sample_field(rows=5, cols=8, frame=0, noise_sigma=1.0):
@@ -47,12 +46,12 @@ def create_sample_field(rows=5, cols=8, frame=0, noise_sigma=1.0):
     data = xr.Dataset({"u": u, "v": v, "chc": chc})
 
     # data.attrs["variables"] = ["x", "y", "u", "v"]
-    data.x.attrs["units"] = "pix"]
+    data.x.attrs["units"] = "pix"
     data.y.attrs["units"] = "pix"
-    data.u.attras["units"] = "pix/dt"
+    data.u.attrs["units"] = "pix/dt"
     data.v.attrs["units"] = "pix/dt"
     data.attrs["dt"] = 1.0
-    data.attrs["files"] = None
+    data.attrs["files"] = []
 
     return data
 
@@ -145,35 +144,35 @@ def from_df(df, frame=0, dt=1.0, filename=''):
 
     data = xr.Dataset({"u": u, "v": v, "chc": chc})
 
-    data.attrs["variables"] = df.columns.to_list()
-    data.attrs["units"] = ['pix','pix','pix/dt','pix/dt']
-    data.attrs["dt"] = dt
-    data.attrs["files"] = filename
+    # data.attrs["variables"] = df.columns.to_list()
+    data.x.attrs['units'] = data.y.attrs['units'] = 'pix'
+    data.u.attrs['units'] = data.v.attrs['units']= 'pix/dt'
+    data.attrs["dt"] = [dt]
+    data.attrs["files"] = [filename]
 
     return data
 
 
 def load_vec_pandas(    
     filename,
-    rows=None,
-    cols=None,
-    variables=default_variables,
-    units=default_units,
     dt=1.0,
     frame=0,
 ):
     """ Using Pandas read_csv """
 
     df = pd.read_csv(filename, header=None, delim_whitespace=1, names=['x','y','u','v','chc'])
-    data1 = df.set_index(['y','x']).to_xarray()
-    data1 = data1.expand_dims('t',axis=2).assign_coords(coords={'t':[frame]})
-    data1.attrs["units"] = ["pix","pix",'pix/dt','pix/dt']
+    data = df.set_index(['y','x']).to_xarray()
+    data = data.expand_dims('t',axis=2).assign_coords(coords={'t':[frame]})
+    data.x.attrs["units"] = data.y.attrs['units'] = "pix"
+    data.u.attrs['units'] = data.v.attrs['units'] = 'pix/dt'
+    data.attrs['dt'] = dt
+    data.attrs['files'] = [filename]
+    return data
 
 def load_vec(
     filename,
     rows=None,
     cols=None,
-    variables=default_variables,
     units=default_units,
     dt=1.0,
     frame=0,
@@ -231,8 +230,9 @@ def load_vec(
 
     data = xr.Dataset({"u": u, "v": v, "chc": chc})
 
-    data.attrs["variables"] = variables
-    data.attrs["units"] = units
+    # data.attrs["variables"] = variables
+    data.x.attrs['units'] = data.y.attrs['units'] = units[0]
+    data.u.attrs['units'] = data.v.attrs['units'] = units[1]
     data.attrs["dt"] = dt
     data.attrs["files"] = filename
 
@@ -277,8 +277,10 @@ def load_directory(path, basename="*", ext=".vec"):
 
         if len(data) > 0:
             combined = xr.concat(data, dim="t")
-            combined.attrs["variables"] = data[0].attrs["variables"]
-            combined.attrs["units"] = data[0].attrs["units"]
+            combined.x.attrs["units"] = data[0].x.attrs["units"]
+            combined.y.attrs["units"] = data[0].y.attrs["units"]
+            combined.u.attrs["units"] = data[0].u.attrs["units"]
+            combined.v.attrs["units"] = data[0].v.attrs["units"]
             combined.attrs["dt"] = data[0].attrs["dt"]
             combined.attrs["files"] = files
     elif ext.lower().endswith("vc7"):
@@ -545,7 +547,6 @@ def load_txt(
     filename,
     rows=None,
     cols=None,
-    variables=default_variables,
     units=default_units,
     dt=1.0,
     frame=0,
@@ -597,10 +598,10 @@ def load_txt(
 
     data = xr.Dataset({"u": u, "v": v, "chc": chc})
 
-    data.attrs["variables"] = variables
-    data.attrs["units"] = units
+    data.x.attrs["units"] = data.y.attrs["units"]= units[0]
+    data.u.attrs["units"] = data.v.attrs["units"]= units[1]
     data.attrs["dt"] = dt
-    data.attrs["files"] = filename
+    data.attrs["files"] = [filename]
 
     return data
 

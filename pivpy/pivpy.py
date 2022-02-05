@@ -184,14 +184,8 @@ class PIVAccessor(object):
 
         self._obj["w"] = ux ** 2 + vy ** 2 + 0.5 * (uy + vx) ** 2
 
-        if len(self._obj.attrs["units"]) < 5:
-            # vel_units = self._obj.attrs['units'][-1]
-            self._obj.attrs["units"].append("1/dt")
-            self._obj.attrs['variables'].append('strain')
-        else:
-            # vel_units = self._obj.attrs['units'][-2]
-            self._obj.attrs["units"][-1] = "1/dt"
-            self._obj.attrs['variables'][1] = 'strain'
+        self._obj['w'].attrs['units'] = "1/dt"
+        self._obj['w'].attrs['label'] = 'strain'
 
         return self._obj
 
@@ -209,19 +203,18 @@ class PIVAccessor(object):
             self._obj["v"], self._obj["x"], self._obj["y"], axis=(0, 1)
         )
 
-        if "t" in self._obj.coords:
-            self._obj["w"] = (("x", "y", "t"), vy + ux)
-        else:
-            self._obj["w"] = (("x", "y"), vy + ux)
+        ux = self._obj.differentiate("x")["u"]
+        vy = self._obj.differentiate("y")["v"] 
+    
+        self._obj["w"] = vy + ux
 
-        if len(self._obj.attrs["units"]) == 4:
-            # vel_units = self._obj.attrs['units'][-1]
-            self._obj.attrs["units"].append("1/dt")
-            self._obj.attrs['variables'].append('divergence')
-        else:
-            # vel_units = self._obj.attrs['units'][-2]
-            self._obj.attrs["units"][-1] = "1/dt"
-            self._obj.attrs['variables'][-1] = 'divergence'
+        # if "t" in self._obj.coords:
+        #     self._obj["w"] = (("x", "y", "t"), vy + ux)
+        # else:
+        #     self._obj["w"] = (("x", "y"), vy + ux)
+
+        self._obj['w'].attrs['units'] = "1/dt"
+        self._obj['w'].attrs['label'] = 'divergence'
 
         return self._obj
 
@@ -248,29 +241,20 @@ class PIVAccessor(object):
             np.sqrt(ax ** 2 + ay ** 2), dims=["x", "y", "t"]
         )
 
-        if len(self._obj.attrs["units"]) == 4:
-            vel_units = self._obj.attrs["units"][-1]
-            self._obj.attrs["units"].append(f"{vel_units}^2")
-            self._obj.attrs['variables'].append('acceleration')
-        else:
-            vel_units = self._obj.attrs["units"][-2]
-            self._obj.attrs["units"][-1] = f"{vel_units}^2"
-            self._obj.attrs['variables'][-1] = 'acceleration'
+
+        vel_units = self._obj.u.attrs["units"]
+        self._obj['w'].attrs['units'] = f"{vel_units}^2"
+        self._obj['w'].attrs['label'] = 'acceleration'
 
         return self._obj
 
     def ke(self):
         """ estimates turbulent kinetic energy """
         self._obj["w"] = self._obj["u"] ** 2 + self._obj["v"] ** 2
+        vel_units = self._obj["u"].attrs["units"]
+        self._obj["w"].attrs["units"] = f"({vel_units})^2"
+        self._obj['w'].attrs['label'] = 'KE'
 
-        if len(self._obj.attrs["units"]) == 4:
-            vel_units = self._obj.attrs["units"][-1]
-            self._obj.attrs["units"].append(f"({vel_units})^2")
-            self._obj.attrs['variables'].append('ke')
-        else:
-            vel_units = self._obj.attrs["units"][-2]
-            self._obj.attrs["units"][-1] = f"({vel_units})^2"
-            self._obj.attrs['variables'][-1] = 'ke'
         return self._obj
 
     def tke(self):
@@ -284,13 +268,11 @@ class PIVAccessor(object):
         self._obj["w"] = (
             self._obj["u"] - self._obj["u"].mean(dim="t")
         ) ** 2 + (self._obj["v"] - self._obj["v"].mean(dim="t")) ** 2
-        vel_units = self._obj.attrs["units"][-1]
-        if len(self._obj.attrs['units']) < 5:
-            self._obj.attrs["units"].append(f"({vel_units})^2")
-            self._obj.attrs["variables"].append("tke")
-        else:
-            self._obj.attrs["units"][-1]  = (f"({vel_units})^2")
-            self._obj.attrs["variables"][-1] = "tke"
+
+        vel_units = self._obj["u"].attrs["units"]
+        self._obj["w"].attrs["units"] = f"({vel_units})^2"
+        self._obj['w'].attrs['label'] = 'TKE'
+
         return self._obj
 
     def fluct(self):
@@ -318,6 +300,9 @@ class PIVAccessor(object):
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
         new_obj["w"] = new_obj["u"] * new_obj["v"]
+        vel_units = self._obj["u"].attrs["units"]
+        new_obj["w"].attrs["units"] = f"({vel_units})^2"
+        new_obj['w'].attrs['label'] = 'RS'
 
         return new_obj
 
@@ -369,7 +354,7 @@ class PIVAccessor(object):
         self._obj.attrs["dt"] = dt
 
     def set_tUnits(self, tUnits):
-        self._obj.attrs["tUnits"] = tUnits
+        self._obj["t"].attrs["units"] = tUnits
 
     def rotate(self, theta=0.0):
         """

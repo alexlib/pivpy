@@ -38,6 +38,7 @@ def quiver(
         aspectratio - set auto or equal for the plot's apearence
         colbar_orient - 'horizontal' or 'vertical' orientation of the colorbar
         (if colbar is True)
+        units = list of length and velocity units, i.e. ['pix','pix/dt'] or ['mm','m/s']
     Outputs:
         none
     Usage:
@@ -58,13 +59,8 @@ def quiver(
         u = u.T
         v = v.T
 
-    if units is not None:  # replace  units
-        lUnits = units[0]  # ['m' 'm' 'mm/s' 'mm/s']
-        velUnits = units[2]
-        # tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
-    else:
-        lUnits = data.attrs["units"][0]
-        velUnits = data.attrs["units"][2]
+    if units is None:  # replace  units
+        units = [data.x.attrs["units"], data.u.attrs['units']]
         # tUnits = data.attrs['units'][2].split('/')[-1]
 
     # in addition, if the x,y units are pixels,
@@ -120,10 +116,10 @@ def quiver(
             cbar = fig.colorbar(
                 strm.lines, orientation=colbar_orient, fraction=0.1
             )
-            cbar.set_label(r"$ V \, (" + velUnits + r")$")
+            cbar.set_label(r"$ V \, (" + units[1] + r")$")
 
-    ax.set_xlabel(f"x({lUnits})")
-    ax.set_ylabel(f"y ({lUnits})")
+    ax.set_xlabel(f"x({units[0]})")
+    ax.set_ylabel(f"y ({units[1]})")
     ax.set_aspect(aspectratio)
     # ax.invert_yaxis()
 
@@ -143,15 +139,15 @@ def histogram(data, normed=False):
     u = np.asarray(data.u).flatten()
     v = np.asarray(data.v).flatten()
 
-    units = data.attrs["units"]
     f, ax = plt.subplots(2)
 
     ax[0].hist(u, bins = np.int32(np.sqrt(len(u)) * 0.5), density=normed)
-    ax[0].set_xlabel("u [" + units[2] + "]")
+    velUnits = data.u.attrs["units"]
+    ax[0].set_xlabel(f"u ({velUnits})")
 
     ax[1] = plt.subplot2grid((2, 1), (1, 0))
     ax[1].hist(v, bins = np.int32(np.sqrt(len(v) * 0.5)), density=normed)
-    ax[1].set_xlabel("v [" + units[2] + "]")
+    ax[1].set_xlabel(f"v ({velUnits})")
     plt.tight_layout()
     return f, ax
 
@@ -182,15 +178,13 @@ def contour_plot(
     if "w" not in data.var():
         data.piv.vec2scal("ke")
 
-    if units is not None:
-        lUnits = units[0]  # ['m' 'm' 'mm/s' 'mm/s']
-        # velUnits = units[2]
-        # tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
+    if units is None:
+        lUnits = data.x.attrs["units"]
     else:
-        # lUnits, velUnits = '', ''
-        lUnits = data.attrs["units"][0]
+        lUnits = units[0]
+
         propUnits = (
-            data.attrs["variables"][-1] + data.attrs["units"][-1]
+            data.w.attrs["label"] + data.w.attrs["units"]
         )  # last one is from 'w'
 
     f, ax = plt.subplots()
@@ -225,8 +219,8 @@ def contour_plot(
             cmap=plt.get_cmap("RdYlBu"),
         )
 
-    plt.xlabel(f"x [{lUnits}]")
-    plt.ylabel(f"y [{lUnits}]")
+    plt.xlabel(f"x ({lUnits})")
+    plt.ylabel(f"y ({lUnits})")
     if colbar is not None:
         cbar = plt.colorbar(c, orientation=colbar)
         cbar.set_label(propUnits)
@@ -290,8 +284,6 @@ def animate(data, arrowscale=1, savepath=None):
     )
 
     cb = plt.colorbar(Q)
-
-    units = data.attrs["units"]
 
     cb.ax.set_ylabel("velocity (" + units[2] + ")")
 

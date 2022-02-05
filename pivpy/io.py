@@ -173,7 +173,6 @@ def load_vec(
     filename,
     rows=None,
     cols=None,
-    units=default_units,
     dt=1.0,
     frame=0,
 ):
@@ -199,6 +198,7 @@ def load_vec(
         x = unique(d[:, 0])
         y = unique(d[:, 1])
         d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
+        units = ["pix", "pix/dt"]
     else:
         # d = np.genfromtxt(
         #     filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
@@ -272,15 +272,15 @@ def load_directory(path, basename="*", ext=".vec"):
 
         for i, f in enumerate(files):
             data.append(
-                load_vec(f, rows, cols, variables, units, dt, frame + i - 1)
+                load_vec(f, rows, cols, dt, frame + i - 1)
             )
 
         if len(data) > 0:
             combined = xr.concat(data, dim="t")
-            combined.x.attrs["units"] = data[0].x.attrs["units"]
-            combined.y.attrs["units"] = data[0].y.attrs["units"]
-            combined.u.attrs["units"] = data[0].u.attrs["units"]
-            combined.v.attrs["units"] = data[0].v.attrs["units"]
+            combined.x.attrs["units"] = units[0]
+            combined.y.attrs["units"] = units[0]
+            combined.u.attrs["units"] = units[2]
+            combined.v.attrs["units"] = units[2]
             combined.attrs["dt"] = data[0].attrs["dt"]
             combined.attrs["files"] = files
     elif ext.lower().endswith("vc7"):
@@ -299,7 +299,7 @@ def load_directory(path, basename="*", ext=".vec"):
 
         for i, f in enumerate(files):
             data.append(
-                load_txt(f, rows, cols, variables, units, dt, frame + i - 1)
+                load_txt(f, rows, cols, variables, dt, frame + i - 1)
             )
         if len(data) > 0:
             combined = xr.concat(data, dim="t")

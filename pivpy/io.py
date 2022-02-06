@@ -14,6 +14,11 @@ import re
 
 default_units = ["pix", "pix/dt"]
 
+VEC = dict(header=None, skiprows=1, names=['x','y','u','v','chc'])
+DAVIS = dict(delimiter="\t",skiprows=1,decimal=",",names=["x","y","u","v"])
+OPENPIVTXT = dict(header=None, delim_whitespace=1, names=['x','y','u','v','chc'])
+
+
 
 def create_sample_field(rows=5, cols=8, frame=0, noise_sigma=1.0):
     """ creates a sample dataset for the tests """
@@ -153,89 +158,22 @@ def from_df(df, frame=0, dt=1.0, filename=''):
     return data
 
 
-def load_vec_pandas(    
+def load(    
     filename,
     dt=1.0,
     frame=0,
+    args=VEC
 ):
     """ Using Pandas read_csv """
 
-    df = pd.read_csv(filename, header=None, delim_whitespace=1, names=['x','y','u','v','chc'])
+    df = pd.read_csv(filename, **args)
+    
     data = df.set_index(['y','x']).to_xarray()
     data = data.expand_dims('t',axis=2).assign_coords(coords={'t':[frame]})
     data.x.attrs["units"] = data.y.attrs['units'] = "pix"
     data.u.attrs['units'] = data.v.attrs['units'] = 'pix/dt'
     data.attrs['dt'] = dt
     data.attrs['files'] = [filename]
-    return data
-
-def load_vec(
-    filename,
-    rows=None,
-    cols=None,
-    dt=1.0,
-    frame=0,
-):
-    """
-        load_vec(filename,rows=rows,cols=cols)
-        Loads the VEC file (TECPLOT format by TSI Inc.),
-        OpenPIV VEC or TXT formats
-        Arguments:
-            filename : file name, expected to have a header and 5 columns
-            rows, cols : number of rows and columns of a vector field,
-            if None, None, then parse_header is called to infer the number
-            written in the header
-            dt : time interval (default is None)
-            frame : frame or time marker (default is None)
-        Output:
-            data is a xAarray Dataset, see xarray for help
-    """
-    if rows is None or cols is None:
-        variables, units, rows, cols, dt, frame = parse_header(filename)
-
-    if rows is None:  # means no headers
-        d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
-        x = unique(d[:, 0])
-        y = unique(d[:, 1])
-        d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
-        units = ["pix", "pix/dt"]
-    else:
-        # d = np.genfromtxt(
-        #     filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
-        # ).reshape(rows, cols, 5)
-        d = np.genfromtxt(
-            filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
-        ).reshape(cols, rows, 5)
-        x = d[:, :, 0][0, :]
-        y = d[:, :, 1][:, 0]
-
-    u = d[:, :, 2]
-    v = d[:, :, 3]
-    chc = d[:, :, 4]
-
-    # extend dimensions
-    u = u[:, :, np.newaxis]
-    v = v[:, :, np.newaxis]
-    chc = chc[:, :, np.newaxis]
-
-    u = xr.DataArray(
-        u, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
-    )
-    v = xr.DataArray(
-        v, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
-    )
-    chc = xr.DataArray(
-        chc, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
-    )
-
-    data = xr.Dataset({"u": u, "v": v, "chc": chc})
-
-    # data.attrs["variables"] = variables
-    data.x.attrs['units'] = data.y.attrs['units'] = units[0]
-    data.u.attrs['units'] = data.v.attrs['units'] = units[1]
-    data.attrs["dt"] = dt
-    data.attrs["files"] = filename
-
     return data
 
 
@@ -256,7 +194,7 @@ def load_directory(path, basename="*", ext=".vec"):
                attributes of variables and units
 
 
-    See more: load_vec
+    See more: load
     """
     files = sorted(glob(os.path.join(path, basename + ext)))
     if len(files) == 0:
@@ -272,7 +210,7 @@ def load_directory(path, basename="*", ext=".vec"):
 
         for i, f in enumerate(files):
             data.append(
-                load_vec(f, rows, cols, dt, frame + i - 1)
+                load(f, dt=dt, frame=frame+i-1, args=VEC)
             )
 
         if len(data) > 0:
@@ -296,10 +234,15 @@ def load_directory(path, basename="*", ext=".vec"):
             combined.attrs = data[-1].attrs
     elif ext.lower().endswith("txt"):
         variables, units, rows, cols, dt, frame = parse_header(files[0])
+        with open(files[0]) as f:
+            if f.readline().startswith('#DaVis'):
+                args = DAVIS
+            else:
+                args = OPENPIVTXT
 
         for i, f in enumerate(files):
             data.append(
-                load_txt(f, rows, cols, variables, dt, frame + i - 1)
+                load(f, dt=dt, frame=frame + i - 1, args=args)
             )
         if len(data) > 0:
             combined = xr.concat(data, dim="t",combine_attrs='override')
@@ -542,68 +485,6 @@ def load_vc7(path, time=0):
     del vatts
     return data
 
-
-def load_txt(
-    filename,
-    rows=None,
-    cols=None,
-    units=default_units,
-    dt=1.0,
-    frame=0,
-):
-    """
-        load_vec(filename,rows=rows,cols=cols)
-        Loads the VEC file (TECPLOT format by TSI Inc.), OpenPIV VEC or TXT
-        formats
-        Arguments:
-            filename : file name, expected to have a header and 5 columns
-            rows, cols : number of rows and columns of a vector field,
-            if None, None, then parse_header is called to infer the number
-            written in the header
-            dt : time interval (default is None)
-            frame : frame or time marker (default is None)
-        Output:
-            data is a xAarray Dataset, see xarray for help
-    """
-    if rows is None:  # means no headers
-        d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
-        x = unique(d[:, 0])
-        y = unique(d[:, 1])
-        d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
-    else:
-        d = np.genfromtxt(
-            filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
-        ).reshape(rows, cols, 5)
-        x = d[:, :, 0][0, :]
-        y = d[:, :, 1][:, 0]
-
-    u = d[:, :, 2]
-    v = d[:, :, 3]
-    chc = d[:, :, 4]
-
-    # extend dimensions
-    u = u[:, :, np.newaxis]
-    v = v[:, :, np.newaxis]
-    chc = chc[:, :, np.newaxis]
-
-    u = xr.DataArray(
-        u, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
-    )
-    v = xr.DataArray(
-        v, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
-    )
-    chc = xr.DataArray(
-        chc, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
-    )
-
-    data = xr.Dataset({"u": u, "v": v, "chc": chc})
-
-    data.x.attrs["units"] = data.y.attrs["units"]= units[0]
-    data.u.attrs["units"] = data.v.attrs["units"]= units[1]
-    data.attrs["dt"] = dt
-    data.attrs["files"] = [filename]
-
-    return data
 
 
 def unique(array):

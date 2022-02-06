@@ -56,9 +56,11 @@ def test_get_units():
     assert lUnits == "pix"
 
 
+
+
 def test_load_vec():
     fname = "Run000001.T000.D000.P000.H001.L.vec"
-    data = io.load_vec(os.path.join(path, "Insight", fname))
+    data = io.load(os.path.join(path, "Insight", fname),args=VEC)
     assert data["u"].shape == (63, 63, 1)
     assert data["u"][0, 0, 0] == 0.0
     assert np.allclose(data.coords["x"][0], 0.31248)
@@ -73,8 +75,13 @@ def test_load_vc7():
 
 
 def test_loadopenpivtxt():
-    data = io.load_vec(os.path.join(path, "openpiv", "exp1_001_b.txt"))
+    data = io.load(os.path.join(path, "openpiv", "exp1_001_b.txt"),\
+        args=OPENPIVTXT)
 
+
+def test_load_davis_txt():
+    data = io.load(os.path.join(path, "openpiv", "exp1_001_b.txt"),\
+        args=DAVIS)
 
 def test_load_directory():
     _ = pkg.resource_filename("pivpy", "data/Insight")
@@ -104,3 +111,25 @@ def test_create_sample_dataset(n=3):
     data = io.create_sample_dataset(n=n)
     assert data.dims["t"] == 3
     assert np.allclose(data["t"], np.arange(3))
+
+
+def test_various_formats():
+    test = []
+for g in pathlib.Path('../../pivpy/data').glob('*'):
+    files = list(g.glob('**/[!.]*'))
+    print(files[0])
+    extension = str(files[0]).split('.')[-1].lower()
+    if extension == 'vc7':
+        data = io.load_vc7(str(files[0]))
+        test.append(data)
+    elif extension == 'vec':
+        data = load(files[0], args=VEC)
+        test.append(data)
+    elif extension == 'txt':
+        with open(files[0]) as f:
+            if f.readline().startswith('#DaVis'):
+                data = load(files[0], args=DAVIS)
+            else:
+                data = load(files[0], args=OPENPIVTXT)
+            
+    test.append(data)

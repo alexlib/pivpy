@@ -1,8 +1,8 @@
 import numpy as np
-from pivpy import io, pivpy
+from pivpy import io
 import matplotlib.pyplot as plt
 
-import os
+import os, pathlib
 import pkg_resources as pkg
 
 path = pkg.resource_filename("pivpy", "data")
@@ -58,32 +58,32 @@ def test_get_units():
 
 
 
-def test_load_vec():
+def test_io_load_vec():
     fname = "Run000001.T000.D000.P000.H001.L.vec"
-    data = io.load(os.path.join(path, "Insight", fname),args=VEC)
+    data = io.load(os.path.join(path, "Insight", fname),args=io.VEC)
     assert data["u"].shape == (63, 63, 1)
     assert data["u"][0, 0, 0] == 0.0
     assert np.allclose(data.coords["x"][0], 0.31248)
     assert "t" in data.dims
 
 
-def test_load_vc7():
+def test_io_load_vc7():
     data = io.load_vc7(os.path.join(path, "VC7/2Ca.VC7"))
     assert data["u"].shape == (57, 43, 1)
     assert np.allclose(data.u.values[0, 0], -0.04354814)
     assert np.allclose(data.coords["x"][-1], 193.313795)
 
 
-def test_loadopenpivtxt():
+def test_io_loadopenpivtxt():
     data = io.load(os.path.join(path, "openpiv", "exp1_001_b.txt"),\
-        args=OPENPIVTXT)
+        args=io.OPENPIVTXT)
 
 
-def test_load_davis_txt():
-    data = io.load(os.path.join(path, "openpiv", "exp1_001_b.txt"),\
-        args=DAVIS)
+def test_io_load_davis_txt():
+    data = io.load(os.path.join(path, "PIV_Challenge", "B00001.txt"),\
+        args=io.DAVIS)
 
-def test_load_directory():
+def test_io_load_directory():
     _ = pkg.resource_filename("pivpy", "data/Insight")
     data = io.load_directory(_, basename="Run*", ext=".vec")
     assert np.allclose(data["t"], [0, 1, 2, 3, 4])
@@ -115,21 +115,21 @@ def test_create_sample_dataset(n=3):
 
 def test_various_formats():
     test = []
-for g in pathlib.Path('../../pivpy/data').glob('*'):
-    files = list(g.glob('**/[!.]*'))
-    print(files[0])
-    extension = str(files[0]).split('.')[-1].lower()
-    if extension == 'vc7':
-        data = io.load_vc7(str(files[0]))
+    for g in pathlib.Path('../../pivpy/data').glob('*'):
+        files = list(g.glob('**/[!.]*'))
+        print(files[0])
+        extension = str(files[0]).split('.')[-1].lower()
+        if extension == 'vc7':
+            data = io.load_vc7(str(files[0]))
+            test.append(data)
+        elif extension == 'vec':
+            data = io.load(files[0], args=io.VEC)
+            test.append(data)
+        elif extension == 'txt':
+            with open(files[0]) as f:
+                if f.readline().startswith('#DaVis'):
+                    data = io.load(files[0], args=io.DAVIS)
+                else:
+                    data = io.load(files[0], args=io.OPENPIVTXT)
+                
         test.append(data)
-    elif extension == 'vec':
-        data = load(files[0], args=VEC)
-        test.append(data)
-    elif extension == 'txt':
-        with open(files[0]) as f:
-            if f.readline().startswith('#DaVis'):
-                data = load(files[0], args=DAVIS)
-            else:
-                data = load(files[0], args=OPENPIVTXT)
-            
-    test.append(data)

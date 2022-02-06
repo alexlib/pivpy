@@ -64,7 +64,7 @@ def create_sample_dataset(n=5):
     for i in range(n):
         data.append(create_sample_field(frame=i))
 
-    combined = xr.concat(data, dim="t",keep_attrs=True)
+    combined = xr.concat(data, dim="t",combine_attrs='override')
 
     # combined.attrs["variables"] = ["x", "y", "u", "v"]
     # combined.attrs["units"] = ["pix", "pix", "pix/dt", "pix/dt"]
@@ -276,7 +276,7 @@ def load_directory(path, basename="*", ext=".vec"):
             )
 
         if len(data) > 0:
-            combined = xr.concat(data, dim="t")
+            combined = xr.concat(data, dim="t",combine_attrs='override')
             combined.x.attrs["units"] = units[0]
             combined.y.attrs["units"] = units[0]
             combined.u.attrs["units"] = units[2]
@@ -292,7 +292,7 @@ def load_directory(path, basename="*", ext=".vec"):
                 time = i
             data.append(load_vc7(f, time))
         if len(data) > 0:
-            combined = xr.concat(data, dim="t")
+            combined = xr.concat(data, dim="t",combine_attrs='override')
             combined.attrs = data[-1].attrs
     elif ext.lower().endswith("txt"):
         variables, units, rows, cols, dt, frame = parse_header(files[0])
@@ -302,7 +302,7 @@ def load_directory(path, basename="*", ext=".vec"):
                 load_txt(f, rows, cols, variables, dt, frame + i - 1)
             )
         if len(data) > 0:
-            combined = xr.concat(data, dim="t")
+            combined = xr.concat(data, dim="t",combine_attrs='override')
             combined.attrs["variables"] = data[0].attrs["variables"]
             combined.attrs["units"] = data[0].attrs["units"]
             combined.attrs["dt"] = data[0].attrs["dt"]

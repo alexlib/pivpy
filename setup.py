@@ -11,7 +11,7 @@ def read(fname):
 
 setup(
     name="pivpy",
-    version="0.0.12",
+    version="0.0.13",
     author="Turbulence Structure Laboratory, Tel Aviv University",
     author_email="alex.liberzon@gmail.com",
     description=(
@@ -31,6 +31,10 @@ setup(
         "matplotlib",
         "pytest",
     ],
+    extras_require = {
+        'readim': ['readim'],
+        'full': ['readim','netcdf4'],
+    }
     long_description=read("README.md"),
     classifiers=[
         "Development Status :: 3 - Alpha",

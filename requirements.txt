@@ -3,5 +3,5 @@ scipy
 xarray
 netcdf4
 matplotlib
-readim
+readim [readim]
 pytest

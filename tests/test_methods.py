@@ -2,6 +2,7 @@
 from pivpy import io, pivpy
 import numpy as np
 import pkg_resources as pkg
+import pytest
 
 import os
 
@@ -20,7 +21,8 @@ def test_crop():
 
     _c = io.create_sample_dataset()
     _c = _c.sel(x=slice(35, 70), y=slice(30, 90))
-    assert _c.u.shape == (2, 2, 5)  # note the last dimension is preserved
+    assert _c.u.shape == (4, 1, 5)  # note the last dimension is preserved
+
 
 
 def test_pan():
@@ -33,7 +35,8 @@ def test_pan():
 
 def test_mean():
     data = io.create_sample_dataset(10)
-    assert np.allclose(data.piv.average.u.median(), 4.5)
+    print(data.piv.average.u.median())
+    assert np.allclose(data.piv.average.u.median(), 6.0)
 
 
 def test_vec2scal():
@@ -82,32 +85,33 @@ def test_set_get_dt():
 
 def test_fluctuations():
     data = io.create_sample_field()
-    data.piv.fluct()
-    assert np.allclose(data['u'], 0.0)
+    with pytest.raises(ValueError):
+        data.piv.fluct()
+    
+    data = io.create_sample_dataset(100) # enough for random
+    fluct = data.piv.fluct()
+    assert np.allclose(fluct['u'].mean(dim='t'), 0.0)
+    assert np.allclose(fluct['v'].mean(dim='t'), 0.0)
 
 
 def test_reynolds_stress():
-    data = io.create_sample_field()
+    data = io.create_sample_dataset(100)
     tmp = data.piv.reynolds_stress()
-    assert np.allclose(tmp['w'], 0.0)
+    assert np.allclose(tmp['w'].mean(dim='t'), 0.0)
 
 
 def test_vorticity():
     """ tests vorticity estimate """
-    data = io.create_sample_field()
+    data = io.create_sample_field() # we need another flow field
     data.piv.vorticity()
-    print(data['w'][0, 0])
-    assert np.allclose(data["w"][0, 0], -0.09266766)
+    assert np.allclose(data['w'], 0.0)
 
 
 def test_strain():
     """ tests shear estimate """
-
-    data = io.create_sample_field()
+    data = io.create_sample_field(noise_sigma=0.)
     data.piv.strain()
-    # this is homogeneous case in which the only derivative is
-    # vy so both shear and vorticity are equal
-    assert np.allclose(np.unique(data.w.values.flatten().round(decimals=6)),np.array([0.001998, 0.002063, 0.002211, 0.002629, 0.00268 ]))
+    assert np.allclose(data['w'], 0.00223713)
 
 
 def test_tke():

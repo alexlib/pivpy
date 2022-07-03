@@ -11,7 +11,7 @@ import numpy as np
 # from scipy.ndimage.filters import median_filter
 import xarray as xr
 from pivpy import graphics
-from scipy.ndimage.filters import gaussian_filter as gf
+from scipy.ndimage import gaussian_filter as gf
 
 """ learn from this example
 

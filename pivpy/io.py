@@ -69,7 +69,10 @@ def create_sample_dataset(n=5):
 
     return combined
 
+def create_uniform_strain():
+    return create_sample_field(noise_sigma=0.0)
 
+    
 def from_arrays(x, y, u, v, mask):
     """
         from_arrays(x,y,u,v,mask,frame=0)

@@ -11,7 +11,7 @@ def read(fname):
 
 setup(
     name="pivpy",
-    version="0.0.09c",
+    version="0.0.10",
     author="Turbulence Structure Laboratory, Tel Aviv University",
     author_email="alex.liberzon@gmail.com",
     description=(
@@ -29,7 +29,6 @@ setup(
         "scipy",
         "xarray",
         "matplotlib",
-        "readim",
         "pytest",
     ],
     long_description=read("README.md"),

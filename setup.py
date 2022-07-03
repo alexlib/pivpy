@@ -34,7 +34,7 @@ setup(
     extras_require = {
         'readim': ['readim'],
         'full': ['readim','netcdf4'],
-    }
+    },
     long_description=read("README.md"),
     classifiers=[
         "Development Status :: 3 - Alpha",

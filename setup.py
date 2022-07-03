@@ -11,7 +11,7 @@ def read(fname):
 
 setup(
     name="pivpy",
-    version="0.0.10",
+    version="0.0.11",
     author="Turbulence Structure Laboratory, Tel Aviv University",
     author_email="alex.liberzon@gmail.com",
     description=(

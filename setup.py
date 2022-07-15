@@ -11,7 +11,7 @@ def read(fname):
 
 setup(
     name="pivpy",
-    version="0.0.13",
+    version="0.0.14",
     author="Turbulence Structure Laboratory, Tel Aviv University",
     author_email="alex.liberzon@gmail.com",
     description=(
@@ -33,6 +33,7 @@ setup(
     ],
     extras_require = {
         'readim': ['readim'],
+        'netcdf': ['netcdf4'],
         'full': ['readim','netcdf4'],
     },
     long_description=read("README.md"),

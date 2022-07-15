@@ -333,8 +333,10 @@ class PIVAccessor(object):
             )
 
         new_obj = self._obj.copy()
-        new_obj -= new_obj.mean(dim="t")
-        new_obj["w"] = new_obj["u"] * new_obj["v"]
+        tmp = new_obj.mean(dim="t")
+        new_obj -= tmp # fluctuations
+        new_obj["w"] = new_obj["u"] * new_obj["v"] # new scalar
+        new_obj = new_obj.mean(dim="t") # reynolds stress is -\rho < u' v'>
 
         return new_obj
 
@@ -370,6 +372,8 @@ class PIVAccessor(object):
         """
         self._obj["u"] *= scalar
         self._obj["v"] *= scalar
+        if 'w' in self._obj.var():
+            self._obj['w'] += scalar
 
         return self._obj
 
@@ -384,6 +388,13 @@ class PIVAccessor(object):
 
     def set_dt(self, dt):
         self._obj.attrs["dt"] = dt
+        return self._obj
+
+    def set_scale(self, scale=1.0):
+        for var in ['x','y','u','v']:
+            self._obj[var] = self._obj[var]*scale
+
+        return self._obj
 
     def set_tUnits(self, tUnits):
         self._obj.attrs["tUnits"] = tUnits

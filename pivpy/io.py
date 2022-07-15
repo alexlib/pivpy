@@ -53,13 +53,13 @@ def create_sample_field(rows=5, cols=8, frame=0, noise_sigma=1.0):
     return data
 
 
-def create_sample_dataset(n=5):
+def create_sample_dataset(n=5, noise_sigma=1.0):
     """ using create_sample_field that has random part in it, create
     a sample dataset of length 'n' """
 
     data = []
     for i in range(n):
-        data.append(create_sample_field(frame=i))
+        data.append(create_sample_field(frame=i, noise_sigma=noise_sigma))
 
     combined = xr.concat(data, dim="t")
     combined.attrs["variables"] = ["x", "y", "u", "v"]

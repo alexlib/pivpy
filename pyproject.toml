@@ -1,0 +1,19 @@
+[project]
+name = "pivpy"
+version = "0.0.14"
+authors = [
+  { name="Alex Liberzon and Ron Shnapp", email="alex.liberzon@gmail.com" },
+]
+description = "Python package for post-processing PIV results"
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/alexlib/pivpy"
+"Bug Tracker" = "https://github.com/alexlib/pivpy/issues"

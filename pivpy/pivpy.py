@@ -276,18 +276,18 @@ class PIVAccessor(object):
 
         return self._obj
 
-    def ke(self):
+    def kinetic_energy(self):
         """ estimates turbulent kinetic energy """
         self._obj["w"] = self._obj["u"] ** 2 + self._obj["v"] ** 2
 
         if len(self._obj.attrs["units"]) == 4:
             vel_units = self._obj.attrs["units"][-1]
             self._obj.attrs["units"].append(f"({vel_units})^2")
-            self._obj.attrs['variables'].append('ke')
         else:
             vel_units = self._obj.attrs["units"][-2]
             self._obj.attrs["units"][-1] = f"({vel_units})^2"
-            self._obj.attrs['variables'][-1] = 'ke'
+
+        self._obj.attrs["variables"] = ["x","y","u","v","kinetic_energy"]
         return self._obj
 
     def tke(self):
@@ -295,20 +295,23 @@ class PIVAccessor(object):
         if len(self._obj.t) < 2:
             raise ValueError(
                 "TKE is not defined for a single vector field, \
-                              use .piv.ke()"
+                              use .piv.kinetic_energy()"
             )
+        
+        new_obj = self._obj.copy()
+        new_obj -= new_obj.mean(dim="t")
+        new_obj["w"] = new_obj["u"] ** 2 + new_obj["v"] ** 2
+        new_obj.attrs["variables"] = ["x","y","uf","vf","tke"]
 
-        self._obj["w"] = (
-            self._obj["u"] - self._obj["u"].mean(dim="t")
-        ) ** 2 + (self._obj["v"] - self._obj["v"].mean(dim="t")) ** 2
-        vel_units = self._obj.attrs["units"][-1]
-        if len(self._obj.attrs['units']) < 5:
-            self._obj.attrs["units"].append(f"({vel_units})^2")
-            self._obj.attrs["variables"].append("tke")
-        else:
-            self._obj.attrs["units"][-1]  = (f"({vel_units})^2")
-            self._obj.attrs["variables"][-1] = "tke"
-        return self._obj
+
+        # if len(new_obj.attrs["units"]) == 4:
+        #     vel_units = new_obj.attrs["units"][-1]
+        #     new_obj.attrs["units"].append(f"({vel_units})^2")
+        # elif len(new_obj.attrs["units"]) == 5:
+        #     vel_units = new_obj.attrs["units"][-2]
+        #     new_obj.attrs["units"][-1] = f"({vel_units})^2"
+
+        return new_obj
 
     def fluct(self):
         """ returns fluctuations as a new dataset """
@@ -321,6 +324,8 @@ class PIVAccessor(object):
 
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
+        new_obj.attrs["variables"] = ["x","y","uf","vf"]
+
         return new_obj
 
     def reynolds_stress(self):
@@ -333,10 +338,11 @@ class PIVAccessor(object):
             )
 
         new_obj = self._obj.copy()
-        tmp = new_obj.mean(dim="t")
-        new_obj -= tmp # fluctuations
-        new_obj["w"] = new_obj["u"] * new_obj["v"] # new scalar
+        new_obj -= new_obj.mean(dim="t")
+
+        new_obj["w"] = -1 * new_obj["u"] * new_obj["v"] # new scalar
         new_obj = new_obj.mean(dim="t") # reynolds stress is -\rho < u' v'>
+        new_obj.attrs["variables"] = ["x","y","uf","vf","reynolds_stress"]
 
         return new_obj
 

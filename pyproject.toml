@@ -14,6 +14,19 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+dependencies = [
+        "numpy",
+        "scipy",
+        "xarray",
+        "matplotlib",
+        "pytest",
+]
+
+[project.optional-dependencies]
+readim = ["readim"]
+netcdf = ["netcdf4"]
+full = ["readim", "netcdf4"]
+
 [project.urls]
 "Homepage" = "https://github.com/alexlib/pivpy"
 "Bug Tracker" = "https://github.com/alexlib/pivpy/issues"

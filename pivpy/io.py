@@ -9,7 +9,10 @@ import xarray as xr
 from glob import glob
 import os
 import re
-import ReadIM
+try:
+    import ReadIM
+except:
+    warnings.warn('ReadIM is not available, do not read IM7 these files')
 
 default_units = ["pix", "pix", "pix/dt", "pix/dt"]
 default_variables = ["x", "y", "u", "v", "s2n"]

@@ -22,6 +22,9 @@ dependencies = [
         "pytest",
 ]
 
+keywords=["example documentation tutorial"]
+
+
 [project.optional-dependencies]
 readim = ["readim"]
 netcdf = ["netcdf4"]
@@ -30,3 +33,7 @@ full = ["readim", "netcdf4"]
 [project.urls]
 "Homepage" = "https://github.com/alexlib/pivpy"
 "Bug Tracker" = "https://github.com/alexlib/pivpy/issues"
+
+
+[tool.setuptools]
+include-package-data = true

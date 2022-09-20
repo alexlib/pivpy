@@ -5,15 +5,18 @@ import matplotlib.pyplot as plt
 import xarray as xr
 
 import os
+import pathlib
 import pkg_resources as pkg
 
 path = pkg.resource_filename("pivpy", "data")
-fname = os.path.join(path, "Insight", "Run000002.T000.D000.P000.H001.L.vec")
+fname = pathlib.Path(path) / "Insight" / "Run000002.T000.D000.P000.H001.L.vec" 
+print(fname)
+print(fname.exists)
 
-# def test_get_dt():
-#     """ test if we get correct delta t """
-#     _, _, _, _,dt,_ = io.parse_header(os.path.join(path,fname))
-#     assert dt == 2000.
+def test_get_dt():
+    """ test if we get correct delta t """
+    _, _, _, _,dt,_ = io.parse_header(os.path.join(path,fname))
+    assert dt == 2000.
 
 
 def test_get_frame():
@@ -45,8 +48,8 @@ def test_get_units():
 
     # test vec file with pixels/dt
     lUnits, vUnits, tUnits = io.get_units(
-        os.path.join(path, "day2/day2a005000.T000.D000.P003.H001.L.vec")
-    )
+        pathlib.Path(path) / "day2" / "day2a005000.T000.D000.P003.H001.L.vec"
+        )
     assert lUnits == "pix"
     assert vUnits == "pix"
     assert tUnits == "dt"
@@ -67,11 +70,12 @@ def test_load_vec():
     assert "t" in data.dims
 
 
-def test_load_vc7():
-    data = io.load_vc7(os.path.join(path, "VC7/2Ca.VC7"))
-    assert data["u"].shape == (57, 43, 1)
-    assert np.allclose(data.u.values[0, 0], -0.04354814)
-    assert np.allclose(data.coords["x"][-1], 193.313795)
+# readim is depreceated, see the new Lavision Python package
+# def test_load_vc7():
+#     data = io.load_vc7(os.path.join(path, "VC7/2Ca.VC7"))
+#     assert data["u"].shape == (57, 43, 1)
+#     assert np.allclose(data.u.values[0, 0], -0.04354814)
+#     assert np.allclose(data.coords["x"][-1], 193.313795)
 
 
 def test_loadopenpivtxt():

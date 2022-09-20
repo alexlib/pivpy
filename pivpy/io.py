@@ -22,7 +22,7 @@ POS_UNITS: str = "pix" # or mm, m, after scaling
 TIME_UNITS: str = "frame" # "frame" if not scaled, can become 'sec' or 'msec', 'usec'
 # after scaling can be m/s, mm/s
 VEL_UNITS: str =  POS_UNITS # default is displacement in pix
-DELTA_T: float = np.float(0.) # default is 0. i.e. uknown, can be any float value
+DELTA_T: np.float64 = 0.0 # default is 0. i.e. uknown, can be any float value
 
 def set_default_attrs(dataset: xr.Dataset)-> xr.Dataset:
     """ Defines default attributes:

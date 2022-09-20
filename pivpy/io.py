@@ -4,23 +4,67 @@
 Contains functions for reading flow fields in various formats
 """
 
+from multiprocessing.dummy import Array
+from socketserver import DatagramRequestHandler
 import numpy as np
 import xarray as xr
+import pandas as pd
 from glob import glob
 import os
+import pathlib
 import re
 import warnings
-try:
-    import ReadIM
-except:
-    warnings.warn('ReadIM is not available, do not read IM7 these files')
+from typing import List, Tuple, Dict, Any
+from numpy.typing import ArrayLike
 
-default_units = ["pix", "pix", "pix/dt", "pix/dt"]
-default_variables = ["x", "y", "u", "v", "s2n"]
+# Defaults
+POS_UNITS: str = "pix" # or mm, m, after scaling
+TIME_UNITS: str = "frame" # "frame" if not scaled, can become 'sec' or 'msec', 'usec'
+# after scaling can be m/s, mm/s
+VEL_UNITS: str =  POS_UNITS # default is displacement in pix
+DELTA_T: float = np.float(0.) # default is 0. i.e. uknown, can be any float value
+
+def set_default_attrs(dataset: xr.Dataset)-> xr.Dataset:
+    """ Defines default attributes:
+
+    # xr.DataSet.x.attrs["units"] = POS_UNITS
+    POS_UNITS: str = "pix" # or mm, m, after scaling
 
 
-def create_sample_field(rows=5, cols=8, frame=0, noise_sigma=1.0):
-    """ creates a sample dataset for the tests """
+    # None if not known, can become 'sec' or 'msec', 'usec'
+    # the time units are for the sequence of PIV realizations
+    # useful for animations of the DataSet and averaging
+    # xr.DataSet.t.attrs["units"] = TIME_UNITS
+    TIME_UNITS: str = None 
+
+    # after scaling can be m/s, mm/s, default is POS_UNITS
+    # xr.DataSet.u.attrs["units"] = VEL_UNITS
+    VEL_UNITS: str =  POS_UNITS
+
+    # attribute of the xr.DataSet, defines things for the 
+    # single flow realization, frame A -> DELTA_T -> frame B
+    # xr.DataSet.attrs["delta_t"] = DELTA_T 
+    DELTA_T: float = None # default is unknown, can be
+    
+    """
+
+    dataset.x.attrs["units"] = POS_UNITS
+    dataset.y.attrs["units"] = POS_UNITS
+    dataset.u.attrs["units"] = VEL_UNITS
+    dataset.v.attrs["units"] = VEL_UNITS
+    dataset.t.attrs["units"] = TIME_UNITS
+    dataset.attrs["delta_t"] = DELTA_T
+    dataset.attrs["files"] = []
+
+    return dataset
+
+def create_sample_field(
+        rows: int=5,
+        cols: int=8,
+        frame: int=0, 
+        noise_sigma: float=1.0
+        ) -> xr.Dataset:
+    """ creates a sample Dataset for the tests """
 
     x = np.arange(32.0, (cols + 1) * 32.0, 32.0)
     y = np.arange(16.0, (rows + 1) * 16.0, 16.0)
@@ -47,29 +91,25 @@ def create_sample_field(rows=5, cols=8, frame=0, noise_sigma=1.0):
         chc, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
     )
 
-    data = xr.Dataset({"u": u, "v": v, "chc": chc})
+    dataset = xr.Dataset({"u": u, "v": v, "chc": chc})
+    dataset = set_default_attrs(dataset)
 
-    data.attrs["variables"] = ["x", "y", "u", "v"]
-    data.attrs["units"] = ["pix", "pix", "pix/dt", "pix/dt"]
-    data.attrs["dt"] = 1.0
-    data.attrs["files"] = ""
-
-    return data
+    return dataset
 
 
-def create_sample_dataset(n=5, noise_sigma=1.0):
+def create_sample_Dataset(
+        n: int=5, 
+        noise_sigma: float=1.0
+        )-> xr.Dataset:
     """ using create_sample_field that has random part in it, create
-    a sample dataset of length 'n' """
+    a sample Dataset of length 'n' """
 
-    data = []
+    dataset = []
     for i in range(n):
-        data.append(create_sample_field(frame=i, noise_sigma=noise_sigma))
+        dataset.append(create_sample_field(frame=i, noise_sigma=noise_sigma))
 
-    combined = xr.concat(data, dim="t")
-    combined.attrs["variables"] = ["x", "y", "u", "v"]
-    combined.attrs["units"] = ["pix", "pix", "pix/dt", "pix/dt"]
-    combined.attrs["dt"] = 1.0
-    combined.attrs["files"] = ""
+    combined = xr.concat(dataset, dim="t")
+    combined = set_default_attrs(combined)
 
     return combined
 
@@ -77,7 +117,11 @@ def create_uniform_strain():
     return create_sample_field(noise_sigma=0.0)
 
     
-def from_arrays(x, y, u, v, mask):
+def from_arrays( x: ArrayLike, 
+                 y: ArrayLike, 
+                 u: ArrayLike, 
+                 v: ArrayLike, 
+                 mask: np.array):
     """
         from_arrays(x,y,u,v,mask,frame=0)
         creates an xArray Dataset from 5 two-dimensional Numpy arrays
@@ -86,23 +130,27 @@ def from_arrays(x, y, u, v, mask):
         Input:
             x,y,u,v,mask = Numpy floating arrays, all the same size
         Output:
-            data is a xAarray Dataset, see xarray for help
+            dataset is a xAarray Dataset, see xarray for help
     """
-    # create data structure of appropriate size
-    data = create_sample_field(rows=x.shape[0], cols=x.shape[1])
+    # create dataset structure of appropriate size
+    dataset = create_sample_field(rows=x.shape[0], cols=x.shape[1])
     # assign arrays
-    data["x"] = x[0, :]
-    data["y"] = y[:, 0]
-    data["u"] = xr.DataArray(u.T[:, :, np.newaxis], dims=("x", "y", "t"))
-    data["v"] = xr.DataArray(v.T[:, :, np.newaxis], dims=("x", "y", "t"))
-    data["chc"] = xr.DataArray(mask.T[:, :, np.newaxis], dims=("x", "y", "t"))
+    dataset["x"] = x[0, :]
+    dataset["y"] = y[:, 0]
+    dataset["u"] = xr.DataArray(u.T[:, :, np.newaxis], dims=("x", "y", "t"))
+    dataset["v"] = xr.DataArray(v.T[:, :, np.newaxis], dims=("x", "y", "t"))
+    dataset["chc"] = xr.DataArray(mask.T[:, :, np.newaxis], dims=("x", "y", "t"))
 
-    return data
+    return dataset
 
-def from_df(df, frame=0, dt=1.0, filename=''):
+def from_df(
+    df: pd.DataFrame, 
+    frame: int=0, 
+    dt: float=None, 
+    filename: str=None):
     """
         from_df(x,y,u,v,mask,frame=0)
-        creates an xArray Dataset from pandas dataframe with 5 columns
+        creates an xArray Dataset from pandas datasetframe with 5 columns
 
         Read the .txt files faster with pandas read_csv()
 
@@ -117,12 +165,12 @@ def from_df(df, frame=0, dt=1.0, filename=''):
         Input:
             x,y,u,v,mask = Numpy floating arrays, all the same size
         Output:
-            data is a xAarray Dataset, see xarray for help
+            dataset is a xAarray Dataset, see xarray for help
     """
     d = df.to_numpy()
 
-    x = np.unique(d[:, 0])
-    y = np.unique(d[:, 1])
+    x = np.sorted_unique(d[:, 0])
+    y = np.sorted_unique(d[:, 1])
     d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
 
     u = d[:, :, 2]
@@ -145,24 +193,23 @@ def from_df(df, frame=0, dt=1.0, filename=''):
         chc, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
     )
 
-    data = xr.Dataset({"u": u, "v": v, "chc": chc})
+    dataset = xr.Dataset({"u": u, "v": v, "chc": chc})
+    dataset = set_default_attrs(dataset)
+    if filename is not None:
+        dataset.attrs["files"].append(filename)
+    if dt is not None:
+        dataset.attrs["dt"] = dt
 
-    data.attrs["variables"] = df.columns.to_list()
-    data.attrs["units"] = ['pix','pix','pix/dt','pix/dt']
-    data.attrs["dt"] = dt
-    data.attrs["files"] = filename
 
-    return data
+    return dataset
 
 def load_vec(
-    filename,
-    rows=None,
-    cols=None,
-    variables=default_variables,
-    units=default_units,
-    dt=1.0,
-    frame=0,
-):
+    filename: str,
+    rows: int=None,
+    cols: int=None,
+    dt: float=None,
+    frame: int=0,
+)-> xr.Dataset:
     """
         load_vec(filename,rows=rows,cols=cols)
         Loads the VEC file (TECPLOT format by TSI Inc.),
@@ -172,18 +219,18 @@ def load_vec(
             rows, cols : number of rows and columns of a vector field,
             if None, None, then parse_header is called to infer the number
             written in the header
-            dt : time interval (default is None)
+            DELTA_T : time interval (default is None)
             frame : frame or time marker (default is None)
         Output:
-            data is a xAarray Dataset, see xarray for help
+            dataset is a xAarray Dataset, see xarray for help
     """
     if rows is None or cols is None:
-        variables, units, rows, cols, dt, frame = parse_header(filename)
+        variables, units, rows, cols, DELTA_T, frame = parse_header(filename)
 
     if rows is None:  # means no headers
         d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
-        x = unique(d[:, 0])
-        y = unique(d[:, 1])
+        x = sorted_unique(d[:, 0])
+        y = sorted_unique(d[:, 1])
         d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
     else:
         # d = np.genfromtxt(
@@ -214,17 +261,22 @@ def load_vec(
         chc, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]}
     )
 
-    data = xr.Dataset({"u": u, "v": v, "chc": chc})
+    dataset = xr.Dataset({"u": u, "v": v, "chc": chc})
 
-    data.attrs["variables"] = variables
-    data.attrs["units"] = units
-    data.attrs["dt"] = dt
-    data.attrs["files"] = filename
+    dataset = set_default_attrs(dataset)
+    if filename is not None:
+        dataset.attrs["files"].append(filename)
+    if dt is not None:
+        dataset.attrs["dt"] = dt
 
-    return data
+    return dataset
 
 
-def load_directory(path, basename="*", ext=".vec"):
+def load_directory(
+        path: pathlib.Path, 
+        basename: str="*", 
+        ext: str=".vec",
+        )->xr.Dataset:
     """
     load_directory (path,basename='*', ext='*.vec')
 
@@ -236,8 +288,8 @@ def load_directory(path, basename="*", ext=".vec"):
         period . can be dropped
 
     Output:
-        data : xarray DataSet with dimensions: x,y,t and
-               data arrays of u,v,
+        dataset : xarray Dataset with dimensions: x,y,t and
+               dataset arrays of u,v,
                attributes of variables and units
 
 
@@ -249,22 +301,22 @@ def load_directory(path, basename="*", ext=".vec"):
     else:
         print(f"found {len(files)} files")
 
-    data = []
+    dataset = []
     combined = []
 
     if ext.lower().endswith("vec"):
-        variables, units, rows, cols, dt, frame = parse_header(files[0])
+        variables, units, rows, cols, DELTA_T, frame = parse_header(files[0])
 
         for i, f in enumerate(files):
-            data.append(
-                load_vec(f, rows, cols, variables, units, dt, frame + i - 1)
+            dataset.append(
+                load_vec(f, rows, cols, variables, units, DELTA_T, frame + i - 1)
             )
 
-        if len(data) > 0:
-            combined = xr.concat(data, dim="t")
-            combined.attrs["variables"] = data[0].attrs["variables"]
-            combined.attrs["units"] = data[0].attrs["units"]
-            combined.attrs["dt"] = data[0].attrs["dt"]
+        if len(dataset) > 0:
+            combined = xr.concat(dataset, dim="t")
+            combined.attrs["variables"] = dataset[0].attrs["variables"]
+            combined.attrs["units"] = dataset[0].attrs["units"]
+            combined.attrs["DELTA_T"] = dataset[0].attrs["DELTA_T"]
             combined.attrs["files"] = files
     elif ext.lower().endswith("vc7"):
         frame = 1
@@ -273,43 +325,44 @@ def load_directory(path, basename="*", ext=".vec"):
                 time = int(f[-9:-4]) - 1
             else:
                 time = i
-            data.append(load_vc7(f, time))
-        if len(data) > 0:
-            combined = xr.concat(data, dim="t")
-            combined.attrs = data[-1].attrs
+            dataset.append(load_vc7(f, time))
+        if len(dataset) > 0:
+            combined = xr.concat(dataset, dim="t")
+            combined.attrs = dataset[-1].attrs
     elif ext.lower().endswith("txt"):
-        variables, units, rows, cols, dt, frame = parse_header(files[0])
+        variables, units, rows, cols, DELTA_T, frame = parse_header(files[0])
 
         for i, f in enumerate(files):
-            data.append(
-                load_txt(f, rows, cols, variables, units, dt, frame + i - 1)
+            dataset.append(
+                load_txt(f, rows, cols, variables, units, DELTA_T, frame + i - 1)
             )
-        if len(data) > 0:
-            combined = xr.concat(data, dim="t")
-            combined.attrs["variables"] = data[0].attrs["variables"]
-            combined.attrs["units"] = data[0].attrs["units"]
-            combined.attrs["dt"] = data[0].attrs["dt"]
+        if len(dataset) > 0:
+            combined = xr.concat(dataset, dim="t")
+            combined.attrs["variables"] = dataset[0].attrs["variables"]
+            combined.attrs["units"] = dataset[0].attrs["units"]
+            combined.attrs["DELTA_T"] = dataset[0].attrs["DELTA_T"]
             combined.attrs["files"] = files
+
         else:
             raise IOError("Could not read the files")
 
     return combined
 
 
-def parse_header(filename):
+def parse_header(filename: pathlib.Path)-> Tuple:
     """
     parse_header ( filename)
     Parses header of the file (.vec) to get the variables (typically X,Y,U,V)
-    and units (can be m,mm, pix/dt or mm/sec, etc.), and the size of the
-    dataset by the number of rows and columns.
+    and units (can be m,mm, pix/DELTA_T or mm/sec, etc.), and the size of the
+    Dataset by the number of rows and columns.
     Input:
         filename : complete path of the file to read
     Returns:
         variables : list of strings
         units : list of strings
-        rows : number of rows of the dataset
-        cols : number of columns of the dataset
-        dt   : time interval between the two PIV frames in microseconds
+        rows : number of rows of the Dataset
+        cols : number of columns of the Dataset
+        DELTA_T   : time interval between the two PIV frames in microseconds
     """
 
     # defaults
@@ -333,7 +386,7 @@ def parse_header(filename):
     if header[:5] != "TITLE":
         return (
             ["x", "y", "u", "v"],
-            ["pix", "pix", "pix/dt", "pix/dt"],
+            ["pix", "pix", "pix/DELTA_T", "pix/DELTA_T"],
             None,
             None,
             None,
@@ -354,14 +407,14 @@ def parse_header(filename):
     rows = int(header_list[-5])
     cols = int(header_list[-3])
 
-    # this is also important to know the time interval, dt
+    # this is also important to know the time interval, DELTA_T
     ind1 = header.find("MicrosecondsPerDeltaT")
-    dt = float(header[ind1:].split('"')[1])
+    DELTA_T = float(header[ind1:].split('"')[1])
 
-    return (variables, units, rows, cols, dt, frame)
+    return (variables, units, rows, cols, DELTA_T, frame)
 
 
-def get_units(filename):
+def get_units(filename: pathlib.Path)->Tuple[str,str,float]:
     """
     get_units(filename)
 
@@ -371,168 +424,31 @@ def get_units(filename):
 
     """
 
-    # lUnits, velUnits, tUnits = 'pixel', 'pixel', 'dt'
+    # lUnits, velUnits, tUnits = 'pixel', 'pixel', 'DELTA_T'
 
     _, units, _, _, _, _ = parse_header(filename)
 
     if units == "":
-        return "pix", "pix", "dt"
+        return (POS_UNITS, VEL_UNITS, DELTA_T)
 
-    lUnits = units[0]
-    velUnits = units[2]
+    lUnits = units[0] # either m, mm, pix
+    velUnits = units[2] # either m/s, mm/s, pix
 
     if velUnits == "pixel":
-        velUnits = velUnits + "/dt"  # make it similar to m/s
+        velUnits = velUnits + "/DELTA_T"  # make it similar to m/s
 
-    tUnits = velUnits.split("/")[1]  # make it 's' or 'dt'
+    tUnits = velUnits.split("/")[1]  # make it 's' or 'DELTA_T'
 
-    return lUnits, velUnits, tUnits
-
-
-def load_vc7(path, time=0):
-    """
-    input path for files format from davis tested for im7&vc7
-    out put [X Y U V mask]
-    valid only for 2d piv cases
-    RETURN:
-     in case of images (image type=0):
-              X = scaled x-coordinates
-              Y = scaled y-coordinates
-              U = scaled image intensities
-              v=0
-              MASK=0
-            in case of 2D vector fields (A.IType = 1,2 or 3):
-              X = scaled x-coordinates
-               Y = scaled y-coordinates
-               U = scaled vx-components of vectors
-               V = scaled vy-components of vectors
-
-    """
-    # you need to add clear to prevent data leaks
-    buff, vatts = ReadIM.extra.get_Buffer_andAttributeList(path)
-    v_array, buff1 = ReadIM.extra.buffer_as_array(buff)
-    nx = buff.nx
-    # nz = buff.nz # flake8 claims it's not used
-    ny = buff.ny
-    # set data range:
-    baseRangeX = np.arange(nx)
-    baseRangeY = np.arange(ny)
-    # baseRangeZ = np.arange(nz)
-    lhs1 = (
-        baseRangeX + 0.5
-    ) * buff.vectorGrid * buff.scaleX.factor + buff.scaleX.offset  # x-range
-    lhs2 = (
-        baseRangeY + 0.5
-    ) * buff.vectorGrid * buff.scaleY.factor + buff.scaleY.offset  # y-range
-    lhs3 = 0
-    lhs4 = 0
-    mask = 0
-    if buff.image_sub_type <= 0:  # grayvalue image format
-        [lhs1, lhs2] = np.meshgrid(lhs1, lhs2)
-        lhs3 = v_array[0, :, :]
-        lhs4 = v_array[1, :, :]
-        Im = xr.DataArray(
-            v_array,
-            dims=("frame", "z", "x"),
-            coords={"x": lhs1[0, :], "z": lhs2[:, 0], "frame": [0, 1]},
-        )
-        data = xr.Dataset({"Im": Im})
-
-    elif buff.image_sub_type == 2:  # simple 2D vector format: (vx,vy)
-        # Calculate vector position and components
-        [lhs1, lhs2] = np.meshgrid(lhs1, lhs2)
-        #    lhs1=np.transpose(lhs1)
-        #    lhs2=np.transpose(lhs2)
-        lhs3 = v_array[0, :, :] * buff.scaleI.factor + buff.scaleI.offset
-        lhs4 = v_array[1, :, :] * buff.scaleI.factor + buff.scaleI.offset
-        if buff.scaleY.factor < 0.0:
-            lhs4 = -lhs4
-        lhs3 = lhs3[:, :, np.newaxis]
-        lhs4 = lhs4[:, :, np.newaxis]
-        u = xr.DataArray(
-            lhs3,
-            dims=("z", "x", "t"),
-            coords={"x": lhs1[0, :], "z": lhs2[:, 0], "t": [time]},
-        )
-        v = xr.DataArray(
-            lhs4,
-            dims=("z", "x", "t"),
-            coords={"x": lhs1[0, :], "z": lhs2[:, 0], "t": [time]},
-        )
-        data = xr.Dataset({"u": u, "v": v})
-    #    	plt.quiver(lhs1,lhs2,lhs3,lhs4);
-    elif buff.image_sub_type == 3 or buff.image_sub_type == 1:
-        # normal 2D vector format + peak: sel+4*(vx,vy) (+peak)
-        # Calculate vector position and components
-        [lhs1, lhs2] = np.meshgrid(lhs1, lhs2)
-        #    lhs1=np.transpose(lhs1)
-        #    lhs2=np.transpose(lhs2)
-        lhs3 = lhs1 * 0
-        lhs4 = lhs2 * 0
-        # Get choice
-        maskData = v_array[0, :, :].astype(np.int8)
-        # Build best vectors from choice field
-        for i in range(5):
-            mask = maskData == (i + 1)
-            if i < 4:  # get best vectors
-                dat = v_array[2 * i + 1, :, :]
-                lhs3[mask] = dat[mask]
-                dat = v_array[2 * i + 2, :, :]
-                lhs4[mask] = dat[mask]
-            else:  # get interpolated vectors
-                dat = v_array[7, :, :]
-                lhs3[mask] = dat[mask]
-                dat = v_array[8, :, :]
-                lhs4[mask] = dat[mask]
-        lhs3 = lhs3 * buff.scaleI.factor + buff.scaleI.offset
-        lhs4 = lhs4 * buff.scaleI.factor + buff.scaleI.offset
-        # Display vector field
-        if buff.scaleY.factor < 0.0:
-            lhs4 = -1 * lhs4
-        lhs3 = lhs3.T[:, :, np.newaxis]
-        lhs4 = lhs4.T[:, :, np.newaxis]
-        chc = maskData.T[:, :, np.newaxis]
-        u = xr.DataArray(
-            lhs3,
-            dims=("x", "y", "t"),
-            coords={"x": lhs1[0, :], "y": lhs2[:, 0], "t": [time]},
-        )
-        v = xr.DataArray(
-            lhs4,
-            dims=("x", "y", "t"),
-            coords={"x": lhs1[0, :], "y": lhs2[:, 0], "t": [time]},
-        )
-        chc = xr.DataArray(
-            chc,
-            dims=("x", "y", "t"),
-            coords={"x": lhs1[0, :], "y": lhs2[:, 0], "t": [time]},
-        )
-        data = xr.Dataset({"u": u, "v": v, "chc": chc})
-    if buff.image_sub_type > 0:
-        data.attrs = ReadIM.extra.att2dict(vatts)
-        data.attrs["variables"] = ["x", "y", "u", "v"]
-        data.attrs["units"] = ["mm", "mm", "m/s", "m/s"]
-        data.attrs["dt"] = int(data.attrs["FrameDt0"][:-3])
-        data.attrs["files"] = path
-    # clean memory
-    ReadIM.DestroyBuffer(buff1)
-    del buff1
-    ReadIM.DestroyBuffer(buff)
-    del buff
-    ReadIM.DestroyAttributeListSafe(vatts)
-    del vatts
-    return data
+    return (lUnits, velUnits, tUnits)
 
 
 def load_txt(
-    filename,
-    rows=None,
-    cols=None,
-    variables=default_variables,
-    units=default_units,
-    dt=1.0,
-    frame=0,
-):
+    filename: str,
+    rows: int=None,
+    cols: int=None,
+    dt: float=None,
+    frame: int=0,
+)-> xr.Dataset:
     """
         load_vec(filename,rows=rows,cols=cols)
         Loads the VEC file (TECPLOT format by TSI Inc.), OpenPIV VEC or TXT
@@ -542,20 +458,22 @@ def load_txt(
             rows, cols : number of rows and columns of a vector field,
             if None, None, then parse_header is called to infer the number
             written in the header
-            dt : time interval (default is None)
+            DELTA_T : time interval (default is None)
             frame : frame or time marker (default is None)
         Output:
-            data is a xAarray Dataset, see xarray for help
+            dataset is a xAarray Dataset, see xarray for help
     """
     if rows is None:  # means no headers
         d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
-        x = unique(d[:, 0])
-        y = unique(d[:, 1])
-        d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
+        x = sorted_unique(d[:, 0])
+        y = sorted_unique(d[:, 1])
+        d = d.reshape((len(y), len(x), 5)).transpose(1, 0, 2)
     else:
         d = np.genfromtxt(
             filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
-        ).reshape(rows, cols, 5)
+        )
+        d = d.reshape((rows, cols, 5))
+
         x = d[:, :, 0][0, :]
         y = d[:, :, 1][:, 0]
 
@@ -563,32 +481,34 @@ def load_txt(
     v = d[:, :, 3]
     chc = d[:, :, 4]
 
-    # extend dimensions
-    u = u[:, :, np.newaxis]
-    v = v[:, :, np.newaxis]
-    chc = chc[:, :, np.newaxis]
 
-    u = xr.DataArray(
-        u, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
-    )
-    v = xr.DataArray(
-        v, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
-    )
-    chc = xr.DataArray(
-        chc, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]}
-    )
+    dataset = xr.Dataset({
+        "u": xr.DataArray(
+                    u[:, :, np.newaxis], 
+                    dims=("x", "y", "t"), 
+                    coords={"x": x, "y": y, "t": [frame]}
+                    ), 
+        "v": xr.DataArray(
+                    v[:, :, np.newaxis], 
+                    dims=("x", "y", "t"), 
+                    coords={"x": x, "y": y, "t": [frame]}
+                    ), 
+        "chc": xr.DataArray(
+                    chc[:, :, np.newaxis], 
+                    dims=("x", "y", "t"), 
+                    coords={"x": x, "y": y, "t": [frame]}
+                    ),
+        })
 
-    data = xr.Dataset({"u": u, "v": v, "chc": chc})
+    dataset = set_default_attrs(dataset)
+    if dt is not None:
+        dataset.attrs["dt"] = dt
+    dataset.attrs["files"].append(filename)
 
-    data.attrs["variables"] = variables
-    data.attrs["units"] = units
-    data.attrs["dt"] = dt
-    data.attrs["files"] = filename
-
-    return data
+    return dataset
 
 
-def unique(array):
-    """ Returns not sorted unique """
+def sorted_unique(array):
+    """ Returns not sorted sorted_unique """
     uniq, index = np.unique(array, return_index=True)
     return uniq[index.argsort()]

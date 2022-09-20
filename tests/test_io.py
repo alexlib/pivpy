@@ -1,6 +1,8 @@
+from xmlrpc.client import boolean
 import numpy as np
 from pivpy import io, pivpy
 import matplotlib.pyplot as plt
+import xarray as xr
 
 import os
 import pkg_resources as pkg
@@ -45,8 +47,8 @@ def test_get_units():
     lUnits, vUnits, tUnits = io.get_units(
         os.path.join(path, "day2/day2a005000.T000.D000.P003.H001.L.vec")
     )
-    assert lUnits == "pixel"
-    assert vUnits == "pixel/dt"
+    assert lUnits == "pix"
+    assert vUnits == "pix"
     assert tUnits == "dt"
 
     # test OpenPIV vec
@@ -90,6 +92,18 @@ def test_load_directory():
     )
     assert np.allclose(data["t"], [0, 1, 2, 3, 4])
 
+def test_check_units(data: xr.Dataset):
+    """ reads units and checks their validitty 
+    def set_default_attrs(dataset: xr.Dataset)-> xr.Dataset:
+    """ 
+    assert data.t.attrs["units"] in ["s", "sec", "frame"]
+    assert data.x.attrs["units"] in ["pix", "m", "mm"]
+    assert data.y.attrs["units"] in ["pix", "m", "mm"]
+    assert data.u.attrs["units"] in ["pix", "m", "mm"]
+    assert data.v.attrs["units"] in ["pix", "m", "mm"]
+    assert data.attrs["delta_t"] == 0.0
+
+
 
 def test_create_sample_field():
     data = io.create_sample_field(frame=3)
@@ -97,10 +111,12 @@ def test_create_sample_field():
     data = io.create_sample_field(rows=3, cols=7)
     assert data.x.shape[0] == 7
     assert data.y.shape[0] == 3
-    assert data["t"] == 0
+    assert data["t"] == 0.0
+
+    assert test_check_units(data)
 
 
 def test_create_sample_dataset(n=3):
-    data = io.create_sample_dataset(n=n)
+    data = io.create_sample_Dataset(n=n)
     assert data.dims["t"] == 3
     assert np.allclose(data["t"], np.arange(3))

@@ -204,7 +204,7 @@ def from_df(
     return dataset
 
 def load_vec(
-    filename: str,
+    filename: pathlib.Path,
     rows: int=None,
     cols: int=None,
     dt: float=None,
@@ -356,7 +356,7 @@ def parse_header(filename: pathlib.Path)-> Tuple:
     and units (can be m,mm, pix/DELTA_T or mm/sec, etc.), and the size of the
     Dataset by the number of rows and columns.
     Input:
-        filename : complete path of the file to read
+        filename : complete path of the file to read, pathlib.Path
     Returns:
         variables : list of strings
         units : list of strings
@@ -369,7 +369,7 @@ def parse_header(filename: pathlib.Path)-> Tuple:
     frame = 0
 
     # split path from the filename
-    fname = os.path.basename(filename)
+    fname = filename.name
     # get the number in a filename if it's a .vec file from Insight
     if "." in fname[:-4]:  # day2a005003.T000.D000.P003.H001.L.vec
         frame = int(re.findall(r"\d+", fname.split(".")[0])[-1])
@@ -378,7 +378,7 @@ def parse_header(filename: pathlib.Path)-> Tuple:
             re.findall(r"\d+", fname.split("_")[1])[-1]
         )  # exp1_001_b.vec, .txt
 
-    with open(filename) as fid:
+    with open(filename,"r") as fid:
         header = fid.readline()
 
     # if the file does not have a header, can be from OpenPIV or elsewhere

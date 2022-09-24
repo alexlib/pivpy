@@ -160,30 +160,13 @@ class PIVAccessor(object):
 
         """
 
-        # ux, uy = np.gradient(self._obj['u'], self._obj['x'],
-        #                    self._obj['y'], axis=(0, 1))
-        # vx, vy = np.gradient(self._obj['v'], self._obj['x'],
-        #                    self._obj['y'], axis=(0, 1))
-        # self._obj['w'] = xr.DataArray(vy - ux, dims=['x', 'y'])
-        # _w = xr.DataArray(vy - ux, dims=['x', 'y', 't'])
-        # if 't' in self._obj.coords:
         self._obj["w"] = (
-            self._obj.differentiate("x")["v"]
-            - self._obj.differentiate("y")["u"]
+            self._obj["v"].differentiate("x")
+            - self._obj["u"].differentiate("y")
         )
-        # else:
-        #     self._obj["w"] = (("x", "y"), vx - uy)
-        # self._obj = self._obj.assign(w=_w)
-        # self._obj.assign(w=vy-ux)
 
-        if len(self._obj.attrs["units"]) < 5:
-            # vel_units = self._obj.attrs['units'][-1]
-            self._obj.attrs["units"].append("1/dt")
-            self._obj.attrs['variables'].append('vorticity')
-        else:
-            # vel_units = self._obj.attrs['units'][-2]
-            self._obj.attrs["units"][-1] = "1/dt"
-            self._obj.attrs['variables'][-1] = 'vorticity'
+        self._obj["w"].attrs["units"] = "1/dt"
+        self._obj["w"].attrs["standard_name"] = "vorticity"
 
         return self._obj
 
@@ -194,21 +177,15 @@ class PIVAccessor(object):
         Output:
             xarray with the estimated shear as a scalar field data['w']
         """
-        ux = self._obj.differentiate("x")["u"]
-        uy = self._obj.differentiate("y")["u"]
-        vx = self._obj.differentiate("x")["v"]
-        vy = self._obj.differentiate("y")["v"]
+        ux = self._obj["u"].differentiate("x")
+        uy = self._obj["u"].differentiate("y")
+        vx = self._obj["v"].differentiate("x")
+        vy = self._obj["v"].differentiate("y")
 
         self._obj["w"] = ux ** 2 + vy ** 2 + 0.5 * (uy + vx) ** 2
 
-        if len(self._obj.attrs["units"]) < 5:
-            # vel_units = self._obj.attrs['units'][-1]
-            self._obj.attrs["units"].append("1/dt")
-            self._obj.attrs['variables'].append('strain')
-        else:
-            # vel_units = self._obj.attrs['units'][-2]
-            self._obj.attrs["units"][-1] = "1/dt"
-            self._obj.attrs['variables'][1] = 'strain'
+        self._obj["w"].attrs["units"] = "1/dt"
+        self._obj["w"].attrs["standard_name"] = "strain"
 
         return self._obj
 
@@ -231,14 +208,9 @@ class PIVAccessor(object):
         else:
             self._obj["w"] = (("x", "y"), vy + ux)
 
-        if len(self._obj.attrs["units"]) == 4:
-            # vel_units = self._obj.attrs['units'][-1]
-            self._obj.attrs["units"].append("1/dt")
-            self._obj.attrs['variables'].append('divergence')
-        else:
-            # vel_units = self._obj.attrs['units'][-2]
-            self._obj.attrs["units"][-1] = "1/dt"
-            self._obj.attrs['variables'][-1] = 'divergence'
+
+        self._obj["w"].attrs["units"] = "1/dt"
+        self._obj["w"].attrs["standard_name"] = "divergence"
 
         return self._obj
 
@@ -253,10 +225,10 @@ class PIVAccessor(object):
             xarray with the estimated acceleration as a scalar field data['w']
 
         """
-        ux = self._obj.differentiate("x")["u"]
-        uy = self._obj.differentiate("y")["u"]
-        vx = self._obj.differentiate("x")["v"]
-        vy = self._obj.differentiate("y")["v"]
+        ux = self._obj["u"].differentiate("x")
+        uy = self._obj["u"].differentiate("y")
+        vx = self._obj["v"].differentiate("x")
+        vy = self._obj["v"].differentiate("y")
 
         ax = self._obj["u"] * ux + self._obj["v"] * uy
         ay = self._obj["u"] * vx + self._obj["v"] * vy
@@ -265,29 +237,16 @@ class PIVAccessor(object):
             np.sqrt(ax ** 2 + ay ** 2), dims=["x", "y", "t"]
         )
 
-        if len(self._obj.attrs["units"]) == 4:
-            vel_units = self._obj.attrs["units"][-1]
-            self._obj.attrs["units"].append(f"{vel_units}^2")
-            self._obj.attrs['variables'].append('acceleration')
-        else:
-            vel_units = self._obj.attrs["units"][-2]
-            self._obj.attrs["units"][-1] = f"{vel_units}^2"
-            self._obj.attrs['variables'][-1] = 'acceleration'
+        self._obj["w"].attrs["units"] = "1/dt"
+        self._obj["w"].attrs["standard_name"] = "acceleration"
 
         return self._obj
 
     def kinetic_energy(self):
         """ estimates turbulent kinetic energy """
         self._obj["w"] = self._obj["u"] ** 2 + self._obj["v"] ** 2
-
-        if len(self._obj.attrs["units"]) == 4:
-            vel_units = self._obj.attrs["units"][-1]
-            self._obj.attrs["units"].append(f"({vel_units})^2")
-        else:
-            vel_units = self._obj.attrs["units"][-2]
-            self._obj.attrs["units"][-1] = f"({vel_units})^2"
-
-        self._obj.attrs["variables"] = ["x","y","u","v","kinetic_energy"]
+        self._obj["w"].attrs["units"] = "(m/s)^2"
+        self._obj["w"].attrs["standard_name"] = "kinetic_energy"
         return self._obj
 
     def tke(self):
@@ -301,7 +260,11 @@ class PIVAccessor(object):
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
         new_obj["w"] = new_obj["u"] ** 2 + new_obj["v"] ** 2
-        new_obj.attrs["variables"] = ["x","y","uf","vf","tke"]
+        new_obj["w"].attrs["units"] = "(m/s)^2"
+        new_obj["w"].attrs["standard_name"] = "TKE"
+
+        # new_obj.attrs["variables"] = ["x","y","uf","vf","tke"]
+
 
 
         # if len(new_obj.attrs["units"]) == 4:
@@ -324,7 +287,9 @@ class PIVAccessor(object):
 
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
-        new_obj.attrs["variables"] = ["x","y","uf","vf"]
+
+        new_obj["u"].attrs["short_name"] = "fluctation"
+        new_obj["v"].attrs["short_name"] = "fluctation"
 
         return new_obj
 
@@ -342,7 +307,7 @@ class PIVAccessor(object):
 
         new_obj["w"] = -1 * new_obj["u"] * new_obj["v"] # new scalar
         new_obj = new_obj.mean(dim="t") # reynolds stress is -\rho < u' v'>
-        new_obj.attrs["variables"] = ["x","y","uf","vf","reynolds_stress"]
+        new_obj["w"].attrs["short_name"] = "Reynolds_stress"
 
         return new_obj
 

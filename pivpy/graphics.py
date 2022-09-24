@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 import xarray as xr
 import os
+from pivpy.io import POS_UNITS, VEL_UNITS
 
 
 def quiver(
@@ -44,6 +45,10 @@ def quiver(
         graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
 
+    pos_units = data.x.attrs["units"] if units is None else units[0]
+    vel_units = data.u.attrs["units"] if units is None else units[2]
+
+
     data = dataset_to_array(data)
 
     # by construction, u and v are rows x columns so need to be rotated 90 deg
@@ -57,15 +62,6 @@ def quiver(
     if u.shape[0]  == x.shape[0]:
         u = u.T
         v = v.T
-
-    if units is not None:  # replace  units
-        lUnits = units[0]  # ['m' 'm' 'mm/s' 'mm/s']
-        velUnits = units[2]
-        # tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
-    else:
-        lUnits = data.attrs["units"][0]
-        velUnits = data.attrs["units"][2]
-        # tUnits = data.attrs['units'][2].split('/')[-1]
 
     # in addition, if the x,y units are pixels,
     # we should plot it in the image coordinate system
@@ -106,10 +102,6 @@ def quiver(
             x, y, u, v, units="width", scale=np.max(S * arrScale), headwidth=2
         )
 
-    # print(f'lUnits = {lUnits}')
-    # if lUnits == "pix":
-    #     ax.invert_yaxis()
-
     if streamlines is True:  # contours or streamlines
         speed = np.sqrt(u ** 2 + v ** 2)
         strm = ax.streamplot(
@@ -122,8 +114,8 @@ def quiver(
             )
             cbar.set_label(r"$ V \, (" + velUnits + r")$")
 
-    ax.set_xlabel(f"x({lUnits})")
-    ax.set_ylabel(f"y ({lUnits})")
+    ax.set_xlabel(f"x ({pos_units})")
+    ax.set_ylabel(f"y ({pos_units})")
     ax.set_aspect(aspectratio)
     # ax.invert_yaxis()
 

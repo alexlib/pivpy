@@ -160,9 +160,9 @@ def from_arrays( x: ArrayLike,
     # assign arrays
     dataset["x"] = x[0, :]
     dataset["y"] = y[:, 0]
-    dataset["u"] = xr.DataArray(u.T[:, :, np.newaxis], dims=("x", "y", "t"))
-    dataset["v"] = xr.DataArray(v.T[:, :, np.newaxis], dims=("x", "y", "t"))
-    dataset["chc"] = xr.DataArray(mask.T[:, :, np.newaxis], dims=("x", "y", "t"))
+    dataset["u"] = xr.DataArray(u[:, :, np.newaxis], dims=("y", "x", "t"))
+    dataset["v"] = xr.DataArray(v[:, :, np.newaxis], dims=("y", "x", "t"))
+    dataset["chc"] = xr.DataArray(mask[:, :, np.newaxis], dims=("y", "x", "t"))
 
     return dataset
 

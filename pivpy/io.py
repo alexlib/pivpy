@@ -17,6 +17,14 @@ import warnings
 from typing import List, Tuple, Dict, Any
 from numpy.typing import ArrayLike
 
+import warnings
+
+try:
+    from lvreader import read_buffer
+except: 
+    warnings.warn('lvreader is not installed')
+
+
 # Defaults
 POS_UNITS: str = "pix" # or mm, m, after scaling
 TIME_UNITS: str = "frame" # "frame" if not scaled, can become 'sec' or 'msec', 'usec'
@@ -163,6 +171,7 @@ def from_arrays( x: ArrayLike,
     dataset["u"] = xr.DataArray(u[:, :, np.newaxis], dims=("y", "x", "t"))
     dataset["v"] = xr.DataArray(v[:, :, np.newaxis], dims=("y", "x", "t"))
     dataset["chc"] = xr.DataArray(mask[:, :, np.newaxis], dims=("y", "x", "t"))
+    dataset = set_default_attrs(dataset)
 
     return dataset
 
@@ -294,6 +303,45 @@ def load_vec(
 
     return dataset
 
+def load_vc7(
+    filename: pathlib.Path,
+)-> xr.Dataset:
+    """
+        load_vc7(filename,rows=rows,cols=cols)
+        Loads the vc7 file using Lavision lvreader package,
+        Arguments:
+            filename : file name, pathlib.Path
+        Output:
+            dataset : xarray.Dataset
+    """
+    buffer = read_buffer(str(filename))
+    data = buffer[0] # first component is a vector frame
+    plane = 0 # don't understand the planes issue, simple vc7 is 0
+
+    u = data.components["U0"][plane]
+    v = data.components["V0"][plane]
+
+    mask = np.logical_not(data.masks[plane] & data.enabled[plane])
+    u[mask] = 0.0
+    v[mask] = 0.0
+
+    # scale
+    u = data.scales.i.offset + u*data.scales.i.slope
+    v = data.scales.i.offset + v*data.scales.i.slope
+
+    x = np.arange(u.shape[1])
+    y = np.arange(u.shape[0])
+
+    x = data.scales.x.offset + (x+.5)*data.scales.x.slope*data.grid.x
+    y = data.scales.y.offset + (y+.5)*data.scales.y.slope*data.grid.y
+
+    x,y = np.meshgrid(x,y)
+    dataset = from_arrays(x,y,u,v,mask)
+
+    dataset.attrs["files"].append(filename)
+    dataset.attrs["dt"]  = data.attributes['FrameDt']
+
+    return dataset
 
 def load_directory(
         path: pathlib.Path, 

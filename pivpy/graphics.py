@@ -54,7 +54,7 @@ def quiver(
         data["u"] = xr.where(data["u"] > threshold, threshold, data["u"])
         data["v"] = xr.where(data["v"] > threshold, threshold, data["v"])
 
-    s = np.array(np.sqrt(data.u ** 2 + data.v ** 2))
+    data['s'] = np.sqrt(data["u"] ** 2 + data["v"] ** 2)
 
     if len(plt.get_fignums()) == 0:  # if no figure is open
         fig, ax = plt.subplots()  # open a new figure
@@ -62,20 +62,25 @@ def quiver(
         fig = plt.gcf()
         ax = plt.gca()
 
-    # quiver itself
 
+    # quiver itself
     Q = data.plot.quiver(
             x='x',
             y='y',
             u='u',
             v='v',
+            hue='s',
             units='width',
-            scale=np.max(s * arrScale),
+            scale=np.max(data['s'].values * arrScale),
             headwidth=2,
             )
 
-    if colorbar:
-        cbar = fig.colorbar(Q, shrink=0.9, orientation=colbar_orient)
+    if colorbar is False:
+        # cbar = fig.colorbar(Q, shrink=0.9, orientation=colbar_orient)
+        cb = Q.colorbar
+        cb.remove()
+        plt.draw()
+
 
     if streamlines:  # contours or streamlines
         strm = ax.streamplot(
@@ -131,13 +136,13 @@ def histogram(data, normed=False):
 
 
 def contour_plot(
-    data,
-    threshold=None,
-    contourLevels=None,
-    colbar=None,
-    logscale=False,
-    aspectratio="equal",
-    units=None,
+    data: xr.DataArray,
+    threshold: float=None,
+    contourLevels: List=[],
+    colorbar: bool=False,
+    logscale: bool=False,
+    aspectratio: str="equal",
+    units: List[str] = [],
 ):
     """ contourf ajusted for the xarray PIV dataset, creates a
         contour map for the data['w'] property.
@@ -151,7 +156,13 @@ def contour_plot(
             aspectration : string, 'equal' is the default
     """
 
-    data = dataset_to_array(data)
+    if isinstance(data, xr.Dataset):
+        if "w" not in data.var():
+            data.piv.vec2scal("ke")
+        
+        data = data["w"]
+
+    data.plot.contourf()
 
     if "w" not in data.var():
         data.piv.vec2scal("ke")

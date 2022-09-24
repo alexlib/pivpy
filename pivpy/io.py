@@ -305,9 +305,10 @@ def load_vec(
 
 def load_vc7(
     filename: pathlib.Path,
+    frame: int=0,
 )-> xr.Dataset:
     """
-        load_vc7(filename,rows=rows,cols=cols)
+        load_vc7(filename) or load_vc7(filename, frame=0)
         Loads the vc7 file using Lavision lvreader package,
         Arguments:
             filename : file name, pathlib.Path
@@ -337,6 +338,7 @@ def load_vc7(
 
     x,y = np.meshgrid(x,y)
     dataset = from_arrays(x,y,u,v,mask)
+    dataset["t"].assign_coords({"t":dataset.t+frame})
 
     dataset.attrs["files"].append(filename)
     dataset.attrs["dt"]  = data.attributes['FrameDt']
@@ -390,13 +392,13 @@ def load_directory(
             combined.attrs["DELTA_T"] = dataset[0].attrs["DELTA_T"]
             combined.attrs["files"] = files
     elif ext.lower().endswith("vc7"):
-        frame = 1
         for i, f in enumerate(files):
             if basename == "B*":  # quite strange to have a specific name?
-                time = int(f[-9:-4]) - 1
+                frame = int(f[-9:-4]) - 1
             else:
-                time = i
-            dataset.append(load_vc7(f, time))
+                frame = i
+            dataset.append(load_vc7(f, frame=frame))
+
         if len(dataset) > 0:
             combined = xr.concat(dataset, dim="t")
             combined.attrs = dataset[-1].attrs

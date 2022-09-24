@@ -61,19 +61,42 @@ def set_default_attrs(dataset: xr.Dataset)-> xr.Dataset:
 def create_sample_field(
         rows: int=5,
         cols: int=8,
+        grid: List=[32,16],
         frame: int=0, 
         noise_sigma: float=1.0
         ) -> xr.Dataset:
-    """ creates a sample Dataset for the tests """
+    """ 
+    creates a sample Dataset for the tests 
 
-    x = np.arange(32.0, (cols + 1) * 32.0, 32.0)
-    y = np.arange(16.0, (rows + 1) * 16.0, 16.0)
+    rows - number of points along vertical coordinate, 
+           corresponds to 'y'
+    cols - number of grid points along horizontal coordinate, 'x'
+    grid - spacing between vectors in two directions (x,y)
+    frame - frame number
+    noise_sigma - strength of Gaussian noise to add
+
+    Returns:
+        xarray.Dataset()
+
+Usage:
+    io.create_sample_field(
+            rows=3,
+            cols=6,
+            grid=[32,16],
+            frame=0,
+            noise_sigma=0.1
+        )
+
+"""
+
+    x = np.arange(grid[0], (cols + 1) * grid[0], grid[0])
+    y = np.arange(grid[1], (rows + 1) * grid[1], grid[1])
 
     xm, ym = np.meshgrid(x, y)
     u = np.ones_like(xm) + np.linspace(0.0, 10.0, cols)
     v = (
         np.zeros_like(ym)
-        + np.linspace(0.0, 1.0, rows).reshape(rows, 1)
+        + np.linspace(-1.0, 1.0, rows).reshape(rows, 1)
         + noise_sigma * np.random.randn(rows, 1)
     )
 

@@ -10,18 +10,19 @@ from matplotlib.animation import FuncAnimation, FFMpegWriter
 import xarray as xr
 import os
 from pivpy.io import POS_UNITS, VEL_UNITS
+from typing import List
 
 
 def quiver(
-    data,
-    arrScale=25.0,
-    threshold=None,
-    nthArr=1,
-    aspectratio="equal",
-    colbar=False,
-    colbar_orient="vertical",
-    units=None,
-    streamlines=False,
+    data: xr.DataArray,
+    arrScale: float=25.0,
+    threshold: float=None,
+    nthArr: int=1,
+    aspectratio: str="equal",
+    colorbar: bool=False,
+    colbar_orient: str="vertical",
+    units: List=[],
+    streamlines: bool=False,
 ):
     """
     Generates a quiver plot of a 'data' xarray DataArray object (single frame
@@ -45,38 +46,15 @@ def quiver(
         graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
 
-    pos_units = data.x.attrs["units"] if units is None else units[0]
-    vel_units = data.u.attrs["units"] if units is None else units[2]
+    pos_units = data.x.attrs["units"] if len(units)==0 else units[0]
+    vel_units = data.u.attrs["units"] if len(units)==0 else units[2]
 
-
-    data = dataset_to_array(data)
-
-    # by construction, u and v are rows x columns so need to be rotated 90 deg
-    # prior to plotting
-
-    x = data.x.values
-    y = data.y.values
-    u = data.u.values
-    v = data.v.values
-
-    if u.shape[0]  == x.shape[0]:
-        u = u.T
-        v = v.T
-
-    # in addition, if the x,y units are pixels,
-    # we should plot it in the image coordinate system
-    # with 0,0 at the top left corner
-    # and so v should be negative
-    # and axis inverted
-
-    # if lUnits == "pix":
-    #     v = -1 * v  # only for graphics, we do not change data
-
+    # clip data to the threshold
     if threshold is not None:
         data["u"] = xr.where(data["u"] > threshold, threshold, data["u"])
         data["v"] = xr.where(data["v"] > threshold, threshold, data["v"])
 
-    S = np.array(np.sqrt(u ** 2 + v ** 2))
+    s = np.array(np.sqrt(data.u ** 2 + data.v ** 2))
 
     if len(plt.get_fignums()) == 0:  # if no figure is open
         fig, ax = plt.subplots()  # open a new figure
@@ -85,34 +63,38 @@ def quiver(
         ax = plt.gca()
 
     # quiver itself
-    if colbar:
-        Q = ax.quiver(
-            x,
-            y,
-            u,
-            v,
-            S,
-            units="width",
-            scale=np.max(S * arrScale),
+
+    Q = data.plot.quiver(
+            x='x',
+            y='y',
+            u='u',
+            v='v',
+            units='width',
+            scale=np.max(s * arrScale),
             headwidth=2,
-        )
-        cbar = fig.colorbar(Q, shrink=0.9, orientation=colbar_orient)
-    else:
-        ax.quiver(
-            x, y, u, v, units="width", scale=np.max(S * arrScale), headwidth=2
-        )
-
-    if streamlines is True:  # contours or streamlines
-        speed = np.sqrt(u ** 2 + v ** 2)
-        strm = ax.streamplot(
-            x, y, u, v, color=speed, cmap=plt.get_cmap("hot"), linewidth=4
-        )
-
-        if colbar:
-            cbar = fig.colorbar(
-                strm.lines, orientation=colbar_orient, fraction=0.1
             )
-            cbar.set_label(r"$ V \, (" + velUnits + r")$")
+
+    if colorbar:
+        cbar = fig.colorbar(Q, shrink=0.9, orientation=colbar_orient)
+
+    if streamlines:  # contours or streamlines
+        strm = ax.streamplot(
+            data.x, 
+            data.y, 
+            data.u, 
+            data.v, 
+            color=s, 
+            cmap="hot", 
+            linewidth=4,
+        )
+
+        if colorbar:
+            cbar = fig.colorbar(
+                strm.lines, 
+                orientation=colbar_orient, 
+                fraction=0.1,
+            )
+            cbar.set_label(r"$ V \, (" + vel_units + r")$")
 
     ax.set_xlabel(f"x ({pos_units})")
     ax.set_ylabel(f"y ({pos_units})")

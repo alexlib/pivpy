@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Various plots
+Various plots, mostly wraping xarray.plot 
 
 """
 
@@ -122,15 +122,14 @@ def histogram(data, normed=False):
     u = np.asarray(data.u).flatten()
     v = np.asarray(data.v).flatten()
 
-    units = data.attrs["units"]
     f, ax = plt.subplots(2)
 
     ax[0].hist(u, bins = np.int32(np.sqrt(len(u)) * 0.5), density=normed)
-    ax[0].set_xlabel("u [" + units[2] + "]")
+    ax[0].set_xlabel(f"u ({data.u.attrs['units']})")
 
     ax[1] = plt.subplot2grid((2, 1), (1, 0))
     ax[1].hist(v, bins = np.int32(np.sqrt(len(v) * 0.5)), density=normed)
-    ax[1].set_xlabel("v [" + units[2] + "]")
+    ax[1].set_xlabel(f"v ({data.v.attrs['units']})")
     plt.tight_layout()
     return f, ax
 

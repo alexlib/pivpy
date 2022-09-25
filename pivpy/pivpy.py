@@ -322,6 +322,7 @@ class PIVAccessor(object):
         # replace few common names
         property = "vorticity" if property == "curl" else property
         property = "kinetic_energy" if property == "ken" else property
+        property = "kinetic_energy" if property == "ke" else property
         property = "vorticity" if property == "vort" else property
  
         method = getattr(self, str(property))

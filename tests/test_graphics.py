@@ -2,10 +2,10 @@ from pivpy import io, graphics, pivpy
 import pkg_resources as pkg
 import pathlib 
 
-# f1 = 'Run000001.T000.D000.P000.H001.L.vec'
 filename = pathlib.Path(
     pkg.resource_filename(
     "pivpy",  "data")) / "Insight" / "Run000001.T000.D000.P000.H001.L.vec"
+
 # load data
 _d = io.load_vec(filename).isel(t=0)
 
@@ -34,6 +34,10 @@ def test_quiver_openpiv_vec():
     _d = io.load_vec(filename)
     _d.piv.quiver() # notice the warning
 
+def test_showf():
+    graphics.showf(_d)
 
-# def test_showf():
-#     graphics.showf(_d)
+def test_average():
+    d = io.create_sample_Dataset()
+    d = d.piv.average
+    d.piv.quiver()

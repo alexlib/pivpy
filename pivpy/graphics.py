@@ -47,9 +47,7 @@ def quiver(
         graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
 
-    if data["t"].shape != (): # only one slice
-        data = data.isel(t=0)
-        warnings.warn("Using isel(t=0)")
+    data = dataset_to_array(data)
 
 
     pos_units = data.x.attrs["units"] if len(units)==0 else units[0]
@@ -168,9 +166,7 @@ def contour_plot(
             aspectration : string, 'equal' is the default
     """
 
-    if data["t"].shape != (): # only one slice
-        data = data.isel(t=0)
-        warnings.warn("Using isel(t=0)")    
+    data = dataset_to_array(data)    
 
     if "w" not in data.var():
         data = data.piv.vec2scal("ke")
@@ -313,14 +309,11 @@ def animate(data, arrowscale=1, savepath=None):
         anim.save("im.mp4", writer=mywriter)
 
 
-def dataset_to_array(data, t=0):
+def dataset_to_array(data:xr.Dataset, t:int=0):
     """ converts xarray Dataset to array """
     if "t" in data.dims:
-        print("Warning: function for a single frame, using the first \
+        warnings.warn("Warning: function for a single frame, using the first \
                frame, supply data.isel(t=N)")
-        data = data.isel(t=t)
-
-    if "z" in data.dims:
-        print("Warning: using first z cordinate, use data.isel(z=0)")
-        data = data.isel(z=0)
-    return data
+        return data.isel(t=t)
+    else:
+        return data

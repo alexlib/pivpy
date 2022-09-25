@@ -1,5 +1,4 @@
 sphinx
-recommonmark
 ipykernel
 nbsphinx
 myst-parser

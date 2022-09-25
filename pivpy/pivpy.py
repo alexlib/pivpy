@@ -401,23 +401,23 @@ class PIVAccessor(object):
 
     def quiver(self, **kwargs):
         """ graphics.quiver() as a property """
-        from graphics import quiver
+        from pivpy.graphics import quiver
         fig, ax = quiver(self._obj, **kwargs)
         return fig, ax
 
     def streamplot(self, **kwargs):
         """ graphics.quiver(streamlines=True) """
-        from graphics import quiver
+        from pivpy.graphics import quiver
         quiver(self._obj, streamlines=True, **kwargs)
 
     def showf(self, **kwargs):
         """ method for graphics.showf """
-        from graphics import showf as gshowf
+        from pivpy.graphics import showf as gshowf
         gshowf(self._obj, **kwargs)
 
     def showscal(self, **kwargs):
         """ method for graphics.showscal """
-        from graphics import showscal
+        from pivpy.graphics import showscal
         showscal(self._obj, **kwargs)
 
     # @property

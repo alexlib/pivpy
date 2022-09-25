@@ -11,6 +11,7 @@ import xarray as xr
 import os
 from pivpy.io import POS_UNITS, VEL_UNITS
 from typing import List
+import warnings
 
 
 def quiver(
@@ -22,7 +23,7 @@ def quiver(
     colorbar: bool=False,
     colorbar_orient: str="vertical",
     units: List=[],
-    streamlines: bool=False,
+    streamlines: bool=False
 ):
     """
     Generates a quiver plot of a 'data' xarray DataArray object (single frame
@@ -46,6 +47,11 @@ def quiver(
         graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
     """
 
+    if data["t"].shape != (): # only one slice
+        data = data.isel(t=0)
+        warnings.warn("Using isel(t=0)")
+
+
     pos_units = data.x.attrs["units"] if len(units)==0 else units[0]
     vel_units = data.u.attrs["units"] if len(units)==0 else units[2]
 
@@ -60,8 +66,7 @@ def quiver(
         fig, ax = plt.subplots()  # open a new figure
     else:
         fig = plt.gcf()
-        ax = plt.gca()
-
+        ax = fig.gca()
 
     # quiver itself
     Q = data.plot.quiver(
@@ -96,17 +101,18 @@ def quiver(
             v='v',
             hue='s',
             cmap="hot", 
-            linewidth=4,
+            linewidth=1,
             ax=ax,
         )
+        strm.colorbar.remove()
 
-        if colorbar:
-            cbar = fig.colorbar(
-                strm, 
-                orientation=colorbar_orient, 
-                fraction=0.1,
-            )
-            cbar.set_label(r"$ V \, (" + vel_units + r")$")
+        # if colorbar:
+        #     cbar = fig.colorbar(
+        #         strm, 
+        #         orientation=colorbar_orient, 
+        #         fraction=0.1,
+        #     )
+        #     cbar.set_label(r"$ V \, (" + vel_units + r")$")
 
     ax.set_xlabel(f"x ({pos_units})")
     ax.set_ylabel(f"y ({pos_units})")
@@ -144,7 +150,7 @@ def histogram(data, normed=False):
 def contour_plot(
     data: xr.DataArray,
     threshold: float=None,
-    contourLevels: List=[],
+    contourLevels: List[float]=[],
     colorbar: bool=False,
     logscale: bool=False,
     aspectratio: str="equal",
@@ -162,51 +168,53 @@ def contour_plot(
             aspectration : string, 'equal' is the default
     """
 
-    if isinstance(data, xr.Dataset):
-        if "w" not in data.var():
-            data.piv.vec2scal("ke")
+    if data["t"].shape != (): # only one slice
+        data = data.isel(t=0)
+        warnings.warn("Using isel(t=0)")    
+
+    if "w" not in data.var():
+        data = data.piv.vec2scal("ke")
         
-        data = data["w"]
-
-    data.plot.contourf(x='x',y='y',row='y',col='x')
-
-    f, ax = plt.subplots()
-
     if threshold is not None:
         data["w"] = xr.where(data["w"] > threshold, threshold, data["w"])
 
-    # m = np.amax(abs(data["w"]))
-    # n = np.amin(abs(data["w"]))
-    if contourLevels is None:
+
+    f, ax = plt.subplots()
+    # data.plot.contourf(x='x',y='y',row='y',col='x', ax=ax)
+
+    if len(contourLevels) == 0:
         levels = np.linspace(
-            np.min(data["w"].values), np.max(data["w"].values), 10
+            np.min(data["w"].values), 
+            np.max(data["w"].values), 
+            10,
         )
     else:
         levels = contourLevels  # vector of levels to set
 
     if logscale:
-        c = ax.contourf(
-            data.x,
-            data.y,
-            np.abs(data["w"]),
+        data["w"] = np.abs(data["w"])
+
+        c = data["w"].plot.contourf(
+            x='x',
+            y='y',
             levels=levels,
             cmap=plt.get_cmap("RdYlBu"),
             norm=plt.colors.LogNorm(),
+            ax=ax,
         )
     else:
-        c = ax.contourf(
-            data.x,
-            data.y,
-            data["w"],
+        c = data["w"].plot.contourf(
+            x='x',
+            y='y',
             levels=levels,
             cmap=plt.get_cmap("RdYlBu"),
+            ax=ax,
         )
 
-    plt.xlabel(f"x [{lUnits}]")
-    plt.ylabel(f"y [{lUnits}]")
-    if colbar is not None:
-        cbar = plt.colorbar(c, orientation=colbar)
-        cbar.set_label(propUnits)
+    if not colorbar:
+        # cbar = c.colorbar(c, orientation=colbar)
+        c.colorbar.remove()
+        # cbar.set_label(propUnits)
 
     ax.set_aspect(aspectratio)
 
@@ -220,9 +228,8 @@ def showf(data, property="ke", **kwargs):
         data : xarray.DataSet that contains dimensions of t,x,y
                and variables u,v and maybe w (scalar)
     """
-    data = data.piv.vec2scal(property=property)
-    contour_plot(data)
-    quiver(data, **kwargs)
+    fig, ax = showscal(data, property=property, **kwargs)
+    fig, ax = quiver(data,**kwargs)
 
 
 def showscal(data, property="ke", **kwargs):
@@ -232,8 +239,8 @@ def showscal(data, property="ke", **kwargs):
         data : xarray.DataSet that contains dimensions of t,x,y
                and a variable w (scalar)
     """
-    data.piv.vec2scal(property=property)
-    fig, ax = contour_plot(data, **kwargs)
+    data = data.piv.vec2scal(property=property)
+    fig, ax = contour_plot(data)
     return fig, ax
 
 

@@ -436,7 +436,7 @@ def parse_header(filename: pathlib.Path) -> Tuple[str, ...]:
         # print(int(re.findall(r'\d+', tmp)[-1]))
         # print(int(''.join(filter(str.isdigit,tmp))[-1]))
         # print(int(re.findall(r'[0-9]+', tmp)[-1]))
-    except:
+    except ValueError:
         frame = 0
 
     # binary, no header

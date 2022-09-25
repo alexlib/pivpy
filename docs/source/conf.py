@@ -25,7 +25,7 @@ copyright = "2019, Turbulence Structure Laboratory"
 author = "Turbulence Structure Laboratory"
 
 # The full version, including alpha/beta/rc tags
-release = "0.0.02"
+release = "0.0.16"
 
 
 # -- General configuration ---------------------------------------------------
@@ -34,7 +34,8 @@ release = "0.0.02"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ["sphinx.ext.autodoc", "sphinx.ext.mathjax",
-              "recommonmark", "nbsphinx"]
+              "myst-parser", "nbsphinx", "sphinx.ext.napoleon",
+              "sphinx.ext.viewcode"]
 
 
 # Add any paths that contain templates here, relative to this directory.

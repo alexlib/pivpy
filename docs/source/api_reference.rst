@@ -3,7 +3,7 @@
 API reference
 =============
 
-This is a complete api reference to the openpiv python module.
+This is a complete api reference to the PIVPy package.
 
 The ``pivpy.io`` module
 ----------------------------------
@@ -11,7 +11,7 @@ The ``pivpy.io`` module
     :members:
 
 The ``pivpy.graphics`` module
-----------------------------
+-----------------------------
 .. automodule:: pivpy.graphics
     :members:  
    

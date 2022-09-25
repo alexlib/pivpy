@@ -57,6 +57,7 @@ contribute
 Using great tutorial http://sphinx-ipynb.readthedocs.org/en/latest/howto.html we now can 
 prepare IPython notebooks (see in /docs/source) and convert those to .rst files, then 
 
-    python setup.py build_sphinx
+    python setup.py sphinx-build
+    sphinx-build -b html docs/source/ docs/build/html
     
-generates ```html``` directory with the documentation ready
+generates ```docs/build/html``` directory with the documentation

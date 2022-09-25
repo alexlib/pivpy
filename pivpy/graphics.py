@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Various plots
+Various plots, mostly wraping xarray.plot 
 
 """
 
@@ -9,18 +9,21 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 import xarray as xr
 import os
+from pivpy.io import POS_UNITS, VEL_UNITS
+from typing import List
+import warnings
 
 
 def quiver(
-    data,
-    arrScale=25.0,
-    threshold=None,
-    nthArr=1,
-    aspectratio="equal",
-    colbar=False,
-    colbar_orient="vertical",
-    units=None,
-    streamlines=False,
+    data: xr.DataArray,
+    arrScale: float=25.0,
+    threshold: float=None,
+    nthArr: int=1,
+    aspectratio: str="equal",
+    colorbar: bool=False,
+    colorbar_orient: str="vertical",
+    units: List=[],
+    streamlines: bool=False
 ):
     """
     Generates a quiver plot of a 'data' xarray DataArray object (single frame
@@ -33,10 +36,10 @@ def quiver(
         arrScale - use to change arrow scales
         nthArr - use to plot only every nth arrow from the array
         contourLevels - use to specify the maximum value (abs) of contour plots
-        colbar - True/False wether to generate a colorbar or not
+        colorbar - True/False wether to generate a colorbar or not
         logscale - if true then colorbar is on log scale
         aspectratio - set auto or equal for the plot's apearence
-        colbar_orient - 'horizontal' or 'vertical' orientation of the colorbar
+        colorbar_orient - 'horizontal' or 'vertical' orientation of the colorbar
         (if colbar is True)
     Outputs:
         none
@@ -46,84 +49,71 @@ def quiver(
 
     data = dataset_to_array(data)
 
-    # by construction, u and v are rows x columns so need to be rotated 90 deg
-    # prior to plotting
 
-    x = data.x.values
-    y = data.y.values
-    u = data.u.values
-    v = data.v.values
+    pos_units = data.x.attrs["units"] if len(units)==0 else units[0]
+    vel_units = data.u.attrs["units"] if len(units)==0 else units[2]
 
-    if u.shape[0]  == x.shape[0]:
-        u = u.T
-        v = v.T
-
-    if units is not None:  # replace  units
-        lUnits = units[0]  # ['m' 'm' 'mm/s' 'mm/s']
-        velUnits = units[2]
-        # tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
-    else:
-        lUnits = data.attrs["units"][0]
-        velUnits = data.attrs["units"][2]
-        # tUnits = data.attrs['units'][2].split('/')[-1]
-
-    # in addition, if the x,y units are pixels,
-    # we should plot it in the image coordinate system
-    # with 0,0 at the top left corner
-    # and so v should be negative
-    # and axis inverted
-
-    # if lUnits == "pix":
-    #     v = -1 * v  # only for graphics, we do not change data
-
+    # clip data to the threshold
     if threshold is not None:
         data["u"] = xr.where(data["u"] > threshold, threshold, data["u"])
         data["v"] = xr.where(data["v"] > threshold, threshold, data["v"])
 
-    S = np.array(np.sqrt(u ** 2 + v ** 2))
+    data['s'] = np.sqrt(data["u"] ** 2 + data["v"] ** 2)
 
     if len(plt.get_fignums()) == 0:  # if no figure is open
         fig, ax = plt.subplots()  # open a new figure
     else:
         fig = plt.gcf()
-        ax = plt.gca()
+        ax = fig.gca()
 
     # quiver itself
-    if colbar:
-        Q = ax.quiver(
-            x,
-            y,
-            u,
-            v,
-            S,
-            units="width",
-            scale=np.max(S * arrScale),
+    Q = data.plot.quiver(
+            x='x',
+            y='y',
+            u='u',
+            v='v',
+            hue='s',
+            units='width',
+            scale=np.max(data['s'].values * arrScale),
             headwidth=2,
-        )
-        cbar = fig.colorbar(Q, shrink=0.9, orientation=colbar_orient)
-    else:
-        ax.quiver(
-            x, y, u, v, units="width", scale=np.max(S * arrScale), headwidth=2
-        )
-
-    # print(f'lUnits = {lUnits}')
-    # if lUnits == "pix":
-    #     ax.invert_yaxis()
-
-    if streamlines is True:  # contours or streamlines
-        speed = np.sqrt(u ** 2 + v ** 2)
-        strm = ax.streamplot(
-            x, y, u, v, color=speed, cmap=plt.get_cmap("hot"), linewidth=4
-        )
-
-        if colbar:
-            cbar = fig.colorbar(
-                strm.lines, orientation=colbar_orient, fraction=0.1
+            ax=ax,
             )
-            cbar.set_label(r"$ V \, (" + velUnits + r")$")
 
-    ax.set_xlabel(f"x({lUnits})")
-    ax.set_ylabel(f"y ({lUnits})")
+    if colorbar is False:
+        # cbar = fig.colorbar(Q, shrink=0.9, orientation=colbar_orient)
+        cb = Q.colorbar
+        cb.remove()
+        plt.draw()
+    else:
+        if colorbar_orient == 'horizontal':
+            cb = Q.colorbar
+            cb.remove()
+            cb = fig.colorbar(Q, orientation=colorbar_orient, ax=ax)
+
+
+    if streamlines:  # contours or streamlines
+        strm = data.plot.streamplot(
+            x='x',
+            y='y',
+            u='u',
+            v='v',
+            hue='s',
+            cmap="hot", 
+            linewidth=1,
+            ax=ax,
+        )
+        strm.colorbar.remove()
+
+        # if colorbar:
+        #     cbar = fig.colorbar(
+        #         strm, 
+        #         orientation=colorbar_orient, 
+        #         fraction=0.1,
+        #     )
+        #     cbar.set_label(r"$ V \, (" + vel_units + r")$")
+
+    ax.set_xlabel(f"x ({pos_units})")
+    ax.set_ylabel(f"y ({pos_units})")
     ax.set_aspect(aspectratio)
     # ax.invert_yaxis()
 
@@ -143,27 +133,26 @@ def histogram(data, normed=False):
     u = np.asarray(data.u).flatten()
     v = np.asarray(data.v).flatten()
 
-    units = data.attrs["units"]
     f, ax = plt.subplots(2)
 
     ax[0].hist(u, bins = np.int32(np.sqrt(len(u)) * 0.5), density=normed)
-    ax[0].set_xlabel("u [" + units[2] + "]")
+    ax[0].set_xlabel(f"u ({data.u.attrs['units']})")
 
     ax[1] = plt.subplot2grid((2, 1), (1, 0))
     ax[1].hist(v, bins = np.int32(np.sqrt(len(v) * 0.5)), density=normed)
-    ax[1].set_xlabel("v [" + units[2] + "]")
+    ax[1].set_xlabel(f"v ({data.v.attrs['units']})")
     plt.tight_layout()
     return f, ax
 
 
 def contour_plot(
-    data,
-    threshold=None,
-    contourLevels=None,
-    colbar=None,
-    logscale=False,
-    aspectratio="equal",
-    units=None,
+    data: xr.DataArray,
+    threshold: float=None,
+    contourLevels: List[float]=[],
+    colorbar: bool=False,
+    logscale: bool=False,
+    aspectratio: str="equal",
+    units: List[str] = [],
 ):
     """ contourf ajusted for the xarray PIV dataset, creates a
         contour map for the data['w'] property.
@@ -177,59 +166,51 @@ def contour_plot(
             aspectration : string, 'equal' is the default
     """
 
-    data = dataset_to_array(data)
+    data = dataset_to_array(data)    
 
     if "w" not in data.var():
-        data.piv.vec2scal("ke")
-
-    if units is not None:
-        lUnits = units[0]  # ['m' 'm' 'mm/s' 'mm/s']
-        # velUnits = units[2]
-        # tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
-    else:
-        # lUnits, velUnits = '', ''
-        lUnits = data.attrs["units"][0]
-        propUnits = (
-            data.attrs["variables"][-1] + data.attrs["units"][-1]
-        )  # last one is from 'w'
-
-    f, ax = plt.subplots()
-
+        data = data.piv.vec2scal("ke")
+        
     if threshold is not None:
         data["w"] = xr.where(data["w"] > threshold, threshold, data["w"])
 
-    # m = np.amax(abs(data["w"]))
-    # n = np.amin(abs(data["w"]))
-    if contourLevels is None:
+
+    f, ax = plt.subplots()
+    # data.plot.contourf(x='x',y='y',row='y',col='x', ax=ax)
+
+    if len(contourLevels) == 0:
         levels = np.linspace(
-            np.min(data["w"].values), np.max(data["w"].values), 10
+            np.min(data["w"].values), 
+            np.max(data["w"].values), 
+            10,
         )
     else:
         levels = contourLevels  # vector of levels to set
 
     if logscale:
-        c = ax.contourf(
-            data.x,
-            data.y,
-            np.abs(data["w"]),
+        data["w"] = np.abs(data["w"])
+
+        c = data["w"].plot.contourf(
+            x='x',
+            y='y',
             levels=levels,
             cmap=plt.get_cmap("RdYlBu"),
             norm=plt.colors.LogNorm(),
+            ax=ax,
         )
     else:
-        c = ax.contourf(
-            data.x,
-            data.y,
-            data["w"],
+        c = data["w"].plot.contourf(
+            x='x',
+            y='y',
             levels=levels,
             cmap=plt.get_cmap("RdYlBu"),
+            ax=ax,
         )
 
-    plt.xlabel(f"x [{lUnits}]")
-    plt.ylabel(f"y [{lUnits}]")
-    if colbar is not None:
-        cbar = plt.colorbar(c, orientation=colbar)
-        cbar.set_label(propUnits)
+    if not colorbar:
+        # cbar = c.colorbar(c, orientation=colbar)
+        c.colorbar.remove()
+        # cbar.set_label(propUnits)
 
     ax.set_aspect(aspectratio)
 
@@ -243,9 +224,8 @@ def showf(data, property="ke", **kwargs):
         data : xarray.DataSet that contains dimensions of t,x,y
                and variables u,v and maybe w (scalar)
     """
-    data.piv.vec2scal(property=property)
-    contour_plot(data)
-    quiver(data, **kwargs)
+    fig, ax = showscal(data, property=property, **kwargs)
+    fig, ax = quiver(data,**kwargs)
 
 
 def showscal(data, property="ke", **kwargs):
@@ -255,8 +235,8 @@ def showscal(data, property="ke", **kwargs):
         data : xarray.DataSet that contains dimensions of t,x,y
                and a variable w (scalar)
     """
-    data.piv.vec2scal(property=property)
-    fig, ax = contour_plot(data, **kwargs)
+    data = data.piv.vec2scal(property=property)
+    fig, ax = contour_plot(data)
     return fig, ax
 
 
@@ -329,14 +309,11 @@ def animate(data, arrowscale=1, savepath=None):
         anim.save("im.mp4", writer=mywriter)
 
 
-def dataset_to_array(data, t=0):
+def dataset_to_array(data:xr.Dataset, t:int=0):
     """ converts xarray Dataset to array """
     if "t" in data.dims:
-        print("Warning: function for a single frame, using the first \
+        warnings.warn("Warning: function for a single frame, using the first \
                frame, supply data.isel(t=N)")
-        data = data.isel(t=t)
-
-    if "z" in data.dims:
-        print("Warning: using first z cordinate, use data.isel(z=0)")
-        data = data.isel(z=0)
-    return data
+        return data.isel(t=t)
+    else:
+        return data

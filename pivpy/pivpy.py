@@ -171,7 +171,7 @@ class PIVAccessor(object):
         return self._obj
 
     def strain(self):
-        """ calculates shear of the data array (single frame)
+        """ calculates strain rate, du/dx^2 + dv/dy^2 + 1/2 (du/dy+dv/dx)^2
         Input:
             xarray with the variables u,v and dimensions x,y
         Output:
@@ -183,7 +183,6 @@ class PIVAccessor(object):
         vy = self._obj["v"].differentiate("y")
 
         self._obj["w"] = ux ** 2 + vy ** 2 + 0.5 * (uy + vx) ** 2
-
         self._obj["w"].attrs["units"] = "1/dt"
         self._obj["w"].attrs["standard_name"] = "strain"
 
@@ -300,11 +299,20 @@ class PIVAccessor(object):
 
         return self._obj
 
+    def rms(self):
+        """ Root mean square """
+        self._obj = tke()
+        self._obj["w"] = np.sqrt(self._obj["w"])
+        self._obj["w"].attrs["standard_name"] = "rms"
+        self._obj["w"].attrs["units"] = "m/s"
+
     def vec2scal(self, property="curl"):
         """ creates a dataset of scalar values on the same
         dimensions and coordinates as the vector dataset
         Agruments:
             data : xarray.DataSet with u,v on t,x,y grid
+            property: str, one of the propertes from the list
+                'vorticity','kinetic_energy', 'tke', 'curl','strain'
         Returns:
             scalar_data : xarray.Dataset w on t,x,y grid
             'w' represents one of the following properties:
@@ -313,13 +321,14 @@ class PIVAccessor(object):
         """
         # replace few common names
         property = "vorticity" if property == "curl" else property
-        property = "tke" if property == "ken" else property
+        property = "kinetic_energy" if property == "ken" else property
         property = "vorticity" if property == "vort" else property
-        property = "vorticity" if property == "" else property
  
         method = getattr(self, str(property))
 
-        return self._obj, method()
+        self._obj = method()
+
+        return self._obj
 
     def __mul__(self, scalar):
         """

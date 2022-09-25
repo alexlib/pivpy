@@ -43,11 +43,11 @@ def test_mean():
 
 def test_vec2scal():
     data = io.create_sample_Dataset()
-    data = data.piv.vec2scal()
-    print(data)
-    #data  = data.piv.vec2scal(property="ke")
+    data = data.piv.vec2scal() # default is curl
+    assert data["w"].attrs["standard_name"] == "vorticity"
 
-    assert data["w"].attrs["standard_name"] == "kinetic_energy"
+    data  = data.piv.vec2scal(property="strain")
+    assert data["w"].attrs["standard_name"] == "strain"
 
 
 def test_add():
@@ -102,6 +102,7 @@ def test_reynolds_stress():
     data.isel(t=1)['v'] -= 0.1
     tmp = data.piv.reynolds_stress()
     assert np.allclose(tmp['w'],0.0025)
+    assert tmp["w"].attrs["standard_name"] == "Reynolds_stress"
 
 def test_set_scale():
     data = io.create_sample_Dataset()
@@ -125,9 +126,9 @@ def test_vorticity():
 
 def test_strain():
     """ tests shear estimate """
-    data = io.create_sample_field(noise_sigma=0.)
-    data.piv.strain()
-    assert np.allclose(data['w'], 0.00223713)
+    data = io.create_sample_field(rows=2,cols=2,noise_sigma=0.0)
+    data = data.piv.strain()
+    assert np.allclose(data["w"].values, 0.11328125, 1e-6)
 
 
 def test_tke():

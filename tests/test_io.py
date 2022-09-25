@@ -107,7 +107,7 @@ def test_create_sample_field():
     
 
 
-def test_create_sample_dataset(n=3):
-    data = io.create_sample_Dataset(n=n)
+def test_create_sample_dataset():
+    data = io.create_sample_Dataset(n_frames=3)
     assert data.dims["t"] == 3
     assert np.allclose(data["t"], np.arange(3))

@@ -10,7 +10,7 @@ import numpy as np
 # from scipy.ndimage.filters import gaussian_filter
 # from scipy.ndimage.filters import median_filter
 import xarray as xr
-from pivpy import graphics
+# from pivpy import graphics
 from scipy.ndimage import gaussian_filter as gf
 
 """ learn from this example
@@ -263,17 +263,6 @@ class PIVAccessor(object):
         new_obj["w"].attrs["units"] = "(m/s)^2"
         new_obj["w"].attrs["standard_name"] = "TKE"
 
-        # new_obj.attrs["variables"] = ["x","y","uf","vf","tke"]
-
-
-
-        # if len(new_obj.attrs["units"]) == 4:
-        #     vel_units = new_obj.attrs["units"][-1]
-        #     new_obj.attrs["units"].append(f"({vel_units})^2")
-        # elif len(new_obj.attrs["units"]) == 5:
-        #     vel_units = new_obj.attrs["units"][-2]
-        #     new_obj.attrs["units"][-1] = f"({vel_units})^2"
-
         return new_obj
 
     def fluct(self):
@@ -288,8 +277,8 @@ class PIVAccessor(object):
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
 
-        new_obj["u"].attrs["short_name"] = "fluctation"
-        new_obj["v"].attrs["short_name"] = "fluctation"
+        new_obj["u"].attrs["standard_name"] = "fluctation"
+        new_obj["v"].attrs["standard_name"] = "fluctation"
 
         return new_obj
 
@@ -307,7 +296,7 @@ class PIVAccessor(object):
 
         new_obj["w"] = -1 * new_obj["u"] * new_obj["v"] # new scalar
         new_obj = new_obj.mean(dim="t") # reynolds stress is -\rho < u' v'>
-        new_obj["w"].attrs["short_name"] = "Reynolds_stress"
+        new_obj["w"].attrs["standard_name"] = "Reynolds_stress"
 
         return new_obj
 
@@ -326,14 +315,9 @@ class PIVAccessor(object):
         property = "vorticity" if property == "curl" else property
         property = "tke" if property == "ken" else property
         property = "vorticity" if property == "vort" else property
-
-        method_name = str(property)
-        method = getattr(self, method_name, lambda: "nothing")
-
-        # if len(self._obj.attrs["variables"]) < 5:  # only x,y,u,v
-        #     self._obj.attrs["variables"].append(property)
-        # else:
-        #     self._obj.attrs["variables"][-1] = property
+        property = "vorticity" if property == "" else property
+ 
+        method = getattr(self, str(property))
 
         return self._obj, method()
 
@@ -358,7 +342,7 @@ class PIVAccessor(object):
         return self._obj
 
     def set_dt(self, dt):
-        self._obj.attrs["dt"] = dt
+        self._obj.attrs["delta_t"] = dt
         return self._obj
 
     def set_scale(self, scale=1.0):
@@ -402,25 +386,29 @@ class PIVAccessor(object):
     def dt(self):
         """ receives the dt from the set """
         if self._dt is None:
-            self._dt = self._obj.attrs["dt"]
+            self._dt = self._obj.attrs["delta_t"]
         return self._dt
 
     def quiver(self, **kwargs):
         """ graphics.quiver() as a property """
-        fig, ax = graphics.quiver(self._obj, **kwargs)
+        from graphics import quiver
+        fig, ax = quiver(self._obj, **kwargs)
         return fig, ax
 
     def streamplot(self, **kwargs):
         """ graphics.quiver(streamlines=True) """
-        graphics.quiver(self._obj, streamlines=True, **kwargs)
+        from graphics import quiver
+        quiver(self._obj, streamlines=True, **kwargs)
 
     def showf(self, **kwargs):
         """ method for graphics.showf """
-        graphics.showf(self._obj, **kwargs)
+        from graphics import showf as gshowf
+        gshowf(self._obj, **kwargs)
 
     def showscal(self, **kwargs):
         """ method for graphics.showscal """
-        graphics.showscal(self._obj, **kwargs)
+        from graphics import showscal
+        showscal(self._obj, **kwargs)
 
     # @property
     # def vel_units(self):

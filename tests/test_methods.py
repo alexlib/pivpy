@@ -8,10 +8,12 @@ import pathlib
 
 f1 = "Run000001.T000.D000.P000.H001.L.vec"
 f2 = "Run000002.T000.D000.P000.H001.L.vec"
-path = pkg.resource_filename("pivpy", "data/Insight")
+path = pathlib.Path(pkg.resource_filename("pivpy", "data"))
+path = path / "Insight"
 
-_a = io.load_vec(pathlib.Path(path) / f1)
-_b = io.load_vec(pathlib.Path(path) / f2)
+
+_a = io.load_vec(path / f1)
+_b = io.load_vec(path / f2)
 
 
 def test_crop():
@@ -27,8 +29,8 @@ def test_crop():
 
 def test_pan():
     """ test a shift by dx,dy using pan method """
-    _a = io.load_vec(os.path.join(path, f1))
-    _c = _a.piv.pan(1.0, -1.0)  # note the use of .piv.
+    _c = _a.copy()
+    _c = _c.piv.pan(1.0, -1.0)  # note the use of .piv.
     assert np.allclose(_c.coords["x"][0], 1.312480)
     assert np.allclose(_c.coords["y"][0], -1.31248)
 
@@ -41,11 +43,11 @@ def test_mean():
 
 def test_vec2scal():
     data = io.create_sample_Dataset()
-    data.piv.vec2scal()
-    data.piv.vec2scal(property="curl")
-    data.piv.vec2scal(property="ke")
-    assert len(data.attrs["variables"]) == 5
-    assert data.attrs["variables"][-1] == "ke"
+    data = data.piv.vec2scal()
+    print(data)
+    #data  = data.piv.vec2scal(property="ke")
+
+    assert data["w"].attrs["standard_name"] == "kinetic_energy"
 
 
 def test_add():
@@ -71,10 +73,10 @@ def test_multiply():
 def test_set_get_dt():
     """ tests setting the new dt """
     data = io.create_sample_Dataset()
-    assert data.attrs["dt"] == 1.0
-    assert data.piv.dt == 1.0
+    assert data.attrs["delta_t"] == 0.0
+
     data.piv.set_dt(2.0)
-    assert data.attrs["dt"] == 2.0
+    assert data.attrs["delta_t"] == 2.0
 
 
 # def test_rotate():
@@ -133,13 +135,13 @@ def test_strain():
 def test_tke():
     """ tests TKE """
     data = io.create_sample_Dataset()
-    data.piv.vec2scal(property="ke")
-    data.piv.vec2scal(property="tke")  # now defined
-    assert data.attrs["variables"][-1] == "tke"
+    data = data.piv.tke()  # now defined
+    assert data["w"].attrs["standard_name"] == "TKE"
 
 
 def test_curl():
     """ tests curl that is also vorticity """
-    _a = io.load_vec(os.path.join(path, f1))
-    _a.piv.vec2scal(property="curl")
-    assert _a.attrs["variables"][-1] == "vorticity"
+    _c = _a.copy()
+    _c.piv.vec2scal(property="curl")
+
+    assert _c["w"].attrs["standard_name"] == "vorticity"

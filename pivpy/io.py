@@ -101,7 +101,9 @@ Usage:
     y = np.arange(grid[1], (rows + 1) * grid[1], grid[1])
 
     xm, ym = np.meshgrid(x, y)
-    u = np.ones_like(xm) + np.linspace(0.0, 10.0, cols)
+    u = np.ones_like(xm) + \
+        np.linspace(0.0, 10.0, cols) +\
+        noise_sigma * np.random.randn(1, cols)    
     v = (
         np.zeros_like(ym)
         + np.linspace(-1.0, 1.0, rows).reshape(rows, 1)
@@ -129,15 +131,23 @@ Usage:
 
 
 def create_sample_Dataset(
-        n: int=5, 
-        noise_sigma: float=1.0
+        n_frames: int=5,
+        rows: int=5,
+        cols: int=3, 
+        noise_sigma: float=0.0
         )-> xr.Dataset:
     """ using create_sample_field that has random part in it, create
     a sample Dataset of length 'n' """
 
     dataset = []
-    for i in range(n):
-        dataset.append(create_sample_field(frame=i, noise_sigma=noise_sigma))
+    for i in range(n_frames):
+        dataset.append(
+            create_sample_field(
+                rows=rows, 
+                cols=cols, 
+                frame=i, 
+                noise_sigma=noise_sigma)
+            )
 
     combined = xr.concat(dataset, dim="t")
     combined = set_default_attrs(combined)

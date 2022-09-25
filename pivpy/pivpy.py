@@ -295,10 +295,10 @@ class PIVAccessor(object):
         new_obj -= new_obj.mean(dim="t")
 
         new_obj["w"] = -1 * new_obj["u"] * new_obj["v"] # new scalar
-        new_obj = new_obj.mean(dim="t") # reynolds stress is -\rho < u' v'>
-        new_obj["w"].attrs["standard_name"] = "Reynolds_stress"
+        self._obj["w"] = new_obj["w"].mean(dim="t") # reynolds stress is -\rho < u' v'>
+        self._obj["w"].attrs["standard_name"] = "Reynolds_stress"
 
-        return new_obj
+        return self._obj
 
     def vec2scal(self, property="curl"):
         """ creates a dataset of scalar values on the same

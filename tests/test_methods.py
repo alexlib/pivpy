@@ -100,10 +100,8 @@ def test_reynolds_stress():
     data = io.create_sample_Dataset(2, noise_sigma=0.0)
     data.isel(t=1)['u'] += 0.1
     data.isel(t=1)['v'] -= 0.1
-    # data['u'] += np.random.randn(*data.u.shape)
     tmp = data.piv.reynolds_stress()
-    # print(tmp['w'].mean(dim=('x','y')))
-    assert np.allclose(tmp['w'],-0.0025)
+    assert np.allclose(tmp['w'],0.0025)
 
 def test_set_scale():
     data = io.create_sample_Dataset()

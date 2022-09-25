@@ -1,4 +1,5 @@
-.. include:: ../README.md
+```{include} ../../README.md
+```
 
 PIVPy
 =====
@@ -7,6 +8,7 @@ PIVPy
 .. toctree::
    :maxdepth: 2
    
+   Home <self>
    intro
    notebook
    tutorial

@@ -340,9 +340,7 @@ def load_vc7(
     x,y = np.meshgrid(x,y)
     dataset = from_arrays(x,y,u,v,mask,frame=frame)
 
-    print(f'frame = {frame}')
     dataset["t"].assign_coords({"t":dataset.t+frame})
-    print(dataset)
 
     dataset.attrs["files"].append(filename)
     dataset.attrs["dt"]  = data.attributes['FrameDt']
@@ -372,9 +370,9 @@ def load_directory(
 
     See more: load_vec
     """
-    print(basename+ext)
+
     files = sorted(path.glob(basename+ext))
-    print(files)
+
 
     if len(files) == 0:
         raise IOError(f"No files {basename+ext} in the directory {path} ")

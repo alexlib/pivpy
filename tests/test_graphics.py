@@ -5,10 +5,7 @@ import pathlib
 # f1 = 'Run000001.T000.D000.P000.H001.L.vec'
 filename = pathlib.Path(
     pkg.resource_filename(
-    "pivpy", 
-    "data/Insight/Run000001.T000.D000.P000.H001.L.vec"
-    )
-)
+    "pivpy",  "data")) / "Insight" / "Run000001.T000.D000.P000.H001.L.vec"
 # load data
 _d = io.load_vec(filename)
 
@@ -23,8 +20,8 @@ def test_quiver():
 
 
 def test_xarray_plot():
-    _d.piv.vec2scal(property="curl")
-    _d["w"].isel(t=0).plot.pcolormesh()
+    d = _d.piv.vec2scal("curl")
+    d["w"].isel(t=0).plot.pcolormesh()
 
 
 def test_histogram():

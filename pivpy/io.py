@@ -32,6 +32,13 @@ TIME_UNITS: str = "frame" # "frame" if not scaled, can become 'sec' or 'msec', '
 VEL_UNITS: str =  POS_UNITS # default is displacement in pix
 DELTA_T: np.float64 = 0.0 # default is 0. i.e. uknown, can be any float value
 
+def sorted_unique(
+    a: ArrayLike
+) -> ArrayLike:
+    b, c = np.unique(a, return_counts=True)
+    out = b[np.argsort(-c)]
+    return out
+
 def set_default_attrs(dataset: xr.Dataset)-> xr.Dataset:
     """ Defines default attributes:
 
@@ -189,7 +196,6 @@ def from_arrays( x: ArrayLike,
 def from_df(
     df: pd.DataFrame, 
     frame: int=0, 
-    dt: float=None, 
     filename: str=None):
     """
         from_df(x,y,u,v,mask,frame=0)
@@ -212,8 +218,13 @@ def from_df(
     """
     d = df.to_numpy()
 
-    x = np.sorted_unique(d[:, 0])
-    y = np.sorted_unique(d[:, 1])
+    x = sorted_unique(d[:, 0])
+    y = sorted_unique(d[:, 1])
+    if d.shape[1] < 5: # not always there's a mask
+        tmp = np.ones((d.shape[0], 5))
+        tmp[:,:-1] = d
+        d = tmp
+
     d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
 
     u = d[:, :, 2]
@@ -240,8 +251,6 @@ def from_df(
     dataset = set_default_attrs(dataset)
     if filename is not None:
         dataset.attrs["files"].append(filename)
-    if dt is not None:
-        dataset.attrs["dt"] = dt
 
 
     return dataset
@@ -268,7 +277,7 @@ def load_vec(
             dataset is a xAarray Dataset, see xarray for help
     """
     if rows is None or cols is None:
-        variables, units, rows, cols, DELTA_T, frame = parse_header(filename)
+        variables, units, rows, cols, dt, frame,_ = parse_header(filename)
 
     if rows is None:  # means no headers
         d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
@@ -310,7 +319,7 @@ def load_vec(
     if filename is not None:
         dataset.attrs["files"].append(filename)
     if dt is not None:
-        dataset.attrs["dt"] = dt
+        dataset.attrs["delta_t"] = dt
 
     return dataset
 
@@ -353,7 +362,7 @@ def load_vc7(
     dataset["t"].assign_coords({"t":dataset.t+frame})
 
     dataset.attrs["files"].append(filename)
-    dataset.attrs["dt"]  = data.attributes['FrameDt']
+    dataset.attrs["delta_t"]  = data.attributes['FrameDt']
 
     return dataset
 
@@ -392,50 +401,37 @@ def load_directory(
     dataset = []
     combined = []
 
-    if ext.lower().endswith("vec"):
-        variables, units, rows, cols, dt, frame = parse_header(files[0])
+    variables, units, rows, cols, dt, frame, method = parse_header(files[0])
 
+    if method == load_vc7:
         for i, f in enumerate(files):
+                dataset.append(load_vc7(f, frame=i))
+
+    else:
+        for i,f in enumerate(files):
             dataset.append(
-                load_vec(f, rows=rows, cols=cols, frame=i, dt=dt)
+                method(
+                    f,
+                    rows=rows,
+                    cols=cols,
+                    frame=i,
+                    dt=dt
+                )
             )
-        if len(dataset) > 0:
-            combined = xr.concat(dataset, dim="t")
-            combined.attrs["dt"] = dataset[0].attrs["dt"]
-            combined.attrs["files"] = files
-            
-    elif ext.lower().endswith("vc7"):
-        for i, f in enumerate(files):
-            # if basename == "B*":  # quite strange to have a specific name?
-            #     frame = int(f[-9:-4]) - 1
-            # else:
-            #     frame = i
-            dataset.append(load_vc7(f, frame=i))
 
-        if len(dataset) > 0:
-            combined = xr.concat(dataset, dim="t")
-            combined.attrs = dataset[-1].attrs
-    elif ext.lower().endswith("txt"):
-        variables, units, rows, cols, DELTA_T, frame = parse_header(files[0])
+    if len(dataset) > 0:
+        combined = xr.concat(dataset, dim="t")
+        combined.attrs["delta_t"] = dataset[-1].attrs["delta_t"]
+        combined.attrs["files"] = files
+        return combined
+                        
+    else:
+        raise IOError("Could not read the files")
 
-        for i, f in enumerate(files):
-            dataset.append(
-                load_txt(f, rows, cols, variables, units, DELTA_T, frame + i - 1)
-            )
-        if len(dataset) > 0:
-            combined = xr.concat(dataset, dim="t")
-            combined.attrs["variables"] = dataset[0].attrs["variables"]
-            combined.attrs["units"] = dataset[0].attrs["units"]
-            combined.attrs["DELTA_T"] = dataset[0].attrs["DELTA_T"]
-            combined.attrs["files"] = files
-
-        else:
-            raise IOError("Could not read the files")
-
-    return combined
+    
 
 
-def parse_header(filename: pathlib.Path)-> Tuple:
+def parse_header(filename: pathlib.Path)-> Tuple[str, ...]:
     """
     parse_header ( filename)
     Parses header of the file (.vec) to get the variables (typically X,Y,U,V)
@@ -448,29 +444,23 @@ def parse_header(filename: pathlib.Path)-> Tuple:
         units : list of strings
         rows : number of rows of the Dataset
         cols : number of columns of the Dataset
-        DELTA_T   : time interval between the two PIV frames in microseconds
+        dt   : time interval between the two PIV frames in microseconds
+        method: function to load
     """
 
-    # defaults
-    frame = 0
-
     # split path from the filename
-    fname = str(filename.name)
+    fname = str(filename.name).split('.')[0]
 
-    # get the number in a filename if it's a .vec file from Insight
-    if "." in fname[:-4]:  # day2a005003.T000.D000.P003.H001.L.vec
-        frame = int(re.findall(r"\d+", fname.split(".")[0])[-1])
-    elif "_" in fname[:-4]:
-        frame = int(
-            re.findall(r"\d+", fname.split("_")[1])[-1]
-        )  # exp1_001_b.vec, .txt
+    try:
+        frame = int(re.findall(r'\d+', fname)[-1])
+        # print(int(re.findall(r'\d+', tmp)[-1]))
+        # print(int(''.join(filter(str.isdigit,tmp))[-1]))
+        # print(int(re.findall(r'[0-9]+', tmp)[-1]))        
+    except:
+        frame = 0
 
-    with open(filename,"r") as fid:
-        header = fid.readline()
-
-    # if the file does not have a header, can be from OpenPIV or elsewhere
-    # return None
-    if header[:5] != "TITLE":
+    # binary, no header
+    if filename.suffix.lower() == '.vc7':
         return (
             ["x", "y", "u", "v"],
             4*[POS_UNITS],
@@ -478,27 +468,60 @@ def parse_header(filename: pathlib.Path)-> Tuple:
             None,
             None,
             frame,
+            load_vc7,
+        )
+    
+    with open(filename,"r") as fid:
+        header = fid.readline()
+        # print(header)
+
+    # if the file does not have a header, can be from OpenPIV or elsewhere
+    # return None
+    if header.startswith('#DaVis'):
+        header_list = header.split(' ')
+        rows = header_list[4]
+        cols = header_list[5]
+        pos_units = header_list[7]
+        vel_units = header_list[-1]
+        variables = ['x','y','u','v']
+        units = [pos_units, pos_units, vel_units, vel_units]
+        dt = 0.0
+        method = load_davis8_txt
+        return variables, units, rows, cols, dt, frame, method
+
+    elif header.startswith('TITLE='): # Insight
+        header_list = (
+            header.replace(",", " ").replace("=", " ").replace('"', " ").split()
         )
 
-    header_list = (
-        header.replace(",", " ").replace("=", " ").replace('"', " ").split()
-    )
+        # get variable names, typically X,Y,U,V
+        variables = header_list[3:12][::2]
 
-    # get variable names, typically X,Y,U,V
-    variables = header_list[3:12][::2]
+        # get units - this is important if it's mm or m/s
+        units = header_list[4:12][::2]
 
-    # get units - this is important if it's mm or m/s
-    units = header_list[4:12][::2]
+        # get the size of the PIV grid in rows x cols
+        rows = int(header_list[-5])
+        cols = int(header_list[-3])
 
-    # get the size of the PIV grid in rows x cols
-    rows = int(header_list[-5])
-    cols = int(header_list[-3])
+        # this is also important to know the time interval, DELTA_T
+        ind1 = header.find("MicrosecondsPerDeltaT")
+        dt = float(header[ind1:].split('"')[1])            
+        method = load_vec
 
-    # this is also important to know the time interval, DELTA_T
-    ind1 = header.find("MicrosecondsPerDeltaT")
-    DELTA_T = float(header[ind1:].split('"')[1])
+        return variables, units, rows, cols, dt, frame, method
 
-    return (variables, units, rows, cols, DELTA_T, frame)
+    else: # no header, probably OpenPIV txt
+        method = load_openpiv_txt
+        return (
+            ["x", "y", "u", "v"],
+            4*[POS_UNITS],
+            None,
+            None,
+            None,
+            frame,
+            method,
+        )
 
 
 def get_units(filename: pathlib.Path)->Tuple[str,str,float]:
@@ -511,7 +534,7 @@ def get_units(filename: pathlib.Path)->Tuple[str,str,float]:
 
     """
 
-    _, units, _, _, _, _ = parse_header(filename)
+    _, units, _, _, _, _,_ = parse_header(filename)
 
     if units == "":
         return (POS_UNITS, VEL_UNITS, DELTA_T)
@@ -524,7 +547,7 @@ def get_units(filename: pathlib.Path)->Tuple[str,str,float]:
     return (lUnits, velUnits, tUnits)
 
 
-def load_txt(
+def load_openpiv_txt(
     filename: str,
     rows: int=None,
     cols: int=None,
@@ -584,10 +607,29 @@ def load_txt(
 
     dataset = set_default_attrs(dataset)
     if dt is not None:
-        dataset.attrs["dt"] = dt
+        dataset.attrs["delta_t"] = dt
     dataset.attrs["files"].append(filename)
 
     return dataset
+
+
+def load_davis8_txt(
+    filename: pathlib.Path,
+    rows: int=None,
+    cols: int=None,
+    dt: float=0.0,
+    frame: int=0,
+) -> xr.Dataset:
+    df = pd.read_csv(
+        filename,
+        delimiter='\t',
+        skiprows=1,
+        names=['x','y','u','v'], 
+        decimal=","
+        )
+    ds = from_df(df, frame=frame)
+    return ds
+
 
 
 def sorted_unique(array):

@@ -20,7 +20,7 @@ def quiver(
     nthArr: int=1,
     aspectratio: str="equal",
     colorbar: bool=False,
-    colbar_orient: str="vertical",
+    colorbar_orient: str="vertical",
     units: List=[],
     streamlines: bool=False,
 ):
@@ -35,10 +35,10 @@ def quiver(
         arrScale - use to change arrow scales
         nthArr - use to plot only every nth arrow from the array
         contourLevels - use to specify the maximum value (abs) of contour plots
-        colbar - True/False wether to generate a colorbar or not
+        colorbar - True/False wether to generate a colorbar or not
         logscale - if true then colorbar is on log scale
         aspectratio - set auto or equal for the plot's apearence
-        colbar_orient - 'horizontal' or 'vertical' orientation of the colorbar
+        colorbar_orient - 'horizontal' or 'vertical' orientation of the colorbar
         (if colbar is True)
     Outputs:
         none
@@ -73,6 +73,7 @@ def quiver(
             units='width',
             scale=np.max(data['s'].values * arrScale),
             headwidth=2,
+            ax=ax,
             )
 
     if colorbar is False:
@@ -80,23 +81,29 @@ def quiver(
         cb = Q.colorbar
         cb.remove()
         plt.draw()
+    else:
+        if colorbar_orient == 'horizontal':
+            cb = Q.colorbar
+            cb.remove()
+            cb = fig.colorbar(Q, orientation=colorbar_orient, ax=ax)
 
 
     if streamlines:  # contours or streamlines
-        strm = ax.streamplot(
-            data.x, 
-            data.y, 
-            data.u, 
-            data.v, 
-            color=s, 
+        strm = data.plot.streamplot(
+            x='x',
+            y='y',
+            u='u',
+            v='v',
+            hue='s',
             cmap="hot", 
             linewidth=4,
+            ax=ax,
         )
 
         if colorbar:
             cbar = fig.colorbar(
-                strm.lines, 
-                orientation=colbar_orient, 
+                strm, 
+                orientation=colorbar_orient, 
                 fraction=0.1,
             )
             cbar.set_label(r"$ V \, (" + vel_units + r")$")
@@ -213,7 +220,7 @@ def showf(data, property="ke", **kwargs):
         data : xarray.DataSet that contains dimensions of t,x,y
                and variables u,v and maybe w (scalar)
     """
-    data.piv.vec2scal(property=property)
+    data = data.piv.vec2scal(property=property)
     contour_plot(data)
     quiver(data, **kwargs)
 

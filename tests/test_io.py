@@ -17,25 +17,25 @@ openpiv_txt_file = path / "openpiv" / "exp1_001_b.txt"
 
 def test_get_dt():
     """ test if we get correct delta t """
-    _, _, _, _,dt,_ = io.parse_header(vec_file)
+    _, _, _, _,dt,_,_ = io.parse_header(vec_file)
     assert dt == 2000.
 
 
 def test_get_frame():
     """ tests the correct frame number """
-    _, _, _, _, _, frame = io.parse_header(
+    _, _, _, _, _, frame, _ = io.parse_header(
         path/  "day2" / "day2a005003.T000.D000.P003.H001.L.vec"
     )
     assert frame == 5003
-    _, _, _, _, _, frame = io.parse_header(
+    _, _, _, _, _, frame,_ = io.parse_header(
         vec_file
     )
     assert frame == 2
-    _, _, _, _, _, frame = io.parse_header(
+    _, _, _, _, _, frame,_ = io.parse_header(
         path / "openpiv" / "exp1_001_b.vec"
         )
     assert frame == 1
-    _, _, _, _, _, frame = io.parse_header(
+    _, _, _, _, _, frame,_ = io.parse_header(
         path / "openpiv" / "exp1_001_b.txt"
     )
     assert frame == 1
@@ -58,8 +58,7 @@ def test_load_vec():
 
 
 def test_loadopenpivtxt():
-    data = io.load_txt(openpiv_txt_file)
-
+    data = io.load_openpiv_txt(openpiv_txt_file)
 
 def test_load_directory():
     data = io.load_directory(
@@ -83,6 +82,13 @@ def test_load_directory():
         ext=".vc7"
     )
     assert np.allclose(data["t"], [0, 1, 2, 3, 4])
+
+    data = io.load_directory(
+        path / "PIV_Challenge", 
+        basename="B*", 
+        ext=".txt"
+    )
+    assert np.allclose(data["t"], [0, 1])
 
 def test_check_units():
     """ reads units and checks their validitty 

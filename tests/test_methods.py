@@ -5,13 +5,14 @@ import pkg_resources as pkg
 import pytest
 
 import os
+import pathlib 
 
 f1 = "Run000001.T000.D000.P000.H001.L.vec"
 f2 = "Run000002.T000.D000.P000.H001.L.vec"
 path = pkg.resource_filename("pivpy", "data/Insight")
 
-_a = io.load_vec(os.path.join(path, f1))
-_b = io.load_vec(os.path.join(path, f2))
+_a = io.load_vec(pathlib.Path(path) / f1)
+_b = io.load_vec(pathlib.Path(path) / f2)
 
 
 def test_crop():

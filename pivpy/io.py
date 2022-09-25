@@ -152,7 +152,8 @@ def from_arrays( x: ArrayLike,
                  y: ArrayLike, 
                  u: ArrayLike, 
                  v: ArrayLike, 
-                 mask: np.array):
+                 mask: np.array,
+                 frame: int=0):
     """
         from_arrays(x,y,u,v,mask,frame=0)
         creates an xArray Dataset from 5 two-dimensional Numpy arrays
@@ -164,7 +165,7 @@ def from_arrays( x: ArrayLike,
             dataset is a xAarray Dataset, see xarray for help
     """
     # create dataset structure of appropriate size
-    dataset = create_sample_field(rows=x.shape[0], cols=x.shape[1])
+    dataset = create_sample_field(rows=x.shape[0], cols=x.shape[1],frame=frame)
     # assign arrays
     dataset["x"] = x[0, :]
     dataset["y"] = y[:, 0]
@@ -337,8 +338,11 @@ def load_vc7(
     y = data.scales.y.offset + (y+.5)*data.scales.y.slope*data.grid.y
 
     x,y = np.meshgrid(x,y)
-    dataset = from_arrays(x,y,u,v,mask)
+    dataset = from_arrays(x,y,u,v,mask,frame=frame)
+
+    print(f'frame = {frame}')
     dataset["t"].assign_coords({"t":dataset.t+frame})
+    print(dataset)
 
     dataset.attrs["files"].append(filename)
     dataset.attrs["dt"]  = data.attributes['FrameDt']
@@ -368,7 +372,10 @@ def load_directory(
 
     See more: load_vec
     """
-    files = sorted(glob(os.path.join(path, basename + ext)))
+    print(basename+ext)
+    files = sorted(path.glob(basename+ext))
+    print(files)
+
     if len(files) == 0:
         raise IOError(f"No files {basename+ext} in the directory {path} ")
     else:
@@ -378,26 +385,24 @@ def load_directory(
     combined = []
 
     if ext.lower().endswith("vec"):
-        variables, units, rows, cols, DELTA_T, frame = parse_header(files[0])
+        variables, units, rows, cols, dt, frame = parse_header(files[0])
 
         for i, f in enumerate(files):
             dataset.append(
-                load_vec(f, rows, cols, variables, units, DELTA_T, frame + i - 1)
+                load_vec(f, rows=rows, cols=cols, frame=i, dt=dt)
             )
-
         if len(dataset) > 0:
             combined = xr.concat(dataset, dim="t")
-            combined.attrs["variables"] = dataset[0].attrs["variables"]
-            combined.attrs["units"] = dataset[0].attrs["units"]
-            combined.attrs["DELTA_T"] = dataset[0].attrs["DELTA_T"]
+            combined.attrs["dt"] = dataset[0].attrs["dt"]
             combined.attrs["files"] = files
+            
     elif ext.lower().endswith("vc7"):
         for i, f in enumerate(files):
-            if basename == "B*":  # quite strange to have a specific name?
-                frame = int(f[-9:-4]) - 1
-            else:
-                frame = i
-            dataset.append(load_vc7(f, frame=frame))
+            # if basename == "B*":  # quite strange to have a specific name?
+            #     frame = int(f[-9:-4]) - 1
+            # else:
+            #     frame = i
+            dataset.append(load_vc7(f, frame=i))
 
         if len(dataset) > 0:
             combined = xr.concat(dataset, dim="t")
@@ -442,11 +447,12 @@ def parse_header(filename: pathlib.Path)-> Tuple:
     frame = 0
 
     # split path from the filename
-    fname = filename.name
+    fname = str(filename.name)
+
     # get the number in a filename if it's a .vec file from Insight
     if "." in fname[:-4]:  # day2a005003.T000.D000.P003.H001.L.vec
         frame = int(re.findall(r"\d+", fname.split(".")[0])[-1])
-    elif "_" in filename[:-4]:
+    elif "_" in fname[:-4]:
         frame = int(
             re.findall(r"\d+", fname.split("_")[1])[-1]
         )  # exp1_001_b.vec, .txt
@@ -459,7 +465,7 @@ def parse_header(filename: pathlib.Path)-> Tuple:
     if header[:5] != "TITLE":
         return (
             ["x", "y", "u", "v"],
-            ["pix", "pix", "pix/DELTA_T", "pix/DELTA_T"],
+            4*[POS_UNITS],
             None,
             None,
             None,
@@ -497,8 +503,6 @@ def get_units(filename: pathlib.Path)->Tuple[str,str,float]:
 
     """
 
-    # lUnits, velUnits, tUnits = 'pixel', 'pixel', 'DELTA_T'
-
     _, units, _, _, _, _ = parse_header(filename)
 
     if units == "":
@@ -507,10 +511,7 @@ def get_units(filename: pathlib.Path)->Tuple[str,str,float]:
     lUnits = units[0] # either m, mm, pix
     velUnits = units[2] # either m/s, mm/s, pix
 
-    if velUnits == "pixel":
-        velUnits = velUnits + "/DELTA_T"  # make it similar to m/s
-
-    tUnits = velUnits.split("/")[1]  # make it 's' or 'DELTA_T'
+    tUnits = velUnits.split("/")[1]  # make it 's' if exists
 
     return (lUnits, velUnits, tUnits)
 

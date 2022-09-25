@@ -1,9 +1,13 @@
 from pivpy import io, graphics, pivpy
 import pkg_resources as pkg
+import pathlib 
 
 # f1 = 'Run000001.T000.D000.P000.H001.L.vec'
-filename = pkg.resource_filename(
-    "pivpy", "data/Insight/Run000001.T000.D000.P000.H001.L.vec"
+filename = pathlib.Path(
+    pkg.resource_filename(
+    "pivpy", 
+    "data/Insight/Run000001.T000.D000.P000.H001.L.vec"
+    )
 )
 # load data
 _d = io.load_vec(filename)

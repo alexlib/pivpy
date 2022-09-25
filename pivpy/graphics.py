@@ -162,21 +162,7 @@ def contour_plot(
         
         data = data["w"]
 
-    data.plot.contourf()
-
-    if "w" not in data.var():
-        data.piv.vec2scal("ke")
-
-    if units is not None:
-        lUnits = units[0]  # ['m' 'm' 'mm/s' 'mm/s']
-        # velUnits = units[2]
-        # tUnits = velUnits.split('/')[1] # make it 's' or 'dt'
-    else:
-        # lUnits, velUnits = '', ''
-        lUnits = data.attrs["units"][0]
-        propUnits = (
-            data.attrs["variables"][-1] + data.attrs["units"][-1]
-        )  # last one is from 'w'
+    data.plot.contourf(x='x',y='y',row='y',col='x')
 
     f, ax = plt.subplots()
 

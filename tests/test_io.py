@@ -117,3 +117,12 @@ def test_create_sample_dataset():
     data = io.create_sample_Dataset(n_frames=3)
     assert data.dims["t"] == 3
     assert np.allclose(data["t"], np.arange(3))
+
+
+def test_to_nc():
+    data = io.create_sample_Dataset(n_frames = 25)
+    data.to_netcdf("tmp.nc")
+
+    data = io.load_directory(path / "Insight" )
+    data.to_netcdf("tmp.nc")
+

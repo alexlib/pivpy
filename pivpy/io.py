@@ -250,7 +250,7 @@ def from_df(
     dataset = xr.Dataset({"u": u, "v": v, "chc": chc})
     dataset = set_default_attrs(dataset)
     if filename is not None:
-        dataset.attrs["files"].append(filename)
+        dataset.attrs["files"].append(str(filename))
 
 
     return dataset
@@ -317,7 +317,7 @@ def load_vec(
 
     dataset = set_default_attrs(dataset)
     if filename is not None:
-        dataset.attrs["files"].append(filename)
+        dataset.attrs["files"].append(str(filename))
     if dt is not None:
         dataset.attrs["delta_t"] = dt
 
@@ -361,7 +361,7 @@ def load_vc7(
 
     dataset["t"].assign_coords({"t":dataset.t+frame})
 
-    dataset.attrs["files"].append(filename)
+    dataset.attrs["files"].append(str(filename))
     dataset.attrs["delta_t"]  = data.attributes['FrameDt']
 
     return dataset
@@ -422,7 +422,7 @@ def load_directory(
     if len(dataset) > 0:
         combined = xr.concat(dataset, dim="t")
         combined.attrs["delta_t"] = dataset[-1].attrs["delta_t"]
-        combined.attrs["files"] = files
+        combined.attrs["files"] = str(files)
         return combined
                         
     else:
@@ -608,7 +608,7 @@ def load_openpiv_txt(
     dataset = set_default_attrs(dataset)
     if dt is not None:
         dataset.attrs["delta_t"] = dt
-    dataset.attrs["files"].append(filename)
+    dataset.attrs["files"].append(str(filename))
 
     return dataset
 

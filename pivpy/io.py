@@ -246,7 +246,7 @@ def load_vec(
     filename: pathlib.Path,
     rows: int = None,
     cols: int = None,
-    dt: float = None,
+    delta_t: float = None,
     frame: int = 0,
 ) -> xr.Dataset:
     """
@@ -299,8 +299,8 @@ def load_vec(
     dataset = set_default_attrs(dataset)
     if filename is not None:
         dataset.attrs["files"].append(str(filename))
-    if dt is not None:
-        dataset.attrs["delta_t"] = dt
+    if delta_t is not None:
+        dataset.attrs["delta_t"] = delta_t
 
     return dataset
 
@@ -418,7 +418,7 @@ def parse_header(filename: pathlib.Path) -> Tuple[str, ...]:
         frame : 
         method :
     """
-    fname = filename.stem # str(filename.name).split(".")[0]
+    fname = filename.stem.split(".")[0] # str(filename.name).split(".")[0]
 
     try:
         frame = int(re.findall(r"\d+", fname)[-1])
@@ -574,8 +574,8 @@ def load_openpiv_txt(
     )
 
     dataset = set_default_attrs(dataset)
-    if dt is not None:
-        dataset.attrs["delta_t"] = dt
+    if delta_t is not None:
+        dataset.attrs["delta_t"] = delta_t
     dataset.attrs["files"].append(str(filename))
 
     return dataset
@@ -583,9 +583,9 @@ def load_openpiv_txt(
 
 def load_davis8_txt(
     filename: pathlib.Path,
-    rows: int = None,
-    cols: int = None,
-    delta_t: float = 0.0,
+    rows: int = None, # pylint: disable=W0613
+    cols: int = None, # pylint: disable=W0613
+    delta_t: float = 0.0, # pylint: disable=W0613
     frame: int = 0,
 ) -> xr.Dataset:
     """loads Davis8 old ASCII tables format
@@ -600,11 +600,12 @@ def load_davis8_txt(
     Returns:
         xr.Dataset: pivpy.Dataset
     """
-    df = pd.read_csv(
+    dataframe = pd.read_csv(
         filename, delimiter="\t", skiprows=1, names=["x", "y", "u", "v"], decimal=","
     )
-    ds = from_df(df, frame=frame)
-    return ds
+    dataset = from_df(dataframe, frame=frame)
+    # print(f'{rows},{cols},{delta_t}')
+    return dataset
 
 
 # def sorted_unique(array):

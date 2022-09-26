@@ -3,12 +3,12 @@
 Various plots, mostly wraping xarray.plot 
 
 """
-
+import os
 import numpy as np
+import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 import xarray as xr
-import os
 from pivpy.io import POS_UNITS, VEL_UNITS
 from typing import List
 import warnings
@@ -25,7 +25,7 @@ def quiver(
     units: List = [],
     streamlines: bool = False,
 ):
-    """ creates quiver of xr.Dataset
+    """creates quiver of xr.Dataset
 
     Args:
         data (xr.DataArray): _description_
@@ -113,7 +113,7 @@ def quiver(
 
 
 def histogram(data, normed=False):
-    """ creates two histograms of two velocity components
+    """creates two histograms of two velocity components
 
     Args:
         data (_type_): _description_
@@ -147,7 +147,7 @@ def contour_plot(
     aspectratio: str = "equal",
     units: List[str] = [],
 ):
-    """ creates contour plot of xr.DataArray
+    """creates contour plot of xr.DataArray
 
     Args:
         data (xr.DataArray): _description_
@@ -189,7 +189,7 @@ def contour_plot(
             y="y",
             levels=levels,
             cmap=plt.get_cmap("RdYlBu"),
-            norm=plt.colors.LogNorm(),
+            norm=colors.LogNorm(),
             ax=ax,
         )
     else:
@@ -212,18 +212,18 @@ def contour_plot(
 
 
 def showf(data, flow_property="ke", **kwargs):
-    """ shows data as quiver over a scalar background 
+    """shows data as quiver over a scalar background
 
     Args:
         data (_type_): _description_
         flow_property (str, optional): _description_. Defaults to "ke".
     """
-    fig, ax = showscal(data, property=property, **kwargs)
+    fig, ax = showscal(data, flow_property=flow_property, **kwargs)
     fig, ax = quiver(data, **kwargs)
 
 
 def showscal(data, flow_property="ke", **kwargs):
-    """ creates contour plot of some scalar field of a flow property
+    """creates contour plot of some scalar field of a flow property
 
     Args:
         data (_type_): _description_
@@ -237,8 +237,8 @@ def showscal(data, flow_property="ke", **kwargs):
     return fig, ax
 
 
-def animate(data: xr.Dataset, arrowscale: int=1, savepath: str=None):
-    """ animates flow fields in the data and saves to MP4 format
+def animate(data: xr.Dataset, arrowscale: int = 1, savepath: str = None):
+    """animates flow fields in the data and saves to MP4 format
 
     Args:
         data (xr.Dataset): _description_
@@ -316,13 +316,14 @@ def animate(data: xr.Dataset, arrowscale: int=1, savepath: str=None):
         anim.save("im.mp4", writer=mywriter)
 
 
-def dataset_to_array(data: xr.Dataset, t: int = 0):
+def dataset_to_array(data: xr.Dataset, t_index: int = 0):
     """converts xarray Dataset to array"""
     if "t" in data.dims:
         warnings.warn(
             "Warning: function for a single frame, using the first \
                frame, supply data.isel(t=N)"
         )
-        return data.isel(t=t)
-    else:
-        return data
+        return data.isel(t=t_index)
+    
+    
+    return data

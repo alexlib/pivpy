@@ -1,13 +1,8 @@
-from xmlrpc.client import boolean
-import numpy as np
-from pivpy import io, pivpy
-import matplotlib.pyplot as plt
-import xarray as xr
-
-import os
 import pathlib
+import numpy as np
 import pkg_resources as pkg
-import pytest
+from pivpy import io
+
 
 path = pathlib.Path(pkg.resource_filename("pivpy", "data"))
 
@@ -17,13 +12,13 @@ openpiv_txt_file = path / "openpiv" / "exp1_001_b.txt"
 
 def test_get_dt():
     """ test if we get correct delta t """
-    _, _, _, _,dt,_,_ = io.parse_header(vec_file)
-    assert dt == 2000.
+    _, _, _, _,delta_t,_,_ = io.parse_header(vec_file)
+    assert delta_t == 2000.
 
 
 def test_get_frame():
     """ tests the correct frame number """
-    _, _, _, _, _, frame, _ = io.parse_header(
+    _, _, _, _, _, frame,_ = io.parse_header(
         path/  "day2" / "day2a005003.T000.D000.P003.H001.L.vec"
     )
     assert frame == 5003
@@ -42,9 +37,12 @@ def test_get_frame():
 
 
 def test_load_vec():
+    """tests loading vec file
+    """
     data = io.load_vec(vec_file)
     assert data["u"].shape == (63, 63, 1)
-    assert data["u"][0, 0, 0] == 0.0
+    tmp = data["u"].values
+    assert tmp[0, 0, 0] == 0.0
     assert np.allclose(data.coords["x"][0], 0.31248)
     assert "t" in data.dims
 
@@ -58,9 +56,13 @@ def test_load_vec():
 
 
 def test_loadopenpivtxt():
-    data = io.load_openpiv_txt(openpiv_txt_file)
+    """tests loading openpivtxt file
+    """
+    io.load_openpiv_txt(openpiv_txt_file)
 
 def test_load_directory():
+    """tests loading directory of Insight VEC, vc7, and Davis8 files
+    """
     data = io.load_directory(
         path / "Insight", 
         basename="Run*", 
@@ -68,13 +70,6 @@ def test_load_directory():
         )
     print(data.t)
     assert np.allclose(data["t"], [0, 1, 2, 3, 4])
-
-    data = io.load_directory(
-        path / "VC7" / "2d2c", 
-        basename="2*", 
-        ext=".vc7")
-    print(data)
-    assert np.allclose(data["t"], [0, 1])
 
     data = io.load_directory(
         path / "urban_canopy", 

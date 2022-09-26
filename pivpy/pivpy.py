@@ -10,19 +10,22 @@ import numpy as np
 # from scipy.ndimage.filters import gaussian_filter
 # from scipy.ndimage.filters import median_filter
 import xarray as xr
-from pivpy.graphics import quiver, showf as gshowf, showscal as gshowscal
 from scipy.ndimage import gaussian_filter
+from pivpy.graphics import quiver as gquiver
+from pivpy.graphics import showf as gshowf, showscal as gshowscal
+from typing import Any, Literal
+from scipy.interpolate import griddata
 
 # """ learn from this example
 
 
-# import xarracc_y as xr
+# import xarray as xr
 
 
 # @xr.register_dataset_accessor('geo')
 # class GeoAccessor(object):
-#     def __init__(self, xarracc_y_obj):
-#         self._obj = xarracc_y_obj
+#     def __init__(self, xarray_obj):
+#         self._obj = xarray_obj
 #         self._center = None
 
 #     @property
@@ -56,12 +59,12 @@ from scipy.ndimage import gaussian_filter
 
 @xr.register_dataset_accessor("piv")
 class PIVAccessor(object):
-    """extends xarracc_y Dataset with PIVPy properties"""
+    """extends xarray Dataset with PIVPy properties"""
 
-    def __init__(self, xarracc_y_obj):
+    def __init__(self, xarray_obj):
         """
         Arguments:
-            data : xarracc_y Dataset:
+            data : xarray Dataset:
             x,y,t are coordinates
             u,v,chs are the data arracc_ys
 
@@ -78,7 +81,7 @@ class PIVAccessor(object):
             data.piv.rotate
 
         """
-        self._obj = xarracc_y_obj
+        self._obj = xarray_obj
         self._average = None
         self._delta_t = None
 
@@ -95,7 +98,7 @@ class PIVAccessor(object):
     def crop(self, crop_vector=None):
         """crop number of rows, cols from either side of the vector fields
         Input:
-            self : xarracc_y Dataset
+            self : xarray Dataset
             crop_vector : [xmin,xmacc_x,ymin,ymacc_x] is a list of values crop
                             the data, defaults are None
         Return:
@@ -126,11 +129,59 @@ class PIVAccessor(object):
         """Gaussian filtering of velocity"""
 
         self._obj["u"] = xr.DataArray(
-            gf(self._obj["u"].values, [1, 1, 0]), dims=("x", "y", "t")
+            gaussian_filter(self._obj["u"].values, [1, 1, 0]), dims=("x", "y", "t")
         )
         self._obj["v"] = xr.DataArray(
-            gf(self._obj["v"].values, [1, 1, 0]), dims=("x", "y", "t")
+            gaussian_filter(self._obj["v"].values, [1, 1, 0]), dims=("x", "y", "t")
         )
+
+        return self._obj
+
+    def fill_nans(self, method: Literal["linear", "nearest", "cubic"] = "nearest"):
+        """
+        This method uses scipy.interpolate.griddata to interpolate missing data.
+        Parameters
+        ----------
+        src_data: Any
+            Input data array.
+        method: {'linear', 'nearest', 'cubic'}, optional
+            The method to use for interpolation in `scipy.interpolate.griddata`.
+        Returns
+        -------
+        :class:`numpy.ndarray`:
+            An interpolated :class:`numpy.ndarray`.
+        """
+
+        def _griddata_nans(src_data, x_coords, y_coords, method=method):
+
+            src_data_flat = src_data.copy().flatten()
+            data_bool = ~np.isnan(src_data_flat)
+
+            if not data_bool.any():
+                return src_data
+
+            return griddata(
+                points=(x_coords.flatten()[data_bool], y_coords.flatten()[data_bool]),
+                values=src_data_flat[data_bool],
+                xi=(x_coords, y_coords),
+                method=method,
+                # fill_value=nodata,
+            )
+
+        x_coords, y_coords = np.meshgrid(
+            self._obj.coords["x"].values, self._obj.coords["y"].values
+        )
+
+        for var_name in self._obj.variables:
+            if var_name not in self._obj.coords:
+                for t_i in self._obj["t"]:
+                    new_data = _griddata_nans(
+                        self._obj.sel(t=t_i)[var_name].data,
+                        x_coords,
+                        y_coords,
+                        method=method,
+                    )
+                    self._obj.sel(t=t_i)[var_name].data[:] = new_data
 
         return self._obj
 
@@ -155,10 +206,10 @@ class PIVAccessor(object):
         adds it to the attributes
 
         Input:
-            xarracc_y with the variables u,v and dimensions x,y
+            xarray with the variables u,v and dimensions x,y
 
         Output:
-            xarracc_y with the estimated vorticity as a scalar field with
+            xarray with the estimated vorticity as a scalar field with
             same dimensions
 
         """
@@ -175,9 +226,9 @@ class PIVAccessor(object):
     def strain(self):
         """calculates strain rate, du/shift_x^2 + dv/shift_y^2 + 1/2 (du/shift_y+dv/shift_x)^2
         Input:
-            xarracc_y with the variables u,v and dimensions x,y
+            xarray with the variables u,v and dimensions x,y
         Output:
-            xarracc_y with the estimated shear as a scalar field data['w']
+            xarray with the estimated shear as a scalar field data['w']
         """
         du_dx = self._obj["u"].differentiate("x")
         du_dy = self._obj["u"].differentiate("y")
@@ -193,9 +244,9 @@ class PIVAccessor(object):
     def divergence(self):
         """calculates shear of the data arracc_y (single frame)
         Input:
-            xarracc_y with the variables u,v and dimensions x,y
+            xarray with the variables u,v and dimensions x,y
         Output:
-            xarracc_y with the estimated shear as a scalar field data['w']
+            xarray with the estimated shear as a scalar field data['w']
         """
         du_dx, _ = np.gradient(
             self._obj["u"], self._obj["x"], self._obj["y"], acc_x_is=(0, 1)
@@ -219,10 +270,10 @@ class PIVAccessor(object):
         data arracc_y (single frame)
 
         Input:
-            xarracc_y with the variables u,v and dimensions x,y
+            xarray with the variables u,v and dimensions x,y
 
         Output:
-            xarracc_y with the estimated acceleration as a scalar field data['w']
+            xarray with the estimated acceleration as a scalar field data['w']
 
         """
         du_dx = self._obj["u"].differentiate("x")
@@ -307,15 +358,15 @@ class PIVAccessor(object):
         self._obj["w"].attrs["standard_name"] = "rms"
         self._obj["w"].attrs["units"] = "m/s"
 
-    def vec2scal(self, flow_property: str="curl"):
+    def vec2scal(self, flow_property: str = "curl"):
         """creates a dataset of scalar values on the same
         dimensions and coordinates as the vector dataset
         Agruments:
-            data : xarracc_y.DataSet with u,v on t,x,y grid
+            data : xarray.DataSet with u,v on t,x,y grid
             flow_property: str, one of the propertes from the list
                 'vorticity','kinetic_energy', 'tke', 'curl','strain'
         Returns:
-            scalar_data : xarracc_y.Dataset w on t,x,y grid
+            scalar_data : xarray.Dataset w on t,x,y grid
             'w' represents one of the following properties:
                 - 'curl' or 'rot' - vorticity
 
@@ -366,12 +417,12 @@ class PIVAccessor(object):
 
     def rotate(self, theta: float = 0.0):
         """rotates the data, but only for some x,y grids
-        Args: 
+        Args:
             theta (float): degrees in the clockwise direction
             it can only work for the cases with equal size along
             x and y
         Returns:
-            rotated object 
+            rotated object
         """
 
         theta = theta / 360.0 * 2 * np.pi
@@ -379,12 +430,12 @@ class PIVAccessor(object):
         x_i = self._obj.x * np.cos(theta) + self._obj.y * np.sin(theta)
         eta = self._obj.y * np.cos(theta) - self._obj.x * np.sin(theta)
         du_dx_i = self._obj.u * np.cos(theta) + self._obj.v * np.sin(theta)
-        U_eta = self._obj.v * np.cos(theta) - self._obj.u * np.sin(theta)
+        u_eta = self._obj.v * np.cos(theta) - self._obj.u * np.sin(theta)
 
         self._obj["x"] = x_i
         self._obj["y"] = eta
         self._obj["u"] = du_dx_i
-        self._obj["v"] = U_eta
+        self._obj["v"] = u_eta
 
         if "theta" in self._obj:
             self._obj["theta"] += theta
@@ -402,8 +453,7 @@ class PIVAccessor(object):
 
     def quiver(self, **kwargs):
         """graphics.quiver() as a flow_property"""
-
-        fig, acc_x = quiver(self._obj, **kwargs)
+        fig, acc_x = gquiver(self._obj, **kwargs)
         return fig, acc_x
 
     def streamplot(self, **kwargs):

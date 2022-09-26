@@ -44,7 +44,8 @@ and additional notebooks:
 
 From a command line just use:
 
-    nosetests
+    pip install pytest
+    pytest
     
 ### Documentation on Github:
 

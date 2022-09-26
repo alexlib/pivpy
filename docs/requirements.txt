@@ -4,3 +4,4 @@ myst-parser
 sphinx
 ipykernel
 nbsphinx
+pivpy

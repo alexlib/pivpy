@@ -1,5 +1,5 @@
+myst-docutils
+myst-parser
 sphinx
 ipykernel
 nbsphinx
-myst-docutils
-myst-parser

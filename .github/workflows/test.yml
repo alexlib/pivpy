@@ -12,4 +12,4 @@ jobs:
     - name: Install the dependencies
       run: python3 -m pip install sphinx -r ./docs/requirements.txt
     - name: Build
-      run: make html
+      run: cd docs && make html

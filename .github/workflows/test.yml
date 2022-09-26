@@ -1,0 +1,15 @@
+name: Test
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 7 * * 6'
+jobs:
+  test-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install the dependencies
+      run: python3 -m pip install sphinx -r ./requirements.txt
+    - name: Build
+      run: make test

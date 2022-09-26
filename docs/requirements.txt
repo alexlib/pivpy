@@ -1,3 +1,4 @@
+pandoc
 myst-docutils
 myst-parser
 sphinx

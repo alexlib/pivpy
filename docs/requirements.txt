@@ -1,3 +1,4 @@
+pivpy
 sphinx
 ipykernel
 nbsphinx

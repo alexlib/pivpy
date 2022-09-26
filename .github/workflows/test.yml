@@ -10,6 +10,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install the dependencies
-      run: python3 -m pip install sphinx -r ./requirements.txt
+      run: python3 -m pip install sphinx -r ./docs/requirements.txt
     - name: Build
       run: make test

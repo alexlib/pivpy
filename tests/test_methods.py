@@ -50,7 +50,7 @@ def test_vec2scal():
     data = data.piv.vec2scal()  # default is curl
     assert data["w"].attrs["standard_name"] == "vorticity"
 
-    data = data.piv.vec2scal(property="strain")
+    data = data.piv.vec2scal(flow_property="strain")
     assert data["w"].attrs["standard_name"] == "strain"
 
 
@@ -80,7 +80,7 @@ def test_set_get_dt():
     data = io.create_sample_Dataset()
     assert data.attrs["delta_t"] == 0.0
 
-    data.piv.set_dt(2.0)
+    data.piv.set_delta_t(2.0)
     assert data.attrs["delta_t"] == 2.0
 
 
@@ -154,6 +154,6 @@ def test_tke():
 def test_curl():
     """tests curl that is also vorticity"""
     _c = _a.copy()
-    _c.piv.vec2scal(property="curl")
+    _c.piv.vec2scal(flow_property="curl")
 
     assert _c["w"].attrs["standard_name"] == "vorticity"

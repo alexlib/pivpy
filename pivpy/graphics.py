@@ -16,14 +16,14 @@ import warnings
 
 def quiver(
     data: xr.DataArray,
-    arrScale: float=25.0,
-    threshold: float=None,
-    nthArr: int=1,
-    aspectratio: str="equal",
-    colorbar: bool=False,
-    colorbar_orient: str="vertical",
-    units: List=[],
-    streamlines: bool=False
+    arrScale: float = 25.0,
+    threshold: float = None,
+    nthArr: int = 1,
+    aspectratio: str = "equal",
+    colorbar: bool = False,
+    colorbar_orient: str = "vertical",
+    units: List = [],
+    streamlines: bool = False,
 ):
     """
     Generates a quiver plot of a 'data' xarray DataArray object (single frame
@@ -49,16 +49,15 @@ def quiver(
 
     data = dataset_to_array(data)
 
-
-    pos_units = data.x.attrs["units"] if len(units)==0 else units[0]
-    vel_units = data.u.attrs["units"] if len(units)==0 else units[2]
+    pos_units = data.x.attrs["units"] if len(units) == 0 else units[0]
+    vel_units = data.u.attrs["units"] if len(units) == 0 else units[2]
 
     # clip data to the threshold
     if threshold is not None:
         data["u"] = xr.where(data["u"] > threshold, threshold, data["u"])
         data["v"] = xr.where(data["v"] > threshold, threshold, data["v"])
 
-    data['s'] = np.sqrt(data["u"] ** 2 + data["v"] ** 2)
+    data["s"] = np.sqrt(data["u"] ** 2 + data["v"] ** 2)
 
     if len(plt.get_fignums()) == 0:  # if no figure is open
         fig, ax = plt.subplots()  # open a new figure
@@ -68,16 +67,16 @@ def quiver(
 
     # quiver itself
     Q = data.plot.quiver(
-            x='x',
-            y='y',
-            u='u',
-            v='v',
-            hue='s',
-            units='width',
-            scale=np.max(data['s'].values * arrScale),
-            headwidth=2,
-            ax=ax,
-            )
+        x="x",
+        y="y",
+        u="u",
+        v="v",
+        hue="s",
+        units="width",
+        scale=np.max(data["s"].values * arrScale),
+        headwidth=2,
+        ax=ax,
+    )
 
     if colorbar is False:
         # cbar = fig.colorbar(Q, shrink=0.9, orientation=colbar_orient)
@@ -85,20 +84,19 @@ def quiver(
         cb.remove()
         plt.draw()
     else:
-        if colorbar_orient == 'horizontal':
+        if colorbar_orient == "horizontal":
             cb = Q.colorbar
             cb.remove()
             cb = fig.colorbar(Q, orientation=colorbar_orient, ax=ax)
 
-
     if streamlines:  # contours or streamlines
         strm = data.plot.streamplot(
-            x='x',
-            y='y',
-            u='u',
-            v='v',
-            hue='s',
-            cmap="hot", 
+            x="x",
+            y="y",
+            u="u",
+            v="v",
+            hue="s",
+            cmap="hot",
             linewidth=1,
             ax=ax,
         )
@@ -106,8 +104,8 @@ def quiver(
 
         # if colorbar:
         #     cbar = fig.colorbar(
-        #         strm, 
-        #         orientation=colorbar_orient, 
+        #         strm,
+        #         orientation=colorbar_orient,
         #         fraction=0.1,
         #     )
         #     cbar.set_label(r"$ V \, (" + vel_units + r")$")
@@ -135,11 +133,11 @@ def histogram(data, normed=False):
 
     f, ax = plt.subplots(2)
 
-    ax[0].hist(u, bins = np.int32(np.sqrt(len(u)) * 0.5), density=normed)
+    ax[0].hist(u, bins=np.int32(np.sqrt(len(u)) * 0.5), density=normed)
     ax[0].set_xlabel(f"u ({data.u.attrs['units']})")
 
     ax[1] = plt.subplot2grid((2, 1), (1, 0))
-    ax[1].hist(v, bins = np.int32(np.sqrt(len(v) * 0.5)), density=normed)
+    ax[1].hist(v, bins=np.int32(np.sqrt(len(v) * 0.5)), density=normed)
     ax[1].set_xlabel(f"v ({data.v.attrs['units']})")
     plt.tight_layout()
     return f, ax
@@ -147,41 +145,40 @@ def histogram(data, normed=False):
 
 def contour_plot(
     data: xr.DataArray,
-    threshold: float=None,
-    contourLevels: List[float]=[],
-    colorbar: bool=False,
-    logscale: bool=False,
-    aspectratio: str="equal",
+    threshold: float = None,
+    contourLevels: List[float] = None,
+    colorbar: bool = False,
+    logscale: bool = False,
+    aspectratio: str = "equal",
     units: List[str] = [],
 ):
-    """ contourf ajusted for the xarray PIV dataset, creates a
-        contour map for the data['w'] property.
-        Input:
-            data : xarray PIV DataArray, converted automatically using
-            .isel(t=0)
-            threshold : a threshold value, default is None (no data clipping)
-            contourLevels : number of contour levels, default is None
-            colbar : None (hide), 'horizontal', or 'vertical'
-            logscale : boolean (True is default) create in linear/log scale
-            aspectration : string, 'equal' is the default
+    """contourf ajusted for the xarray PIV dataset, creates a
+    contour map for the data['w'] property.
+    Input:
+        data : xarray PIV DataArray, converted automatically using
+        .isel(t=0)
+        threshold : a threshold value, default is None (no data clipping)
+        contourLevels : number of contour levels, default is None
+        colbar : None (hide), 'horizontal', or 'vertical'
+        logscale : boolean (True is default) create in linear/log scale
+        aspectration : string, 'equal' is the default
     """
 
-    data = dataset_to_array(data)    
+    data = dataset_to_array(data)
 
     if "w" not in data.var():
         data = data.piv.vec2scal("ke")
-        
+
     if threshold is not None:
         data["w"] = xr.where(data["w"] > threshold, threshold, data["w"])
-
 
     f, ax = plt.subplots()
     # data.plot.contourf(x='x',y='y',row='y',col='x', ax=ax)
 
-    if len(contourLevels) == 0:
+    if contourLevels is None:
         levels = np.linspace(
-            np.min(data["w"].values), 
-            np.max(data["w"].values), 
+            np.min(data["w"].values),
+            np.max(data["w"].values),
             10,
         )
     else:
@@ -191,8 +188,8 @@ def contour_plot(
         data["w"] = np.abs(data["w"])
 
         c = data["w"].plot.contourf(
-            x='x',
-            y='y',
+            x="x",
+            y="y",
             levels=levels,
             cmap=plt.get_cmap("RdYlBu"),
             norm=plt.colors.LogNorm(),
@@ -200,8 +197,8 @@ def contour_plot(
         )
     else:
         c = data["w"].plot.contourf(
-            x='x',
-            y='y',
+            x="x",
+            y="y",
             levels=levels,
             cmap=plt.get_cmap("RdYlBu"),
             ax=ax,
@@ -217,7 +214,7 @@ def contour_plot(
     return f, ax
 
 
-def showf(data, property="ke", **kwargs):
+def showf(data, flow_property="ke", **kwargs):
     """
     showf(data, var, units)
     Arguments:
@@ -225,23 +222,23 @@ def showf(data, property="ke", **kwargs):
                and variables u,v and maybe w (scalar)
     """
     fig, ax = showscal(data, property=property, **kwargs)
-    fig, ax = quiver(data,**kwargs)
+    fig, ax = quiver(data, **kwargs)
 
 
-def showscal(data, property="ke", **kwargs):
+def showscal(data, flow_property="ke", **kwargs):
     """
     showf(data, var, units)
     Arguments:
         data : xarray.DataSet that contains dimensions of t,x,y
                and a variable w (scalar)
     """
-    data = data.piv.vec2scal(property=property)
+    data = data.piv.vec2scal(flow_property=flow_property)
     fig, ax = contour_plot(data)
     return fig, ax
 
 
 def animate(data, arrowscale=1, savepath=None):
-    """ animates the quiver plot for the dataset (multiple frames)
+    """animates the quiver plot for the dataset (multiple frames)
     Input:
         data : xarray PIV type of DataSet
         arrowscale : [optional] integer, default is 1
@@ -257,7 +254,7 @@ def animate(data, arrowscale=1, savepath=None):
     Y = Y.T
     U, V = data.u[:, :, 0], data.v[:, :, 0]  # first frame
     fig, ax = plt.subplots(1, 1)
-    M = np.sqrt(U ** 2 + V ** 2)
+    M = np.sqrt(U**2 + V**2)
 
     Q = ax.quiver(
         X[::3, ::3],
@@ -309,11 +306,13 @@ def animate(data, arrowscale=1, savepath=None):
         anim.save("im.mp4", writer=mywriter)
 
 
-def dataset_to_array(data:xr.Dataset, t:int=0):
-    """ converts xarray Dataset to array """
+def dataset_to_array(data: xr.Dataset, t: int = 0):
+    """converts xarray Dataset to array"""
     if "t" in data.dims:
-        warnings.warn("Warning: function for a single frame, using the first \
-               frame, supply data.isel(t=N)")
+        warnings.warn(
+            "Warning: function for a single frame, using the first \
+               frame, supply data.isel(t=N)"
+        )
         return data.isel(t=t)
     else:
         return data

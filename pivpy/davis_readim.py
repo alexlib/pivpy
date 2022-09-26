@@ -164,9 +164,7 @@ def load_directory(path, basename=""):
 
     data = []
     for i, f in enumerate(files):
-        data.append(
-            loadvec(f, rows, cols, variables, units, dt, frame + i - 1)
-        )
+        data.append(loadvec(f, rows, cols, variables, units, dt, frame + i - 1))
 
     combined = xr.concat(data, dim="t")
     combined.attrs["variables"] = variables

@@ -28,7 +28,7 @@ DELTA_T: np.float64 = 0.0  # default is 0. i.e. uknown, can be any float value
 
 
 def sorted_unique(arr: ArrayLike) -> ArrayLike:
-    """ creates a sorted unique numpy array """
+    """creates a sorted unique numpy array"""
     arr1, c = np.unique(arr, return_counts=True)
     out = arr1[np.argsort(-c)]
     return out

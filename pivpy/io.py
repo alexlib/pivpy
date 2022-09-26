@@ -200,23 +200,15 @@ def from_df(
     frame: int = 0,
     filename: str = None,
 ) -> xr.Dataset:
-    """from_df(x,y,u,v,mask,frame=0)
-    creates an xArray Dataset from pandas datasetframe with 5 columns
-    Read the .txt files faster with pandas read_csv()
-
-    %%time
-    df = pd.read_csv(files_list[-1],delimiter='\t',
-                    names = ['x','y','u','v','mask'],header=0)
-    from_df(df,filename=files_list[-1])
-
-    is 3 times faster than the load_txt
-
+    """creates pivpy.Dataset from pandas DataFrame
 
     Args:
-        x,y,u,v,mask = Numpy floating arrays, all the same size
-    Returns:
-        dataset is a xAarray Dataset, see xarray for help
+        df (pd.DataFrame): DataFrame with columns of x,y,u,v
+        frame (int, optional): frame number. Defaults to 0.
+        filename (str, optional): filename to add to the attributes. Defaults to None.
 
+    Returns:
+        xr.Dataset: pivpy.Dataset
     """
     d = df.to_numpy()
 
@@ -412,24 +404,22 @@ def load_directory(
 
 
 def parse_header(filename: pathlib.Path) -> Tuple[str, ...]:
-    """
-    parse_header ( filename)
-    Parses header of the file (.vec) to get the variables (typically X,Y,U,V)
-    and units (can be m,mm, pix/DELTA_T or mm/sec, etc.), and the size of the
-    Dataset by the number of rows and columns.
-    Input:
-        filename : complete path of the file to read, pathlib.Path
-    Returns:
-        variables : list of strings
-        units : list of strings
-        rows : number of rows of the Dataset
-        cols : number of columns of the Dataset
-        dt   : time interval between the two PIV frames in microseconds
-        method: function to load
-    """
+    """ parses the header line in the file to obtain attributes
 
-    # split path from the filename
-    fname = str(filename.name).split(".")[0]
+    Args:
+        filename (pathlib.Path): txt, vec file name
+
+    Returns:
+        Tuple[str, ...]: 
+        variables:  
+        units : 
+        rows : 
+        cols : 
+        delta_t: 
+        frame : 
+        method :
+    """
+    fname = filename.stem # str(filename.name).split(".")[0]
 
     try:
         frame = int(re.findall(r"\d+", fname)[-1])
@@ -451,7 +441,7 @@ def parse_header(filename: pathlib.Path) -> Tuple[str, ...]:
             load_vc7,
         )
 
-    with open(filename, "r") as fid:
+    with open(filename, "r", encoding="utf-8") as fid:
         header = fid.readline()
         # print(header)
 
@@ -598,9 +588,21 @@ def load_davis8_txt(
     filename: pathlib.Path,
     rows: int = None,
     cols: int = None,
-    dt: float = 0.0,
+    delta_t: float = 0.0,
     frame: int = 0,
 ) -> xr.Dataset:
+    """loads Davis8 old ASCII tables format
+
+    Args:
+        filename (pathlib.Path): Davis8 filename.txt
+        rows (int, optional): rows. Defaults to None.
+        cols (int, optional): cols. Defaults to None.
+        delta_t (float, optional): delta_t. Defaults to 0.0.
+        frame (int, optional): frame number. Defaults to 0.
+
+    Returns:
+        xr.Dataset: pivpy.Dataset
+    """
     df = pd.read_csv(
         filename, delimiter="\t", skiprows=1, names=["x", "y", "u", "v"], decimal=","
     )

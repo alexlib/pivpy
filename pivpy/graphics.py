@@ -233,21 +233,20 @@ def showscal(data, flow_property="ke", **kwargs):
                and a variable w (scalar)
     """
     data = data.piv.vec2scal(flow_property=flow_property)
-    fig, ax = contour_plot(data)
+    fig, ax = contour_plot(data, **kwargs)
     return fig, ax
 
 
-def animate(data, arrowscale=1, savepath=None):
-    """animates the quiver plot for the dataset (multiple frames)
-    Input:
-        data : xarray PIV type of DataSet
-        arrowscale : [optional] integer, default is 1
-        savepath : [optional] path to save the MP4 animation, default is None
+def animate(data: xr.Dataset, arrowscale: int=1, savepath: str=None):
+    """ animates flow fields in the data and saves to MP4 format
 
-    Output:
-        if savepath is None, then only an image display of the animation
-        if savepath is an existing path, a file named im.mp4 is saved
+    Args:
+        data (xr.Dataset): _description_
+        arrowscale (int, optional): _description_. Defaults to 1.
+        savepath (str, optional): _description_. Defaults to None.
 
+    Returns:
+        _type_: _description_
     """
     X, Y = np.meshgrid(data.x, data.y)
     X = X.T
@@ -282,6 +281,17 @@ def animate(data, arrowscale=1, savepath=None):
     )
 
     def update_quiver(num, Q, data, text):
+        """_summary_
+
+        Args:
+            num (_type_): _description_
+            Q (_type_): _description_
+            data (_type_): _description_
+            text (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         U, V = data.u[:, :, num], data.v[:, :, num]
 
         M = np.sqrt(U[::3, ::3] ** 2 + V[::3, ::3] ** 2)

@@ -1,11 +1,14 @@
+
+
+# PIVPy
+Python based post-processing PIV data analysis
+
+
 [![PyPI version](https://badge.fury.io/py/pivpy.svg)](https://badge.fury.io/py/pivpy)
 [![Documentation Status](https://readthedocs.org/projects/pivpy/badge/?version=latest)](https://pivpy.readthedocs.io/en/latest/?badge=latest)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/alexlib/pivpy/master?filepath=examples%2Fnotebooks%2FGetting_Started.ipynb)
 
 
-
-# PIVPy
-Python based post-processing PIV data analysis, similar to PIVMAT and VecPy
 
 Merging the three packages: 
 1. https://github.com/tomerast/Vecpy

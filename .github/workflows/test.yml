@@ -6,8 +6,9 @@ on:
     - cron: '0 7 * * 6'
 jobs:
   test-ubuntu:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
+    - uses: docker://pandoc/core:2.9
     - uses: actions/checkout@v2
     - name: Install the dependencies
       run: python3 -m pip install sphinx -r ./docs/requirements.txt

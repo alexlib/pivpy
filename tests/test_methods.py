@@ -157,3 +157,13 @@ def test_curl():
     _c.piv.vec2scal(flow_property="curl")
 
     assert _c["w"].attrs["standard_name"] == "vorticity"
+
+def test_fill_nans():
+    """" tests fill_nans function """
+    ds = io.create_sample_Dataset(n_frames=1,rows=7,cols=11,noise_sigma=0.5)
+    ds["u"][1:4,1:4] = np.nan
+    # ds.sel(t=0)["u"].plot()
+    new = ds.copy(deep=True) # prepare memory for the result
+    new.piv.fill_nans() # fill nans
+    assert ds.dropna(dim='x')["v"].shape == (7, 8, 1)
+    assert new.dropna(dim='x')["v"].shape == (7, 11, 1)

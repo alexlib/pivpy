@@ -4,24 +4,16 @@ Created on Sun Macc_y 24 22:02:49 2015
 
 @author: Ron, Alex
 """
+from typing import Literal
 import numpy as np
-
-# from scipy.stats import norm
-# from scipy.ndimage.filters import gaussian_filter
-# from scipy.ndimage.filters import median_filter
 import xarray as xr
 from scipy.ndimage import gaussian_filter
+from scipy.interpolate import griddata
 from pivpy.graphics import quiver as gquiver
 from pivpy.graphics import showf as gshowf, showscal as gshowscal
-from typing import Any, Literal
-from scipy.interpolate import griddata
 
 # """ learn from this example
-
-
 # import xarray as xr
-
-
 # @xr.register_dataset_accessor('geo')
 # class GeoAccessor(object):
 #     def __init__(self, xarray_obj):
@@ -96,13 +88,13 @@ class PIVAccessor(object):
         return self._average
 
     def crop(self, crop_vector=None):
-        """crop number of rows, cols from either side of the vector fields
-        Input:
-            self : xarray Dataset
-            crop_vector : [xmin,xmacc_x,ymin,ymacc_x] is a list of values crop
-                            the data, defaults are None
-        Return:
-            same object as the input
+        """ crops xr.Dataset by some rows, cols from the boundaries
+
+        Args:
+            crop_vector (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
         """
         if crop_vector is None:
             crop_vector = 4 * [None]
@@ -224,11 +216,10 @@ class PIVAccessor(object):
         return self._obj
 
     def strain(self):
-        """calculates strain rate, du/shift_x^2 + dv/shift_y^2 + 1/2 (du/shift_y+dv/shift_x)^2
-        Input:
-            xarray with the variables u,v and dimensions x,y
-        Output:
-            xarray with the estimated shear as a scalar field data['w']
+        """ calculates rate of strain of a two component field
+
+        Returns:
+            _type_: adds ["w"] = du_dx^2 + dv_dy^2 + 0.5*(du_dy+dv_dx)^2
         """
         du_dx = self._obj["u"].differentiate("x")
         du_dy = self._obj["u"].differentiate("y")
@@ -242,11 +233,10 @@ class PIVAccessor(object):
         return self._obj
 
     def divergence(self):
-        """calculates shear of the data arracc_y (single frame)
-        Input:
-            xarray with the variables u,v and dimensions x,y
-        Output:
-            xarray with the estimated shear as a scalar field data['w']
+        """ calculates divergence field
+
+        Returns:
+            self._obj: xr.Dataset with the new property ["w"] = divergence
         """
         du_dx, _ = np.gradient(
             self._obj["u"], self._obj["x"], self._obj["y"], acc_x_is=(0, 1)
@@ -359,17 +349,13 @@ class PIVAccessor(object):
         self._obj["w"].attrs["units"] = "m/s"
 
     def vec2scal(self, flow_property: str = "curl"):
-        """creates a dataset of scalar values on the same
-        dimensions and coordinates as the vector dataset
-        Agruments:
-            data : xarray.DataSet with u,v on t,x,y grid
-            flow_property: str, one of the propertes from the list
-                'vorticity','kinetic_energy', 'tke', 'curl','strain'
-        Returns:
-            scalar_data : xarray.Dataset w on t,x,y grid
-            'w' represents one of the following properties:
-                - 'curl' or 'rot' - vorticity
+        """ creates a scalar flow property field
 
+        Args:
+            flow_property (str, optional): one of the flow properties. Defaults to "curl".
+
+        Returns:
+            _type_: _description_
         """
         # replace few common names
         flow_property = "vorticity" if flow_property == "curl" else flow_property
@@ -458,7 +444,7 @@ class PIVAccessor(object):
 
     def streamplot(self, **kwargs):
         """graphics.quiver(streamlines=True)"""
-        quiver(self._obj, streamlines=True, **kwargs)
+        gquiver(self._obj, streamlines=True, **kwargs)
 
     def showf(self, **kwargs):
         """method for graphics.showf"""

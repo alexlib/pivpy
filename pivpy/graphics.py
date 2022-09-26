@@ -25,28 +25,22 @@ def quiver(
     units: List = [],
     streamlines: bool = False,
 ):
-    """
-    Generates a quiver plot of a 'data' xarray DataArray object (single frame
-    from a dataset)
-    Inputs:
-        data - xarray DataArray of the type defined in pivpy, one of the
-        frames in the Dataset
-            selected by default using .isel(t=0)
-        threshold - values above the threshold will be set equal to threshold
-        arrScale - use to change arrow scales
-        nthArr - use to plot only every nth arrow from the array
-        contourLevels - use to specify the maximum value (abs) of contour plots
-        colorbar - True/False wether to generate a colorbar or not
-        logscale - if true then colorbar is on log scale
-        aspectratio - set auto or equal for the plot's apearence
-        colorbar_orient - 'horizontal' or 'vertical' orientation of the colorbar
-        (if colbar is True)
-    Outputs:
-        none
-    Usage:
-        graphics.quiver(data, arrScale = 0.2, threshold = Inf, n)
-    """
+    """ creates quiver of xr.Dataset
 
+    Args:
+        data (xr.DataArray): _description_
+        arrScale (float, optional): _description_. Defaults to 25.0.
+        threshold (float, optional): _description_. Defaults to None.
+        nthArr (int, optional): _description_. Defaults to 1.
+        aspectratio (str, optional): _description_. Defaults to "equal".
+        colorbar (bool, optional): _description_. Defaults to False.
+        colorbar_orient (str, optional): _description_. Defaults to "vertical".
+        units (List, optional): _description_. Defaults to [].
+        streamlines (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        _type_: _description_
+    """
     data = dataset_to_array(data)
 
     pos_units = data.x.attrs["units"] if len(units) == 0 else units[0]
@@ -119,13 +113,14 @@ def quiver(
 
 
 def histogram(data, normed=False):
-    """
-    this function will plot a normalized histogram of
-    the velocity data.
-    Input:
-        data : xarray DataSet with ['u','v'] attrs['units']
-        normed : (optional) default is False to present normalized
-        histogram
+    """ creates two histograms of two velocity components
+
+    Args:
+        data (_type_): _description_
+        normed (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        _type_: _description_
     """
 
     u = np.asarray(data.u).flatten()
@@ -152,18 +147,20 @@ def contour_plot(
     aspectratio: str = "equal",
     units: List[str] = [],
 ):
-    """contourf ajusted for the xarray PIV dataset, creates a
-    contour map for the data['w'] property.
-    Input:
-        data : xarray PIV DataArray, converted automatically using
-        .isel(t=0)
-        threshold : a threshold value, default is None (no data clipping)
-        contourLevels : number of contour levels, default is None
-        colbar : None (hide), 'horizontal', or 'vertical'
-        logscale : boolean (True is default) create in linear/log scale
-        aspectration : string, 'equal' is the default
-    """
+    """ creates contour plot of xr.DataArray
 
+    Args:
+        data (xr.DataArray): _description_
+        threshold (float, optional): _description_. Defaults to None.
+        contourLevels (List[float], optional): _description_. Defaults to None.
+        colorbar (bool, optional): _description_. Defaults to False.
+        logscale (bool, optional): _description_. Defaults to False.
+        aspectratio (str, optional): _description_. Defaults to "equal".
+        units (List[str], optional): _description_. Defaults to [].
+
+    Returns:
+        _type_: _description_
+    """
     data = dataset_to_array(data)
 
     if "w" not in data.var():
@@ -215,22 +212,25 @@ def contour_plot(
 
 
 def showf(data, flow_property="ke", **kwargs):
-    """
-    showf(data, var, units)
-    Arguments:
-        data : xarray.DataSet that contains dimensions of t,x,y
-               and variables u,v and maybe w (scalar)
+    """ shows data as quiver over a scalar background 
+
+    Args:
+        data (_type_): _description_
+        flow_property (str, optional): _description_. Defaults to "ke".
     """
     fig, ax = showscal(data, property=property, **kwargs)
     fig, ax = quiver(data, **kwargs)
 
 
 def showscal(data, flow_property="ke", **kwargs):
-    """
-    showf(data, var, units)
-    Arguments:
-        data : xarray.DataSet that contains dimensions of t,x,y
-               and a variable w (scalar)
+    """ creates contour plot of some scalar field of a flow property
+
+    Args:
+        data (_type_): _description_
+        flow_property (str, optional): _description_. Defaults to "ke".
+
+    Returns:
+        _type_: _description_
     """
     data = data.piv.vec2scal(flow_property=flow_property)
     fig, ax = contour_plot(data, **kwargs)

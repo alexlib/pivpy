@@ -377,21 +377,20 @@ def load_directory(
 
     if len(files) == 0:
         raise IOError(f"No files {basename+ext} in the directory {path} ")
-    else:
-        print(f"found {len(files)} files")
+    
+    print(f"found {len(files)} files")
 
     dataset = []
     combined = []
 
-    _, _, rows, cols, dt, _, method = parse_header(files[0])
+    _, _, rows, cols, delta_t, _, method = parse_header(files[0])
 
     if method is load_vc7:
         for i, f in enumerate(files):
             dataset.append(load_vc7(f, frame=i))
-
     else:
         for i, f in enumerate(files):
-            dataset.append(method(f, rows=rows, cols=cols, frame=i, dt=dt))
+            dataset.append(method(f, rows=rows, cols=cols, frame=i, delta_t=delta_t))
 
     if len(dataset) > 0:
         combined = xr.concat(dataset, dim="t")
@@ -521,22 +520,20 @@ def load_openpiv_txt(
     filename: str,
     rows: int = None,
     cols: int = None,
-    dt: float = None,
+    delta_t: float = None,
     frame: int = 0,
 ) -> xr.Dataset:
-    """
-    load_vec(filename,rows=rows,cols=cols)
-    Loads the VEC file (TECPLOT format by TSI Inc.), OpenPIV VEC or TXT
-    formats
-    Arguments:
-        filename : file name, expected to have a header and 5 columns
-        rows, cols : number of rows and columns of a vector field,
-        if None, None, then parse_header is called to infer the number
-        written in the header
-        DELTA_T : time interval (default is None)
-        frame : frame or time marker (default is None)
-    Output:
-        dataset is a xAarray Dataset, see xarray for help
+    """ loads OpenPIV txt file 
+
+    Args:
+        filename (str): _description_
+        rows (int, optional): _description_. Defaults to None.
+        cols (int, optional): _description_. Defaults to None.
+        delta_t (float, optional): _description_. Defaults to None.
+        frame (int, optional): _description_. Defaults to 0.
+
+    Returns:
+        xr.Dataset: _description_
     """
     if rows is None:  # means no headers
         d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))

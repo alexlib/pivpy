@@ -1,0 +1,7 @@
+pandoc
+myst-docutils
+myst-parser
+sphinx
+ipykernel
+nbsphinx
+pivpy

@@ -1,5 +1,14 @@
-# pivpy
-Python based post-processing PIV data analysis, similar to PIVMAT and VecPy
+
+
+# PIVPy
+Python based post-processing PIV data analysis
+
+
+[![PyPI version](https://badge.fury.io/py/pivpy.svg)](https://badge.fury.io/py/pivpy)
+[![Documentation Status](https://readthedocs.org/projects/pivpy/badge/?version=latest)](https://pivpy.readthedocs.io/en/latest/?badge=latest)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/alexlib/pivpy/master?filepath=examples%2Fnotebooks%2FGetting_Started.ipynb)
+
+
 
 Merging the three packages: 
 1. https://github.com/tomerast/Vecpy
@@ -11,16 +20,36 @@ Merging the three packages:
 
 ### How do I get set up? ###
 
-to start working just download the code and run the init.py script file.
-this script imports all the other code needed for running the program properly. also, given a proper path destination and a file name of an example .vec file, this script will generate example plots.    
+Use `pip`:  
+
+    pip install pivpy
+    
+### What packages are required and which are optional
+
+1. `lvreader` by Lavision if you use vc7 files
+2. `netcdf4` if you want to store NetCDF4 files by xarray
+3. `pyarrow` if you want to store parquet files
+4. `numpy`, `scipy`, `matplotlib`, `xarray` are must and installed with the `pivpy`
+    
+### How to get started? 
+
+Look into the [getting started Jupyter notebook](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.ipynb)
+
+and additional notebooks:
+[Notebooks](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/)
+
 
 
 ### How to test? ### 
 
 From a command line just use:
 
-    nosetests
+    pip install pytest
+    pytest
     
+### Documentation on Github:
+
+[PIVPy on ReadTheDocs](http://pivpy.readthedocs.io)
 
 ### How to help? ###
 
@@ -32,6 +61,7 @@ contribute
 Using great tutorial http://sphinx-ipynb.readthedocs.org/en/latest/howto.html we now can 
 prepare IPython notebooks (see in /docs/source) and convert those to .rst files, then 
 
-    python setup.py build_sphinx
+    python setup.py sphinx-build
+    sphinx-build -b html docs/source/ docs/build/html
     
-generates ```html``` directory with the documentation ready
+generates ```docs/build/html``` directory with the documentation

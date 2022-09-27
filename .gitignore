@@ -7,3 +7,16 @@ dist/*
 PIVPy.egg-info/*
 tests/PIVPy.egg-info/*
 .vscode/
+docs/build/*
+docs/build/doctrees/*
+docs/build/html/*
+docs/source/.ipynb_checkpoints/*
+examples/notebooks/.ipynb_checkpoints/*
+pivpy.egg-info/PKG-INFO
+pivpy/data/openpiv/.ipynb_checkpoints/*
+.ipynb_checkpoints/*
+pivpy.egg-info/dependency_links.txt
+pivpy.egg-info/requires.txt
+pivpy.egg-info/SOURCES.txt
+pivpy.egg-info/top_level.txt
+tmp.nc

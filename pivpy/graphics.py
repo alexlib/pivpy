@@ -24,6 +24,8 @@ def quiver(
     colorbar_orient: str = "vertical",
     units: List = [],
     streamlines: bool = False,
+    cmap: str = 'RdBu',
+    **kwargs,
 ):
     """creates quiver of xr.Dataset
 
@@ -37,6 +39,7 @@ def quiver(
         colorbar_orient (str, optional): _description_. Defaults to "vertical".
         units (List, optional): _description_. Defaults to [].
         streamlines (bool, optional): _description_. Defaults to False.
+        cmap (str, optional): matplotlib.colormap, e.g. 'jet', 'hot', 'RdBu', 'Reds'
 
     Returns:
         _type_: _description_
@@ -69,7 +72,9 @@ def quiver(
         units="width",
         scale=np.max(data["s"].values * arrScale),
         headwidth=2,
+        cmap=cmap,
         ax=ax,
+        **kwargs,
     )
 
     if colorbar is False:

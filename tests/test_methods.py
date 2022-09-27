@@ -167,3 +167,12 @@ def test_fill_nans():
     new.piv.fill_nans() # fill nans
     assert ds.dropna(dim='x')["v"].shape == (7, 8, 1)
     assert new.dropna(dim='x')["v"].shape == (7, 11, 1)
+
+def test_filterf():
+    """ tests filterf
+    """
+    dataset = io.create_sample_Dataset(n_frames=3,rows=5,cols=10)
+    dataset = dataset.piv.filterf() # no inputs
+    dataset = dataset.piv.filterf([.5, .5, 0.]) # with sigma
+    # ds["mag"] = np.hypot(ds["u"], ds["v"])
+    # ds.plot.quiver(x='x',y='y',u='u',v='v',hue='mag',col='t',scale=150,cmap='RdBu')

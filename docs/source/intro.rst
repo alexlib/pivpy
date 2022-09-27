@@ -7,13 +7,19 @@ History and motivation
 ----------------------
 
 
-Federic Moisy created wonderful package, called PIVMAT http://www.fast.u-psud.fr/pivmat/ which 
-is simpler than our GUI-based post-processing package, http://www.openpiv.net/openpiv-spatial-analysis-toolbox/
+PIVPy is inspired by Federic Moisy Matlab package, called PIVMAT http://www.fast.u-psud.fr/pivmat/
 
-BUT, it's in Matlab which we decided to abandon and move all our activity to Python. So we also try to 
-translate the PIVMAT into PIVPy. Of course, it won't be one-to-one translation because Python 
-is by far richer language and provides us with some basic programming things that Matlab cannot. We 
-hope that our effort will be useful. 
+
+Futhermore, although OpenPIV is our main PIV analysis tool, we work with multiple software vendors in 
+our research projects, TSI, Lavision, Dantec, PIVLab, etc. PIVPy, like PIVMAT is reading all these
+files and unifies the post-processing. The main underlying Python packages are: 
+- xarray
+- numpy
+- scipy
+- matplotlib
+- jupyter
+
+
 
 
 

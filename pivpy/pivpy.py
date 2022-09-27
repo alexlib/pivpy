@@ -117,15 +117,22 @@ class PIVAccessor(object):
         )
         return self._obj
 
-    def filterf(self):
+    def filterf(self, sigma: float=[1.,1.,0],**kwargs):
         """Gaussian filtering of velocity"""
 
         self._obj["u"] = xr.DataArray(
-            gaussian_filter(self._obj["u"].values, [1, 1, 0]), dims=("x", "y", "t")
+            gaussian_filter(
+                self._obj["u"].values, sigma, **kwargs),
+                dims=("y", "x", "t"),
+                attrs = self._obj["u"].attrs,
         )
         self._obj["v"] = xr.DataArray(
-            gaussian_filter(self._obj["v"].values, [1, 1, 0]), dims=("x", "y", "t")
+            gaussian_filter(
+                self._obj["v"].values, sigma, **kwargs),
+                dims=("y", "x", "t"),
+                attrs = self._obj["v"].attrs,
         )
+
 
         return self._obj
 

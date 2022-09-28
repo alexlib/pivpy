@@ -1,8 +1,8 @@
 
 
-![pivpy logo](pivpy_logo.png)
 
-# PIVPy
+#  <img src="pivpy_logo.png" alt="PIVPy" width="120" height="120">  PIVPy 
+
 Python based post-processing PIV data analysis
 
 

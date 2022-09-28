@@ -1,5 +1,7 @@
 
 
+![pivpy logo](pivpy_logo.png)
+
 # PIVPy
 Python based post-processing PIV data analysis
 

@@ -4,3 +4,4 @@ xarray
 netcdf4
 matplotlib
 pytest
+typing-extensions

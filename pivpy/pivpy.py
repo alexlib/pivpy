@@ -4,7 +4,10 @@ Created on Sun Macc_y 24 22:02:49 2015
 
 @author: Ron, Alex
 """
-from typing import Literal
+try:
+    from typing_extensions import Literal
+except ImportError:
+    from typing import Literal
 import numpy as np
 import xarray as xr
 from scipy.ndimage import gaussian_filter

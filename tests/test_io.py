@@ -7,7 +7,7 @@ from pivpy import io
 path = pathlib.Path(pkg.resource_filename("pivpy", "data"))
 
 vec_file = path / "Insight" / "Run000002.T000.D000.P000.H001.L.vec" 
-openpiv_txt_file = path / "openpiv" / "exp1_001_b.txt"
+openpiv_txt_file = path / "openpiv_txt" / "exp1_001_b.txt"
 
 
 def test_get_dt():
@@ -27,11 +27,11 @@ def test_get_frame():
     )
     assert frame == 2
     _, _, _, _, _, frame,_ = io.parse_header(
-        path / "openpiv" / "exp1_001_b.vec"
+        path / "openpiv_vec" / "exp1_001_b.vec"
         )
     assert frame == 1
     _, _, _, _, _, frame,_ = io.parse_header(
-        path / "openpiv" / "exp1_001_b.txt"
+        path / "openpiv_txt" / "exp1_001_b.txt"
     )
     assert frame == 1
 

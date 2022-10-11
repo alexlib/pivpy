@@ -40,7 +40,8 @@ def test_histogram():
 def test_quiver_openpiv_vec():
     """ tests quiver of openpiv vec file
     """
-    filename = pathlib.Path(pkg.resource_filename("pivpy", "data")) / "openpiv" / "exp1_001_b.vec"
+    filename = pathlib.Path(
+        pkg.resource_filename("pivpy", "data")) / "openpiv_vec" / "exp1_001_b.vec"
     print(filename, filename.exists())
     _d = io.load_vec(filename)
     _d.piv.quiver() # notice the warning

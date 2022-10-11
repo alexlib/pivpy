@@ -214,14 +214,14 @@ def from_df(
 
     x, ix = unsorted_unique(d[:, 0])
     y, iy = unsorted_unique(d[:, 1])
-    if d.shape[1] < 5:  # not always there's a mask
-        tmp = np.ones((d.shape[0], 5))
-        tmp[:, :-1] = d
-        d = tmp
+    
+    if d.shape[1] < 5: # davis8 does not have mask or chc
+        d = np.column_stack((d,np.zeros_like(d[:,-1])))
+        
     if ix[1] == 1: #x grows first
         d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
     elif iy[1] == 1: # y grows first
-        d = d.reshape(len(y), len(x), 5) # .transpose(1,0,2)
+        d = d.reshape(len(x), len(y), 5) # .transpose(1,0,2)
     else:
         raise ValueError('not sorted x or y')
 
@@ -269,26 +269,33 @@ def load_vec(
     """
     if rows is None or cols is None:
         _, _, rows, cols, dt, frame, _ = parse_header(filename)
+        # print(f'rows = {rows}, cols = {cols}')
 
-    if rows is None:  # means no headers
-        d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
+    if rows is None:  # means no headers, openpiv vec file
+        # d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
+        d = np.genfromtxt(
+            filename, 
+            usecols=(0, 1, 2, 3, 4)
+          )
         x, ix = unsorted_unique(d[:, 0])
         y, iy = unsorted_unique(d[:, 1])
+        
+        # print(f'rows = {len(y)}, cols = {len(x)}')
+        
         if ix[1] == 1: #x grows first
             d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
         elif iy[1] == 1: # y grows first
             d = d.reshape(len(y), len(x), 5) # .transpose(1,0,2)
         else:
             raise ValueError('not sorted x or y')
-    else:
-        # d = np.genfromtxt(
-        #     filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
-        # ).reshape(rows, cols, 5)
+    else: # Insight VEC file
         d = np.genfromtxt(
             filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
-        ).reshape(cols, rows, 5)
-        x = d[:, :, 0][0, :]
-        y = d[:, :, 1][:, 0]
+        ).reshape(cols, rows, 5).transpose(1, 0, 2)
+        
+        x = d[:, :, 0][:, 0]
+        y = d[:, :, 1][0, :]
+ 
 
     u = d[:, :, 2]
     v = d[:, :, 3]
@@ -312,6 +319,33 @@ def load_vec(
         dataset.attrs["delta_t"] = delta_t
 
     return dataset
+
+def load_insight_vec_as_csv(
+    filename: pathlib.Path,
+    rows: int = None,
+    cols: int = None,
+    delta_t: float = None,
+    frame: int = 0,
+) -> xr.Dataset:
+    """
+    load_insight_vec_as_csv(filename,rows=rows,cols=cols)
+    Loads the VEC file (TECPLOT format by TSI Inc.),
+    Arguments:
+        filename : file name, expected to have a header and 5 columns
+        rows, cols : number of rows and columns of a vector field,
+        if None, None, then parse_header is called to infer the number
+        written in the header
+        DELTA_T : time interval (default is None)
+        frame : frame or time marker (default is None)
+    Output:
+        dataset is a xAarray Dataset, see xarray for help
+    """    
+    df = pd.read_csv(filename,header=None,skiprows=1,names=["x","y","u","v","chc"])
+    dataset = from_df(df,frame=frame,filename=filename)
+    
+    return dataset
+    
+    
 
 
 def load_vc7(
@@ -596,6 +630,45 @@ def load_openpiv_txt(
     return dataset
 
 
+def load_openpiv_txt_as_csv(
+    filename: str,
+    rows: int = None,
+    cols: int = None,
+    delta_t: float = None,
+    frame: int = 0,
+) -> xr.Dataset:
+    """ loads OpenPIV txt file 
+
+    Args:
+        filename (str): _description_
+        rows (int, optional): _description_. Defaults to None.
+        cols (int, optional): _description_. Defaults to None.
+        delta_t (float, optional): _description_. Defaults to None.
+        frame (int, optional): _description_. Defaults to 0.
+
+    Returns:
+        xr.Dataset: _description_
+    """
+    df = pd.read_csv(
+        filename, 
+        header=None,
+        names=['x','y','u','v','chc'],
+        delim_whitespace=True
+    )
+    
+    dataset = from_df(
+        df,
+        frame=frame,
+        filename=filename
+    )
+    
+    return dataset
+    
+    
+    
+
+
+
 def load_davis8_txt(
     filename: pathlib.Path,
     rows: int = None, # pylint: disable=W0613
@@ -618,7 +691,7 @@ def load_davis8_txt(
     dataframe = pd.read_csv(
         filename, delimiter="\t", skiprows=1, names=["x", "y", "u", "v"], decimal=","
     )
-    dataset = from_df(dataframe, frame=frame)
+    dataset = from_df(dataframe, frame=frame,filename=filename)
     # print(f'{rows},{cols},{delta_t}')
     return dataset
 

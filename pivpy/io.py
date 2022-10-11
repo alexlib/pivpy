@@ -27,11 +27,11 @@ VEL_UNITS: str = POS_UNITS  # default is displacement in pix
 DELTA_T: np.float64 = 0.0  # default is 0. i.e. uknown, can be any float value
 
 
-def sorted_unique(arr: ArrayLike) -> ArrayLike:
+def unsorted_unique(arr: ArrayLike) -> ArrayLike:
     """creates a sorted unique numpy array"""
-    arr1, c = np.unique(arr, return_counts=True)
-    out = arr1[np.argsort(-c)]
-    return out
+    arr1, c = np.unique(arr, return_index=True)
+    out = arr1[c.argsort()]
+    return out, c
 
 
 def set_default_attrs(dataset: xr.Dataset) -> xr.Dataset:
@@ -212,14 +212,18 @@ def from_df(
     """
     d = df.to_numpy()
 
-    x = sorted_unique(d[:, 0])
-    y = sorted_unique(d[:, 1])
+    x, ix = unsorted_unique(d[:, 0])
+    y, iy = unsorted_unique(d[:, 1])
     if d.shape[1] < 5:  # not always there's a mask
         tmp = np.ones((d.shape[0], 5))
         tmp[:, :-1] = d
         d = tmp
-
-    d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
+    if ix[1] == 1: #x grows first
+        d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
+    elif iy[1] == 1: # y grows first
+        d = d.reshape(len(y), len(x), 5) # .transpose(1,0,2)
+    else:
+        raise ValueError('not sorted x or y')
 
     u = d[:, :, 2]
     v = d[:, :, 3]
@@ -230,9 +234,9 @@ def from_df(
     v = v[:, :, np.newaxis]
     chc = chc[:, :, np.newaxis]
 
-    u = xr.DataArray(u, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]})
-    v = xr.DataArray(v, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]})
-    chc = xr.DataArray(chc, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]})
+    u = xr.DataArray(u, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]})
+    v = xr.DataArray(v, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]})
+    chc = xr.DataArray(chc, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]})
 
     dataset = xr.Dataset({"u": u, "v": v, "chc": chc})
     dataset = set_default_attrs(dataset)
@@ -268,9 +272,14 @@ def load_vec(
 
     if rows is None:  # means no headers
         d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
-        x = sorted_unique(d[:, 0])
-        y = sorted_unique(d[:, 1])
-        d = d.reshape(len(y), len(x), 5)  # .transpose(1, 0, 2)
+        x, ix = unsorted_unique(d[:, 0])
+        y, iy = unsorted_unique(d[:, 1])
+        if ix[1] == 1: #x grows first
+            d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
+        elif iy[1] == 1: # y grows first
+            d = d.reshape(len(y), len(x), 5) # .transpose(1,0,2)
+        else:
+            raise ValueError('not sorted x or y')
     else:
         # d = np.genfromtxt(
         #     filename, skiprows=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
@@ -290,9 +299,9 @@ def load_vec(
     v = v[:, :, np.newaxis]
     chc = chc[:, :, np.newaxis]
 
-    u = xr.DataArray(u, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]})
-    v = xr.DataArray(v, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]})
-    chc = xr.DataArray(chc, dims=("y", "x", "t"), coords={"x": x, "y": y, "t": [frame]})
+    u = xr.DataArray(u, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]})
+    v = xr.DataArray(v, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]})
+    chc = xr.DataArray(chc, dims=("x", "y", "t"), coords={"x": x, "y": y, "t": [frame]})
 
     dataset = xr.Dataset({"u": u, "v": v, "chc": chc})
 
@@ -537,9 +546,15 @@ def load_openpiv_txt(
     """
     if rows is None:  # means no headers
         d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
-        x = sorted_unique(d[:, 0])
-        y = sorted_unique(d[:, 1])
-        d = d.reshape((len(y), len(x), 5)).transpose(1, 0, 2)
+        x, ix = unsorted_unique(d[:, 0])
+        y, iy = unsorted_unique(d[:, 1])
+
+        if ix[1] == 1: #x grows first
+            d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
+        elif iy[1] == 1: # y grows first
+            d = d.reshape(len(y), len(x), 5)
+        else:
+            raise ValueError('not sorted x or y')
     else:
         d = np.genfromtxt(
             filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)

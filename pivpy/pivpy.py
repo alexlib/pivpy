@@ -8,12 +8,15 @@ try:
     from typing_extensions import Literal
 except ImportError:
     from typing import Literal
+
 import numpy as np
 import xarray as xr
-from scipy.ndimage import gaussian_filter
 from scipy.interpolate import griddata
+from scipy.ndimage import gaussian_filter
+
 from pivpy.graphics import quiver as gquiver
-from pivpy.graphics import showf as gshowf, showscal as gshowscal
+from pivpy.graphics import showf as gshowf
+from pivpy.graphics import showscal as gshowscal
 
 # """ learn from this example
 # import xarray as xr

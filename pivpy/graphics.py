@@ -49,12 +49,17 @@ def quiver(
     pos_units = data.x.attrs["units"] if len(units) == 0 else units[0]
     vel_units = data.u.attrs["units"] if len(units) == 0 else units[2]
 
+    # subsampling number of vectors
+    data = data.sel(x=data.x[::nthArr], y=data.y[::nthArr])  
+
     # clip data to the threshold
     if threshold is not None:
         data["u"] = xr.where(data["u"] > threshold, threshold, data["u"])
         data["v"] = xr.where(data["v"] > threshold, threshold, data["v"])
 
     data["s"] = np.sqrt(data["u"] ** 2 + data["v"] ** 2)
+    
+    
 
     if len(plt.get_fignums()) == 0:  # if no figure is open
         fig, ax = plt.subplots()  # open a new figure

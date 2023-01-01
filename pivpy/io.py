@@ -339,8 +339,14 @@ def load_insight_vec_as_csv(
         frame : frame or time marker (default is None)
     Output:
         dataset is a xAarray Dataset, see xarray for help
-    """    
-    df = pd.read_csv(filename,header=None,skiprows=1,names=["x","y","u","v","chc"])
+    """
+    df = pd.read_csv(
+        filename,
+        header=None,
+        skiprows=1,
+        usecols=[0,1,2,3,4],
+        names=["x","y","u","v","chc"],
+        )
     dataset = from_df(df,frame=frame,filename=filename)
     
     return dataset

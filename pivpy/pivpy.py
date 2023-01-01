@@ -8,6 +8,7 @@ try:
     from typing_extensions import Literal
 except ImportError:
     from typing import Literal
+from typing import List
 
 import numpy as np
 import xarray as xr
@@ -123,7 +124,7 @@ class PIVAccessor(object):
         )
         return self._obj
 
-    def filterf(self, sigma: float=[1.,1.,0],**kwargs):
+    def filterf(self, sigma: List[float]=[1.,1.,0], **kwargs):
         """Gaussian filtering of velocity"""
 
         self._obj["u"] = xr.DataArray(
@@ -138,7 +139,6 @@ class PIVAccessor(object):
                 dims=("y", "x", "t"),
                 attrs = self._obj["v"].attrs,
         )
-
 
         return self._obj
 

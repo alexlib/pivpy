@@ -1,6 +1,6 @@
 [project]
 name = "pivpy"
-version = "0.0.18"
+version = "0.0.18b"
 authors = [
   { name="Alex Liberzon and Ron Shnapp", email="alex.liberzon@gmail.com" },
 ]

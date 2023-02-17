@@ -247,7 +247,10 @@ def showscal(data, flow_property="ke", **kwargs):
     return fig, ax
 
 
-def animate(data: xr.Dataset, arrowscale: int = 1, savepath: str = None):
+def animate(data: xr.Dataset,
+            arrowscale: int = 1,
+            savepath: str = None,
+            units: str = "pix/dt"):
     """animates flow fields in the data and saves to MP4 format
 
     Args:
@@ -277,9 +280,9 @@ def animate(data: xr.Dataset, arrowscale: int = 1, savepath: str = None):
 
     cb = plt.colorbar(Q)
 
-    units = data.attrs["units"]
+    # units = data.attrs["units"]
 
-    cb.ax.set_ylabel("velocity (" + units[2] + ")")
+    cb.ax.set_ylabel(f"velocity ({units})")
 
     text = ax.text(
         0.2,

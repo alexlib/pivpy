@@ -659,7 +659,8 @@ def load_openpiv_txt_as_csv(
         filename, 
         header=None,
         names=['x','y','u','v','chc'],
-        delim_whitespace=True
+        delim_whitespace=True,
+        usecols = (0,1,2,3,4),
     )
     
     dataset = from_df(

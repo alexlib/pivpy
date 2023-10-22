@@ -85,7 +85,8 @@ def quiver(
     if colorbar is False:
         # cbar = fig.colorbar(Q, shrink=0.9, orientation=colbar_orient)
         cb = Q.colorbar
-        cb.remove()
+        if cb:
+            cb.remove()
         plt.draw()
     else:
         if colorbar_orient == "horizontal":

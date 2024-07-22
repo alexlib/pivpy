@@ -334,8 +334,8 @@ def dataset_to_array(data: xr.Dataset, t_index: int = 0):
     """converts xarray Dataset to array"""
     if "t" in data.dims:
         warnings.warn(
-            "Warning: function for a single frame, using the first \
-               frame, supply data.isel(t=N)"
+            "Warning: this function uses the first \
+               frame, otherwise use: data.isel(t=N)"
         )
         return data.isel(t=t_index)
     

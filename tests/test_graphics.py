@@ -58,7 +58,7 @@ def test_quiver_openpiv_vec():
     filename = path / "openpiv_vec" / "exp1_001_b.vec"
     print(filename, filename.exists())
     _d = io.load_vec(filename)
-    _d.piv.quiver() # notice the warning
+    _d.isel(t=0).piv.quiver() # notice the warning
 
 def test_showf():
     """tests showf

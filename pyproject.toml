@@ -1,6 +1,6 @@
 [project]
 name = "pivpy"
-version = "0.0.18b"
+version = "0.0.19"
 authors = [
   { name="Alex Liberzon and Ron Shnapp", email="alex.liberzon@gmail.com" },
 ]
@@ -26,9 +26,10 @@ keywords=["example documentation tutorial"]
 
 
 [project.optional-dependencies]
+lvpyio = ["lvpyio"]
 readim = ["readim"]
 netcdf = ["netcdf4"]
-full = ["readim", "netcdf4"]
+full = ["lvpyio", "readim", "netcdf4"]
 
 [project.urls]
 "Homepage" = "https://github.com/alexlib/pivpy"

@@ -14,9 +14,9 @@ import pandas as pd
 from numpy.typing import ArrayLike
 
 try:
-    from lvreader import read_buffer
+    from lvpyio import read_buffer
 except ImportError:
-    warnings.warn("lvreader is not installed")
+    warnings.warn("lvreader is not installed, use pip install lvpyio")
 
 
 # Defaults

@@ -1,14 +1,28 @@
 """ tests pivpy.pivpy methods """
 import pathlib
 import numpy as np
-import pkg_resources as pkg
+import importlib.resources
 import pytest
 from pivpy import io
 
 
 FILE1 = "Run000001.T000.D000.P000.H001.L.vec"
 FILE2 = "Run000002.T000.D000.P000.H001.L.vec"
-path = pathlib.Path(pkg.resource_filename("pivpy", "data"))
+
+# Ensure compatibility with different Python versions (3.9+ has 'files', 3.7 and 3.8 need 'path')
+try:
+    from importlib.resources import files
+except ImportError:
+    from importlib.resources import path as resource_path
+
+# For Python 3.9+
+try:
+    path = files('pivpy') / 'data'
+except NameError:
+    # For Python 3.7 and 3.8
+    with resource_path('pivpy', 'data') as data_path:
+        path = data_path
+        
 path = path / "Insight"
 
 

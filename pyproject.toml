@@ -20,6 +20,7 @@ dependencies = [
         "xarray",
         "matplotlib",
         "pytest",
+        "vortexfitting"
 ]
 
 keywords=["example documentation tutorial"]
@@ -29,7 +30,8 @@ keywords=["example documentation tutorial"]
 lvpyio = ["lvpyio"]
 readim = ["readim"]
 netcdf = ["netcdf4"]
-full = ["lvpyio", "readim", "netcdf4"]
+vortexfitting = ["vortexfitting"]
+full = ["lvpyio", "readim", "netcdf4", "vortexfitting"]
 
 [project.urls]
 "Homepage" = "https://github.com/alexlib/pivpy"

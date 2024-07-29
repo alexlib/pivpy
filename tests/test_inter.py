@@ -1,10 +1,25 @@
 """ tests of pivpy.inter module """
 import pathlib
-import pkg_resources as pkg
+import importlib.resources
 import numpy as np
 from pivpy import io, inter
 
-path = pathlib.Path(pkg.resource_filename("pivpy", "data"))
+# Ensure compatibility with different Python versions (3.9+ has 'files', 3.7 and 3.8 need 'path')
+try:
+    from importlib.resources import files
+except ImportError:
+    from importlib.resources import path as resource_path
+
+# For Python 3.9+
+try:
+    path = files('pivpy') / 'data'
+except NameError:
+    # For Python 3.7 and 3.8
+    with resource_path('pivpy', 'data') as data_path:
+        path = data_path
+
+# Convert to pathlib.Path if not already
+path = pathlib.Path(path)
 
 openpivTxtTestFile = path / "openpiv_txt" / "interTest.txt"
 saveNcFile  = path / "interTest" / "testInterCreates_nc.nc"

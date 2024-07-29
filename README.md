@@ -31,7 +31,8 @@ Use `pip`:
 1. `lvreader` by Lavision if you use vc7 files
 2. `netcdf4` if you want to store NetCDF4 files by xarray
 3. `pyarrow` if you want to store parquet files
-4. `numpy`, `scipy`, `matplotlib`, `xarray` are must and installed with the `pivpy`
+4. `vortexfitting` if you want to do vortex analysis ($\lambda_2$ and $Q$ criterions, vortex fitting) 
+5. `numpy`, `scipy`, `matplotlib`, `xarray` are must and installed with the `pivpy`
     
 ### How to get started? 
 

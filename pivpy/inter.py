@@ -6,8 +6,14 @@ Here is the link to the VortexFitting article:
 https://www.sciencedirect.com/science/article/pii/S2352711020303174?via%3Dihub .
 """
 
+import warnings
 import numpy as np
-import vortexfitting.classes as vf
+# import vortexfitting.classes as vf
+
+try:
+    import vortexfitting.classes as vf
+except ImportError:
+    warnings.warn("VortexFitting is not installed, use pip install vortexfitting")
 
 
 def pivpyTOvf(field, ncFilePath):

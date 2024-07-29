@@ -8,7 +8,6 @@ https://www.sciencedirect.com/science/article/pii/S2352711020303174?via%3Dihub .
 
 import warnings
 import numpy as np
-# import vortexfitting.classes as vf
 
 try:
     import vortexfitting.classes as vf

@@ -24,7 +24,7 @@ path = pathlib.Path(path)
 openpivTxtTestFile = path / "openpiv_txt" / "interTest.txt"
 saveNcFile  = path / "interTest" / "testInterCreates_nc.nc"
 
-def test_pivpyTOvf():
+def test_pivpy_to_vf():
     """
     The idea is to check if VortexFitting gets the same velocity field
     as PIVPY. But note that VortexFitting modifies the field a bit

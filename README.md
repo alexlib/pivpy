@@ -33,6 +33,14 @@ Use `pip`:
 3. `pyarrow` if you want to store parquet files
 4. `vortexfitting` if you want to do vortex analysis ($\lambda_2$ and $Q$ criterions, vortex fitting) 
 5. `numpy`, `scipy`, `matplotlib`, `xarray` are must and installed with the `pivpy`
+
+
+ 
+### Contributors
+
+1. @alexlib
+2. @nepomnyi - connection to VortexFitting 
+
     
 ### How to get started? 
 

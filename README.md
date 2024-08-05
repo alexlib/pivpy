@@ -22,13 +22,19 @@ Merging the three packages:
 
 Use `pip`:  
 
+    pip install pivpy[all]
+
+to include also `lvpyio` if you work with Lavision files
+
     pip install pivpy
+
+if you use OpenPIV, PIVlab, etc. 
 
 #### For developers, local use: 
 
     git clone https://github.com/alexlib/pivpy .
     cd pivpy
-    conda create -n pivpy
+    conda create -n pivpy python=3.11
     conda activate pivpy
     conda install pip
     pip install -e .

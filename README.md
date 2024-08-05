@@ -18,22 +18,29 @@ Merging the three packages:
 3. https://github.com/ronshnapp/vecpy
 
 
-
-
 ### How do I get set up? ###
 
 Use `pip`:  
 
     pip install pivpy
-    
+
+#### For developers, local use: 
+
+    git clone https://github.com/alexlib/pivpy .
+    cd pivpy
+    conda create -n pivpy
+    conda activate pivpy
+    conda install pip
+    pip install -e .
+
+   
 ### What packages are required and which are optional
 
-1. `lvreader` by Lavision if you use vc7 files
+1. `lvpyio` by Lavision Inc. if you use vc7 files
 2. `netcdf4` if you want to store NetCDF4 files by xarray
 3. `pyarrow` if you want to store parquet files
 4. `vortexfitting` if you want to do vortex analysis ($\lambda_2$ and $Q$ criterions, vortex fitting) 
 5. `numpy`, `scipy`, `matplotlib`, `xarray` are must and installed with the `pivpy`
-
 
  
 ### Contributors
@@ -48,8 +55,6 @@ Look into the [getting started Jupyter notebook](https://github.com/alexlib/pivp
 
 and additional notebooks:
 [Notebooks](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/)
-
-
 
 ### How to test? ### 
 

@@ -362,6 +362,55 @@ class PIVAccessor(object):
         self._obj["w"].attrs["standard_name"] = "rms"
         self._obj["w"].attrs["units"] = "m/s"
 
+    def Γ1(self):
+        """Makes use of Dask (kind of) to run Γ1movingWindowFunction via Γ1pad.
+           It takes an Xarray dataset, applies rolling window to it, groups rolling windows
+           and applyies custom Γ1-calculating function to it in a parallel manner.
+           
+    Parameters: field (xr.Dataset) - must contain, at least, u, v, x as array, y as array
+                n (int) - (2*n+1) gives the rolling window size
+    Return: field (xr.Dataset) - the argument with the Γ1 data array
+    """
+    # Create the object of class rolling:
+    rollingW = field.rolling({"x":(2*n+1), "y":(2*n+1), "t":1}, center=True)
+    # Construct the dataset containing a new dimension corresponding to the rolling window
+    fieldRoll = rollingW.construct(x='rollWx', y='rollWy', t='rollWt')
+    # Xarray requires stacked array in case of a multidimensional rolling windows
+    fieldStacked = fieldRoll.stack(gridcell=['x','y','t'])
+    # map_blocks is an automated Dask-parallel mapping function. It requires a 
+    # special implementation. Thus, I have to create a separate function - Γpad - 
+    # which performs groupping of the stacked dataset fieldStacked. Then map_blocks
+    # automaticly Dask-chunks Γpad returns. Every Dask-chunk can contain several groups.
+    # The chunks are computed in parallel.
+    newArr = fieldStacked.map_blocks(Γpad, args=[n]).compute()   
+    # Now, the result must be unstacked to return to the original x, y, t coordinates.
+    field['Γ1'] = newArr.unstack("gridcell")
+
+    # Plot Γ1 fields.
+    for i in range(field.coords['t'].values.size):
+        levelsΓ1 = np.linspace(np.min(field['Γ1'].isel(t=i).values), np.max(field['Γ1'].isel(t=i).values), 1000)   
+        figΓ1, axΓ1 = plt.subplots(nrows=1, ncols=1, clear=True, num="figGamma1", figsize=(15,10))
+        field['Γ1'].isel(t=i).plot.contourf(x="x",
+                                            y="y",
+                                            levels=levelsΓ1,
+                                            cmap=plt.get_cmap("RdYlBu"),
+                                            ax=axΓ1
+        )
+        # Save the plots.
+        # # Resize the figure to the full screen in order to save it as 
+        # # screen sized image.
+        # plt.get_current_fig_manager().full_screen_toggle()      
+        # # The stupid full_screen_toggle works only if I show the picture first, but I don't 
+        # # want to show it. That's why I use the closing operation.
+        # figΓ1.show()
+        nameΓ1 = saveToDir / 'Gamma1AveragedOver{}correlationsBatch{}.png'.format(N,i)
+        figΓ1.savefig(str(nameΓ1))
+        plt.close(fig=figΓ1)
+
+        plt.close('all')
+
+    return field
+
     def vec2scal(self, flow_property: str = "curl"):
         """ creates a scalar flow property field
 

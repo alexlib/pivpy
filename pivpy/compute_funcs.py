@@ -19,6 +19,10 @@ def Γ1_moving_window_function(
     This function accepts a (2*n+1)x(2*n+1) neighborhood of one velocity vector from the
     entire velocity field in the form of Xarray dataset. And for this neighborhood only, 
     it calculates the value of Γ1.
+    Also, note this function is designed in a way that assumes point P (see the referenced
+    article) to coincide with the center for fWin.
+    This function works only for 2D velocity field.
+
     Args:
         fWin (xarray.Dataset) - a moving window of the dataset (fWin = field rolling window)
         n (int) - the rolling window size (n=1 means a 3x3 rolling window)
@@ -39,7 +43,13 @@ def Γ1_moving_window_function(
     # u = fWin['u'].to_numpy()
     # v = fWin['v'].to_numpy()
     # U = (u**2 + v**2)**(0.5)
-    # sinΘM_Γ1 = (PMx*v - PMy*u) / PM / U # this line has been verified and validated: it is correct
+    # The external tensor product (PM ^ U) * z (see the referenced article) can be simplified as a
+    # cross product for the case of the 2D velocity field: (PM x U). According to the rules of
+    # cross product, for the 2D velocity field, we have (PM x U) = PM_x * v - PM_y * u. In other
+    # words, we don't have to compute the sin given in the referenced article. But I am, still,
+    # going to use sin down below as the variable to be consistent with the expression given
+    # in the referenced article.
+    # sinΘM_Γ1 = (PMx*v - PMy*u) / PM / U 
     # Γ1 = np.nansum(sinΘM_Γ1) / (((2*n+1)**2))
     # And now here goes my one-liner. Note, that I didn't put PMx, PMy, u and v calculations
     # into my line. That's because I figured out emperically that would slow down the calculations.
@@ -48,7 +58,7 @@ def Γ1_moving_window_function(
     PMy = np.subtract(fWin['yCoordinates'].to_numpy(), float(fWin['yCoordinates'][n,n]))    
     u = fWin['u'].to_numpy()
     v = fWin['v'].to_numpy()  
-    Γ1 = np.mean(np.nan_to_num(np.divide(np.subtract(np.multiply(PMx,v), np.multiply(PMy,u)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(u), np.square(v)))))))
+    Γ1 = np.nanmean(np.divide(np.subtract(np.multiply(PMx,v), np.multiply(PMy,u)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(u), np.square(v))))))
 
     return xr.DataArray(Γ1).fillna(0.0) # fillna(0) is necessary for plotting
 
@@ -69,6 +79,12 @@ def Γ2_moving_window_function(
     This function accepts a (2*n+1)x(2*n+1) neighborhood of one velocity vector from the
     entire velocity field in the form of Xarray dataset. And for this neighborhood only, 
     it calculates the value of Γ2.
+    Also, note this function is designed in a way that assumes point P (see the referenced
+    article) to coincide with the center for fWin.
+    And finally, the choice of convective velocity (see the referenced article) is made in the
+    article: it is the average velocity within fWin.
+    This function works only for 2D velocity field.
+    
     Args:
         fWin (xarray.Dataset) - a moving window of the dataset (fWin = field rolling window)
         n (int) - the rolling window size (n=1 means a 3x3 rolling window)
@@ -88,9 +104,19 @@ def Γ2_moving_window_function(
     # PM = np.sqrt(np.add(np.square(PMx), np.square(PMy)))
     # u = fWin['u'].to_numpy()
     # v = fWin['v'].to_numpy()
-    # U = (u**2 + v**2)**(0.5)
-    # sinΘM_Γ1 = (PMx*v - PMy*u) / PM / U # this line has been verified and validated: it is correct
-    # Γ1 = np.nansum(sinΘM_Γ1) / (((2*n+1)**2))
+    # We are going to include point P into the calculations of velocity UP_tilde
+    # uP_tilde = np.nanmean(u)
+    # vP_tilde = np.nanmean(v)
+    # uDif = u - uP_tilde
+    # vDif = v - vP_tilde
+    # UDif = (uDif**2 + vDif**2)**(0.5)
+    # The external tensor product (PM ^ UDif) * z (see the referenced article) can be simplified as a
+    # cross product for the case of the 2D velocity field: (PM x UDif). According to the rules of
+    # cross product, for the 2D velocity field, we have (PM x UDif) = PM_x * vDif - PM_y * uDif. 
+    # I am going to use sin down below as the variable to be consistent with the expression given
+    # for Γ1 function.
+    # sinΘM_Γ2 = (PMx*vDif - PMy*uDif) / PM / UDif 
+    # Γ2 = np.nansum(sinΘM_Γ2) / (((2*n+1)**2))
     # And now here goes my one-liner. Note, that I didn't put PMx, PMy, u and v calculations
     # into my line. That's because I figured out emperically that would slow down the calculations.
     # n always points to the central interrogation window (just think of it). It gives me point P.
@@ -98,6 +124,8 @@ def Γ2_moving_window_function(
     PMy = np.subtract(fWin['yCoordinates'].to_numpy(), float(fWin['yCoordinates'][n,n]))    
     u = fWin['u'].to_numpy()
     v = fWin['v'].to_numpy()  
-    Γ2 = np.mean(np.nan_to_num(np.divide(np.subtract(np.multiply(PMx,v), np.multiply(PMy,u)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(u), np.square(v)))))))
+    uDif = u - np.nanmean(u)
+    vDif = v - np.nanmean(v)
+    Γ2 = np.nanmean(np.divide(np.subtract(np.multiply(PMx,vDif), np.multiply(PMy,uDif)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(uDif), np.square(vDif))))))
 
     return xr.DataArray(Γ2).fillna(0.0) # fillna(0) is necessary for plotting

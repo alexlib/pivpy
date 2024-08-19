@@ -12,8 +12,8 @@ def Γ1_moving_window_function(
     unsteady turbulent swirling flows", Meas.Sci.Technol., 12(2001), p.1422-1429.
     Γ1 function is used to identify the locations of the centers of the vortices (which are
     given by the Γ1 peak values within the velocity field).
-    IMPORTANT NOTICE: even though this function can be used on its own (see an example in 
-    the PIVPY package), it is not supposed to. It is designed to be used with Dask for big
+    IMPORTANT NOTICE: even though this function, theoretically, can be used on its own,  
+    it is not supposed to. It is designed to be used with Dask for big
     PIV datasets. The recomendation is not to use this function on its own, but rather use
     Γ1 attribute of piv class of PIVPY package (example of usage in this case would be: ds.piv.Γ1())
     This function accepts a (2*n+1)x(2*n+1) neighborhood of one velocity vector from the
@@ -58,7 +58,11 @@ def Γ1_moving_window_function(
     PMy = np.subtract(fWin['yCoordinates'].to_numpy(), float(fWin['yCoordinates'][n,n]))    
     u = fWin['u'].to_numpy()
     v = fWin['v'].to_numpy()  
-    Γ1 = np.nanmean(np.divide(np.subtract(np.multiply(PMx,v), np.multiply(PMy,u)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(u), np.square(v))))))
+    # Since for the case when point M coincides with point P we have a 0/0 situation, we'll
+    # recive a warning. To temporarily suspend that warning do the following (credit goes to
+    # https://stackoverflow.com/a/29950752/10073233):
+    with np.errstate(divide='ignore', invalid='ignore'):
+        Γ1 = np.nanmean(np.divide(np.subtract(np.multiply(PMx,v), np.multiply(PMy,u)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(u), np.square(v))))))
 
     return xr.DataArray(Γ1).fillna(0.0) # fillna(0) is necessary for plotting
 
@@ -72,8 +76,8 @@ def Γ2_moving_window_function(
     N. Grosjean, "Combining PIV, POD and vortex identification algorithms for the study of
     unsteady turbulent swirling flows", Meas.Sci.Technol., 12(2001), p.1422-1429.
     Γ2 function is used to identify the boundaries of the vortices in a velocity field.
-    IMPORTANT NOTICE: even though this function can be used on its own (see an example in 
-    the PIVPY package), it is not supposed to. It is designed to be used with Dask for big
+    IMPORTANT NOTICE: even though this function, theoretically, can be used on its own, 
+    it is not supposed to. It is designed to be used with Dask for big
     PIV datasets. The recomendation is not to use this function on its own, but rather use
     Γ2 attribute of piv class of PIVPY package (example of usage in this case would be: ds.piv.Γ2())
     This function accepts a (2*n+1)x(2*n+1) neighborhood of one velocity vector from the
@@ -84,7 +88,7 @@ def Γ2_moving_window_function(
     And finally, the choice of convective velocity (see the referenced article) is made in the
     article: it is the average velocity within fWin.
     This function works only for 2D velocity field.
-    
+
     Args:
         fWin (xarray.Dataset) - a moving window of the dataset (fWin = field rolling window)
         n (int) - the rolling window size (n=1 means a 3x3 rolling window)
@@ -126,6 +130,10 @@ def Γ2_moving_window_function(
     v = fWin['v'].to_numpy()  
     uDif = u - np.nanmean(u)
     vDif = v - np.nanmean(v)
-    Γ2 = np.nanmean(np.divide(np.subtract(np.multiply(PMx,vDif), np.multiply(PMy,uDif)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(uDif), np.square(vDif))))))
+    # Since for the case when point M coincides with point P, we have a 0/0 situation and we'll
+    # recive a warning. To temporarily suspend that warning do the following (credit goes to
+    # https://stackoverflow.com/a/29950752/10073233):
+    with np.errstate(divide='ignore', invalid='ignore'):
+        Γ2 = np.nanmean(np.divide(np.subtract(np.multiply(PMx,vDif), np.multiply(PMy,uDif)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(uDif), np.square(vDif))))))
 
     return xr.DataArray(Γ2).fillna(0.0) # fillna(0) is necessary for plotting

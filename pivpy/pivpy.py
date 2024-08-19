@@ -363,18 +363,34 @@ class PIVAccessor(object):
         self._obj["w"].attrs["standard_name"] = "rms"
         self._obj["w"].attrs["units"] = "m/s"
 
-    def Γ1(self, n):
-        """Makes use of Dask (kind of) to run Γ1movingWindowFunction via Γ1pad.
+    def Γ1(self, n, convCoords = True):
+        """Makes use of Dask (kind of) to run Γ1_moving_window_function via Γ1_pad.
            It takes an Xarray dataset, applies rolling window to it, groups rolling windows
            and applyies custom Γ1-calculating function to it in a parallel manner.
 
         Args:
             self._obj (xr.Dataset) - must contain, at least, u, v, x, y and t
             n (int) - (2*n+1) gives the rolling window size
+            convCoords (bool) - either True or False, convCoords = convert coordinates,
+                                if True - create two new data arrays within self._obj with
+                                the names "xCoordiantes" and "yCoordiantes" that store x and y
+                                coordinates as data arrays; always keep it "True" unless you
+                                have already created "xCoordiantes" and "yCoordiantes" somehow
+                                (say, by running Γ1 or Γ2 functions before)
 
         Returns:
             self._obj (xr.Dataset) - the argument with the Γ1 data array
         """
+        # Xarray rolling window (below) doesn't roll over the coordinates. We're going to convert
+        # them to data arrays. Xarray does't make the conversion procedure easy. So, instead of
+        # Xarray, we are going to adhere to numpy for the conversion.
+        if convCoords:
+            PMX, PMY = np.meshgrid(self._obj.coords['x'].to_numpy(), self._obj.coords['y'].to_numpy())
+            tTimes = self._obj.coords['t'].to_numpy().size
+            XYshape = PMX.T.shape + (tTimes,)
+            self._obj['xCoordinates'] = xr.DataArray(np.broadcast_to(PMX.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
+            self._obj['yCoordinates'] = xr.DataArray(np.broadcast_to(PMY.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
+
         # Create the object of class rolling:
         rollingW = self._obj.rolling({"x":(2*n+1), "y":(2*n+1), "t":1}, center=True)
         # Construct the dataset containing a new dimension corresponding to the rolling window
@@ -398,18 +414,34 @@ class PIVAccessor(object):
 
         return self._obj
     
-    def Γ2(self, n):
-        """Makes use of Dask (kind of) to run Γ2_moving_window_function via Γ2pad.
+    def Γ2(self, n, convCoords = True):
+        """Makes use of Dask (kind of) to run Γ2_moving_window_function via Γ2_pad.
            It takes an Xarray dataset, applies rolling window to it, groups rolling windows
            and applyies custom Γ2-calculating function to it in a parallel manner.
 
         Args:
             self._obj (xr.Dataset) - must contain, at least, u, v, x, y and t
             n (int) - (2*n+1) gives the rolling window size
+            convCoords (bool) - either True or False, convCoords = convert coordinates,
+                                if True - create two new data arrays within self._obj with
+                                the names "xCoordiantes" and "yCoordiantes" that store x and y
+                                coordinates as data arrays; always keep it "True" unless you
+                                have already created "xCoordiantes" and "yCoordiantes" somehow
+                                (say, by running Γ1 or Γ2 functions before)
 
         Returns:
             self._obj (xr.Dataset) - the argument with the Γ2 data array
         """
+        # Xarray rolling window (below) doesn't roll over the coordinates. We're going to convert
+        # them to data arrays. Xarray does't make the conversion procedure easy. So, instead of
+        # Xarray, we are going to adhere to numpy for the conversion.
+        if convCoords:
+            PMX, PMY = np.meshgrid(self._obj.coords['x'].to_numpy(), self._obj.coords['y'].to_numpy())
+            tTimes = self._obj.coords['t'].to_numpy().size
+            XYshape = PMX.T.shape + (tTimes,)
+            self._obj['xCoordinates'] = xr.DataArray(np.broadcast_to(PMX.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
+            self._obj['yCoordinates'] = xr.DataArray(np.broadcast_to(PMY.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
+            
         # Create the object of class rolling:
         rollingW = self._obj.rolling({"x":(2*n+1), "y":(2*n+1), "t":1}, center=True)
         # Construct the dataset containing a new dimension corresponding to the rolling window

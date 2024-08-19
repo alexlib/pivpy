@@ -441,7 +441,7 @@ class PIVAccessor(object):
             XYshape = PMX.T.shape + (tTimes,)
             self._obj['xCoordinates'] = xr.DataArray(np.broadcast_to(PMX.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
             self._obj['yCoordinates'] = xr.DataArray(np.broadcast_to(PMY.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
-            
+
         # Create the object of class rolling:
         rollingW = self._obj.rolling({"x":(2*n+1), "y":(2*n+1), "t":1}, center=True)
         # Construct the dataset containing a new dimension corresponding to the rolling window
@@ -450,7 +450,7 @@ class PIVAccessor(object):
         fieldStacked = fieldRoll.stack(gridcell=['x','y','t'])
 
         # map_blocks is an automated Dask-parallel mapping function. It requires a 
-        # special implementation. Thus, I have to create a separate function - Γ2pad - 
+        # special implementation. Thus, I have to create a separate function - Γ2_pad - 
         # which performs groupping of the stacked dataset fieldStacked. Then map_blocks
         # automaticly Dask-chunks Γpad returns. Every Dask-chunk can contain several groups.
         # The chunks are computed in parallel. See here for map_blocks() function:

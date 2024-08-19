@@ -412,6 +412,9 @@ class PIVAccessor(object):
         # Now, the result must be unstacked to return to the original x, y, t coordinates.
         self._obj['Γ1'] = newArr.unstack("gridcell")
 
+        self._obj['Γ1'].attrs["standard_name"] = "Gamma 1"
+        self._obj['Γ1'].attrs["units"] = "dimensionless"
+
         return self._obj
     
     def Γ2(self, n, convCoords = True):
@@ -462,6 +465,9 @@ class PIVAccessor(object):
         newArr = fieldStacked.map_blocks(Γ2_pad, args=[n]).compute()   
         # Now, the result must be unstacked to return to the original x, y, t coordinates.
         self._obj['Γ2'] = newArr.unstack("gridcell")
+
+        self._obj['Γ2'].attrs["standard_name"] = "Gamma 2"
+        self._obj['Γ2'].attrs["units"] = "dimensionless"
 
         return self._obj
 

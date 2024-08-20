@@ -52,7 +52,9 @@ if you use OpenPIV, PIVlab, etc.
 ### Contributors
 
 1. @alexlib
-2. @nepomnyi - connection to VortexFitting 
+2. @ronshnapp - original steps
+3. @liorshig - LVreader and great visualizaiton for Lavision
+4. @nepomnyi - connection to VortexFitting and new algorithms 
 
     
 ### How to get started? 

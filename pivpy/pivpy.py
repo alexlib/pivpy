@@ -19,6 +19,7 @@ from scipy.ndimage import gaussian_filter
 from pivpy.graphics import quiver as gquiver
 from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
+from pivpy.compute_funcs import Γ1_moving_window_function, Γ2_moving_window_function
 
 # """ learn from this example
 # import xarray as xr
@@ -361,6 +362,114 @@ class PIVAccessor(object):
         self._obj["w"] = np.sqrt(self._obj["w"])
         self._obj["w"].attrs["standard_name"] = "rms"
         self._obj["w"].attrs["units"] = "m/s"
+
+    def Γ1(self, n, convCoords = True):
+        """Makes use of Dask (kind of) to run Γ1_moving_window_function via Γ1_pad.
+           It takes an Xarray dataset, applies rolling window to it, groups rolling windows
+           and applyies custom Γ1-calculating function to it in a parallel manner.
+
+        Args:
+            self._obj (xr.Dataset) - must contain, at least, u, v, x, y and t
+            n (int) - (2*n+1) gives the rolling window size
+            convCoords (bool) - either True or False, convCoords = convert coordinates,
+                                if True - create two new data arrays within self._obj with
+                                the names "xCoordiantes" and "yCoordiantes" that store x and y
+                                coordinates as data arrays; always keep it "True" unless you
+                                have already created "xCoordiantes" and "yCoordiantes" somehow
+                                (say, by running Γ1 or Γ2 functions before)
+
+        Returns:
+            self._obj (xr.Dataset) - the argument with the Γ1 data array
+        """
+        # Xarray rolling window (below) doesn't roll over the coordinates. We're going to convert
+        # them to data arrays. Xarray does't make the conversion procedure easy. So, instead of
+        # Xarray, we are going to adhere to numpy for the conversion.
+        if convCoords:
+            PMX, PMY = np.meshgrid(self._obj.coords['x'].to_numpy(), self._obj.coords['y'].to_numpy())
+            tTimes = self._obj.coords['t'].to_numpy().size
+            XYshape = PMX.T.shape + (tTimes,)
+            self._obj['xCoordinates'] = xr.DataArray(np.broadcast_to(PMX.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
+            self._obj['yCoordinates'] = xr.DataArray(np.broadcast_to(PMY.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
+
+        # Create the object of class rolling:
+        rollingW = self._obj.rolling({"x":(2*n+1), "y":(2*n+1), "t":1}, center=True)
+        # Construct the dataset containing a new dimension corresponding to the rolling window
+        fieldRoll = rollingW.construct(x='rollWx', y='rollWy', t='rollWt')
+        # Xarray requires stacked array in case of a multidimensional rolling window
+        fieldStacked = fieldRoll.stack(gridcell=['x','y','t'])
+
+        # map_blocks is an automated Dask-parallel mapping function. It requires a 
+        # special implementation. Thus, I have to create a separate function - Γ1_pad - 
+        # which performs groupping of the stacked dataset fieldStacked. Then map_blocks
+        # automaticly Dask-chunks Γpad returns. Every Dask-chunk can contain several groups.
+        # The chunks are computed in parallel. See here for map_blocks() function:
+        # https://tutorial.xarray.dev/advanced/map_blocks/simple_map_blocks.html
+        def Γ1_pad(ds, n):
+            dsGroup = ds.groupby("gridcell")
+            return dsGroup.map(Γ1_moving_window_function, args=[n])
+        
+        newArr = fieldStacked.map_blocks(Γ1_pad, args=[n]).compute()   
+        # Now, the result must be unstacked to return to the original x, y, t coordinates.
+        self._obj['Γ1'] = newArr.unstack("gridcell")
+
+        self._obj['Γ1'].attrs["standard_name"] = "Gamma 1"
+        self._obj['Γ1'].attrs["units"] = "dimensionless"
+
+        return self._obj
+    
+    def Γ2(self, n, convCoords = True):
+        """Makes use of Dask (kind of) to run Γ2_moving_window_function via Γ2_pad.
+           It takes an Xarray dataset, applies rolling window to it, groups rolling windows
+           and applyies custom Γ2-calculating function to it in a parallel manner.
+
+        Args:
+            self._obj (xr.Dataset) - must contain, at least, u, v, x, y and t
+            n (int) - (2*n+1) gives the rolling window size
+            convCoords (bool) - either True or False, convCoords = convert coordinates,
+                                if True - create two new data arrays within self._obj with
+                                the names "xCoordiantes" and "yCoordiantes" that store x and y
+                                coordinates as data arrays; always keep it "True" unless you
+                                have already created "xCoordiantes" and "yCoordiantes" somehow
+                                (say, by running Γ1 or Γ2 functions before)
+
+        Returns:
+            self._obj (xr.Dataset) - the argument with the Γ2 data array
+        """
+        # Xarray rolling window (below) doesn't roll over the coordinates. We're going to convert
+        # them to data arrays. Xarray does't make the conversion procedure easy. So, instead of
+        # Xarray, we are going to adhere to numpy for the conversion.
+        if convCoords:
+            PMX, PMY = np.meshgrid(self._obj.coords['x'].to_numpy(), self._obj.coords['y'].to_numpy())
+            tTimes = self._obj.coords['t'].to_numpy().size
+            XYshape = PMX.T.shape + (tTimes,)
+            self._obj['xCoordinates'] = xr.DataArray(np.broadcast_to(PMX.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
+            self._obj['yCoordinates'] = xr.DataArray(np.broadcast_to(PMY.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
+
+        # Create the object of class rolling:
+        rollingW = self._obj.rolling({"x":(2*n+1), "y":(2*n+1), "t":1}, center=True)
+        # Construct the dataset containing a new dimension corresponding to the rolling window
+        fieldRoll = rollingW.construct(x='rollWx', y='rollWy', t='rollWt')
+        # Xarray requires stacked array in case of a multidimensional rolling window
+        fieldStacked = fieldRoll.stack(gridcell=['x','y','t'])
+
+        # map_blocks is an automated Dask-parallel mapping function. It requires a 
+        # special implementation. Thus, I have to create a separate function - Γ2_pad - 
+        # which performs groupping of the stacked dataset fieldStacked. Then map_blocks
+        # automaticly Dask-chunks Γpad returns. Every Dask-chunk can contain several groups.
+        # The chunks are computed in parallel. See here for map_blocks() function:
+        # https://tutorial.xarray.dev/advanced/map_blocks/simple_map_blocks.html
+        def Γ2_pad(ds, n):
+            dsGroup = ds.groupby("gridcell")
+            return dsGroup.map(Γ2_moving_window_function, args=[n])
+        
+        newArr = fieldStacked.map_blocks(Γ2_pad, args=[n]).compute()   
+        # Now, the result must be unstacked to return to the original x, y, t coordinates.
+        self._obj['Γ2'] = newArr.unstack("gridcell")
+
+        self._obj['Γ2'].attrs["standard_name"] = "Gamma 2"
+        self._obj['Γ2'].attrs["units"] = "dimensionless"
+
+        return self._obj
 
     def vec2scal(self, flow_property: str = "curl"):
         """ creates a scalar flow property field

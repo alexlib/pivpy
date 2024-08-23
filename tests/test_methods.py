@@ -164,6 +164,21 @@ def test_tke():
     data = data.piv.tke()  # now defined
     assert data["w"].attrs["standard_name"] == "TKE"
 
+def test_Γ1():
+    """tests Γ1"""
+    data = io.create_sample_Dataset(n_frames=4, rows=3, cols=2)
+    data = data.piv.Γ1(n=1)  
+    assert data["Γ1"].to_numpy().shape == (2,3,4)
+    assert data["Γ1"].attrs["standard_name"] == "Gamma 1"
+    assert data["Γ1"].attrs["units"] == "dimensionless"
+
+def test_Γ2():
+    """tests Γ2"""
+    data = io.create_sample_Dataset(n_frames=2, rows=3, cols=4)
+    data = data.piv.Γ2(n=1)  
+    assert data["Γ2"].to_numpy().shape == (4,3,2)
+    assert data["Γ2"].attrs["standard_name"] == "Gamma 2"
+    assert data["Γ2"].attrs["units"] == "dimensionless"
 
 def test_curl():
     """tests curl that is also vorticity"""

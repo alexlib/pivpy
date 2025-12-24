@@ -76,18 +76,21 @@ def create_sample_field(
     frame: int = 0,
     noise_sigma: float = 1.0,
 ) -> xr.Dataset:
-    """Creates a sample Dataset for the tests.
-
+    """Creates a synthetic velocity field dataset for testing
+    
     Args:
-        rows (int) : number of points along vertical coordinate,
-            corresponds to 'y'
-        cols (int) : number of grid points along horizontal coordinate, 'x'
-        grid (int, int) : spacing between vectors in two directions (x,y)
-        frame (int):  frame number
-        noise_sigma (float): strength of Gaussian noise to add
-
+        rows (int, optional): Number of grid points along vertical (y) direction. Defaults to 5.
+        cols (int, optional): Number of grid points along horizontal (x) direction. Defaults to 8.
+        grid (List, optional): Grid spacing [dx, dy] in pixels. Defaults to [16, 8].
+        frame (int, optional): Frame number for time coordinate. Defaults to 0.
+        noise_sigma (float, optional): Standard deviation of Gaussian noise to add. Defaults to 1.0.
+        
     Returns:
-        xarray.Dataset(): dataset
+        xr.Dataset: Synthetic PIVPy dataset with u, v velocity components and chc mask
+        
+    Example:
+        >>> data = create_sample_field(rows=10, cols=15, noise_sigma=0.5)
+        >>> print(data.dims)  # {'x': 15, 'y': 10, 't': 1}
     """
     if grid is None:
         grid = [16, 8]
@@ -124,22 +127,21 @@ def create_sample_field(
 def create_sample_Dataset(
     n_frames: int = 5, rows: int = 5, cols: int = 3, noise_sigma: float = 0.0
 ) -> xr.Dataset:
-    """Creates a syntetic dataset
-
+    """Creates a synthetic time-series dataset with multiple frames
+    
     Args:
-        n_frames : number of frames
-        rows (int) : number of points along vertical coordinate,
-            corresponds to 'y'
-        cols  : number of grid points along horizontal coordinate, 'x'
-        grid : spacing between vectors in two directions (x,y)
-        frame :  frame number
-        noise_sigma : strength of Gaussian noise to add
-
+        n_frames (int, optional): Number of time frames to generate. Defaults to 5.
+        rows (int, optional): Number of grid points along vertical (y) direction. Defaults to 5.
+        cols (int, optional): Number of grid points along horizontal (x) direction. Defaults to 3.
+        noise_sigma (float, optional): Standard deviation of Gaussian noise. Defaults to 0.0 (no noise).
+        
     Returns:
-        dataset: PIVPy dataset
-
+        xr.Dataset: Synthetic PIVPy dataset with time dimension
+        
     Example:
-            ds = create_sample_dataset(n_frames=3)
+        >>> dataset = create_sample_Dataset(n_frames=10, rows=20, cols=30, noise_sigma=0.1)
+        >>> print(dataset.dims)  # {'x': 30, 'y': 20, 't': 10}
+        >>> print(dataset.t.values)  # [0, 1, 2, ..., 9]
     """
 
     dataset = []
@@ -167,20 +169,25 @@ def from_arrays(
     mask: np.array,
     frame: int = 0,
 ) -> xr.Dataset:
-    """creates a dataset from two-dimensional Numpy arrays
-    of x,y,u,v and mask
-
+    """Creates a PIVPy dataset from 2D NumPy arrays
+    
     Args:
-        x (array): x
-        y (array): y
-        u (array): u
-        v (array): v
-        mask (array): mask, all numpy arrays of the same shape
-        frame (int): frame number, default is 0
+        x (ArrayLike): 2D array of x coordinates
+        y (ArrayLike): 2D array of y coordinates  
+        u (ArrayLike): 2D array of u velocity component
+        v (ArrayLike): 2D array of v velocity component
+        mask (np.array): 2D array of mask/quality values
+        frame (int, optional): Frame number for time coordinate. Defaults to 0.
+        
     Returns:
-        ds (xarray.Dataset): xarray dataset with default attributes
+        xr.Dataset: PIVPy dataset with velocity fields and coordinates
+        
     Example:
-        ds = io.from_arrays(x,y,u,v,mask,frame=0)
+        >>> x, y = np.meshgrid(np.arange(10), np.arange(8))
+        >>> u = np.random.rand(8, 10)
+        >>> v = np.random.rand(8, 10)
+        >>> mask = np.ones_like(u)
+        >>> dataset = from_arrays(x, y, u, v, mask, frame=0)
     """
     # create dataset structure of appropriate size
     dataset = create_sample_field(rows=x.shape[0], cols=x.shape[1], frame=frame)
@@ -200,15 +207,22 @@ def from_df(
     frame: int = 0,
     filename: str = None,
 ) -> xr.Dataset:
-    """creates pivpy.Dataset from pandas DataFrame
-
+    """Creates PIVPy dataset from pandas DataFrame
+    
     Args:
-        df (pd.DataFrame): DataFrame with columns of x,y,u,v
-        frame (int, optional): frame number. Defaults to 0.
-        filename (str, optional): filename to add to the attributes. Defaults to None.
-
+        df (pd.DataFrame): DataFrame with columns 'x', 'y', 'u', 'v', and optionally 'chc' (mask)
+        frame (int, optional): Frame number for time coordinate. Defaults to 0.
+        filename (str, optional): Filename to store in dataset attributes. Defaults to None.
+        
     Returns:
-        xr.Dataset: pivpy.Dataset
+        xr.Dataset: PIVPy dataset with velocity fields and coordinates
+        
+    Raises:
+        ValueError: If x or y coordinates are not properly sorted
+        
+    Example:
+        >>> df = pd.DataFrame({'x': [...], 'y': [...], 'u': [...], 'v': [...]})
+        >>> dataset = from_df(df, frame=0)
     """
     d = df.to_numpy()
 
@@ -218,12 +232,15 @@ def from_df(
     if d.shape[1] < 5: # davis8 does not have mask or chc
         d = np.column_stack((d,np.zeros_like(d[:,-1])))
         
-    if ix[1] == 1: #x grows first
+    if ix[1] == 1:  # x grows first
         d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
-    elif iy[1] == 1: # y grows first
-        d = d.reshape(len(x), len(y), 5) # .transpose(1,0,2)
+    elif iy[1] == 1:  # y grows first
+        d = d.reshape(len(x), len(y), 5)
     else:
-        raise ValueError('not sorted x or y')
+        raise ValueError(
+            'Data is not properly sorted. Either x or y coordinates must be '
+            'monotonically ordered. Check your input data format.'
+        )
 
     u = d[:, :, 2]
     v = d[:, :, 3]
@@ -247,26 +264,34 @@ def from_df(
 
 
 def load_vec(
-    filename: pathlib.Path,
+    filename,
     rows: int = None,
     cols: int = None,
     delta_t: float = None,
     frame: int = 0,
 ) -> xr.Dataset:
+    """Loads VEC file in TECPLOT format (TSI Inc.), OpenPIV VEC or TXT formats
+    
+    Args:
+        filename (str or pathlib.Path): Path to the VEC file with header and 5 columns (x, y, u, v, mask)
+        rows (int, optional): Number of rows in the vector field. If None, will be parsed from header.
+        cols (int, optional): Number of columns in the vector field. If None, will be parsed from header.
+        delta_t (float, optional): Time interval between frames. Defaults to None.
+        frame (int, optional): Frame or time marker. Defaults to 0.
+        
+    Returns:
+        xr.Dataset: PIVPy dataset with velocity fields and coordinates
+        
+    Raises:
+        ValueError: If coordinates are not properly sorted
+        IOError: If file cannot be read
+        
+    Example:
+        >>> dataset = load_vec('data/velocity_field.vec')
+        >>> dataset = load_vec('data/field.vec', delta_t=0.001, frame=5)
     """
-    load_vec(filename,rows=rows,cols=cols)
-    Loads the VEC file (TECPLOT format by TSI Inc.),
-    OpenPIV VEC or TXT formats
-    Arguments:
-        filename : file name, expected to have a header and 5 columns
-        rows, cols : number of rows and columns of a vector field,
-        if None, None, then parse_header is called to infer the number
-        written in the header
-        DELTA_T : time interval (default is None)
-        frame : frame or time marker (default is None)
-    Output:
-        dataset is a xAarray Dataset, see xarray for help
-    """
+    # Ensure filename is a pathlib.Path object
+    filename = pathlib.Path(filename) if not isinstance(filename, pathlib.Path) else filename
     if rows is None or cols is None:
         _, _, rows, cols, dt, frame, _ = parse_header(filename)
         # print(f'rows = {rows}, cols = {cols}')
@@ -282,13 +307,16 @@ def load_vec(
         
         # print(f'rows = {len(y)}, cols = {len(x)}')
         
-        if ix[1] == 1: #x grows first
+        if ix[1] == 1:  # x grows first
             d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
-        elif iy[1] == 1: # y grows first
-            d = d.reshape(len(y), len(x), 5) # .transpose(1,0,2)
+        elif iy[1] == 1:  # y grows first
+            d = d.reshape(len(y), len(x), 5)
         else:
-            raise ValueError('not sorted x or y')
-    else: # Insight VEC file
+            raise ValueError(
+                'Data is not properly sorted. Either x or y coordinates must be '
+                'monotonically ordered. Check your VEC file format.'
+            )
+    else:  # Insight VEC file
         d = np.genfromtxt(
             filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
         ).reshape(cols, rows, 5).transpose(1, 0, 2)
@@ -403,23 +431,28 @@ def load_directory(
     basename: str = "*",
     ext: str = ".vec",
 ) -> xr.Dataset:
-    """
-    load_directory (path,basename='*', ext='*.vec')
-
-    Loads all the files with the chosen sextension in the directory into a
-    single xarray Dataset with variables and units added as attributes
-
-    Input:
-        directory : path to the directory with .vec, .txt or .VC7 files,
-        period . can be dropped
-
-    Output:
-        dataset : xarray Dataset with dimensions: x,y,t and
-               dataset arrays of u,v,
-               attributes of variables and units
-
-
-    See more: load_vec
+    """Loads all velocity field files from a directory into a single xarray Dataset
+    
+    Args:
+        path (pathlib.Path): Path to directory containing velocity field files
+        basename (str, optional): Filename pattern to match (e.g., 'Run*'). Defaults to "*".
+        ext (str, optional): File extension (.vec, .txt, or .vc7). Defaults to ".vec".
+        
+    Returns:
+        xr.Dataset: Combined dataset with time dimension containing all loaded files
+        
+    Raises:
+        IOError: If no matching files are found in the directory
+        
+    Example:
+        >>> import pathlib
+        >>> path = pathlib.Path('data/velocity_fields')
+        >>> dataset = load_directory(path, basename='Run*', ext='.vec')
+        >>> print(dataset.dims)  # Should show x, y, t dimensions
+        
+    Note:
+        Files are sorted alphabetically and assigned sequential frame numbers (0, 1, 2, ...).
+        All files must have the same grid dimensions (rows, cols).
     """
 
     files = sorted(path.glob(basename + ext))
@@ -572,29 +605,38 @@ def load_openpiv_txt(
     delta_t: float = None,
     frame: int = 0,
 ) -> xr.Dataset:
-    """ loads OpenPIV txt file 
-
+    """Loads OpenPIV text output file
+    
     Args:
-        filename (str): _description_
-        rows (int, optional): _description_. Defaults to None.
-        cols (int, optional): _description_. Defaults to None.
-        delta_t (float, optional): _description_. Defaults to None.
-        frame (int, optional): _description_. Defaults to 0.
-
+        filename (str): Path to OpenPIV text file with 5 columns (x, y, u, v, mask)
+        rows (int, optional): Number of rows in vector field. Defaults to None (auto-detect).
+        cols (int, optional): Number of columns in vector field. Defaults to None (auto-detect).
+        delta_t (float, optional): Time interval between frames. Defaults to None.
+        frame (int, optional): Frame number. Defaults to 0.
+        
     Returns:
-        xr.Dataset: _description_
+        xr.Dataset: PIVPy dataset with velocity fields
+        
+    Raises:
+        ValueError: If coordinates are not properly sorted
+        
+    Example:
+        >>> dataset = load_openpiv_txt('openpiv_output.txt')
     """
     if rows is None:  # means no headers
         d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
         x, ix = unsorted_unique(d[:, 0])
         y, iy = unsorted_unique(d[:, 1])
 
-        if ix[1] == 1: #x grows first
+        if ix[1] == 1:  # x grows first
             d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
-        elif iy[1] == 1: # y grows first
+        elif iy[1] == 1:  # y grows first
             d = d.reshape(len(y), len(x), 5)
         else:
-            raise ValueError('not sorted x or y')
+            raise ValueError(
+                'Data is not properly sorted. Either x or y coordinates must be '
+                'monotonically ordered. Check your OpenPIV file format.'
+            )
     else:
         d = np.genfromtxt(
             filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)

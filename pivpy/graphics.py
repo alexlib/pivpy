@@ -168,6 +168,7 @@ def contour_plot(
     logscale: bool = False,
     aspectratio: str = "equal",
     units: List[str] = [],
+    **kwargs,
 ):
     """Creates contour plot of scalar field from xarray Dataset
     
@@ -179,14 +180,19 @@ def contour_plot(
         logscale (bool, optional): Whether to use logarithmic scale. Defaults to False.
         aspectratio (str, optional): Aspect ratio of the plot. Defaults to "equal".
         units (List[str], optional): List of units for axes labels. Defaults to [].
+        **kwargs: Additional keyword arguments (including deprecated 'contourLevels')
         
     Returns:
         tuple: (fig, ax) matplotlib figure and axes objects
     """
-    # Backward compatibility
-    if 'contourLevels' in locals():
+    # Backward compatibility for old parameter name
+    if 'contourLevels' in kwargs:
         warnings.warn("'contourLevels' is deprecated, use 'contour_levels' instead", DeprecationWarning)
-        contour_levels = contourLevels
+        if contour_levels is None:  # Only use if not already specified
+            contour_levels = kwargs.pop('contourLevels')
+        else:
+            kwargs.pop('contourLevels')  # Remove to avoid confusion
+    
     data = dataset_to_array(data)
 
     if "w" not in data.var():
@@ -286,11 +292,7 @@ def animate(data: xr.Dataset,
     Returns:
         FuncAnimation: matplotlib animation object
     """
-    # Backward compatibility
-    if arrow_scale != 1:  # Check if explicitly set
-        arrowscale = arrow_scale
-    else:
-        arrowscale = arrow_scale
+    arrowscale = arrow_scale  # Use consistent naming internally
     X, Y = np.meshgrid(data.x, data.y)
     X = X.T
     Y = Y.T

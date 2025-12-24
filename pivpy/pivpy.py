@@ -67,7 +67,7 @@ class PIVAccessor(object):
         Arguments:
             data : xarray Dataset:
             x,y,t are coordinates
-            u,v,chs are the data arracc_ys
+            u,v,chc are the data arrays
 
         We add few shortcuts (properties):
             data.piv.average is the time average (data.mean(dim='t'))
@@ -97,37 +97,66 @@ class PIVAccessor(object):
         return self._average
 
     def crop(self, crop_vector=None):
-        """ crops xr.Dataset by some rows, cols from the boundaries
-
+        """Crops xarray Dataset to specified spatial boundaries
+        
         Args:
-            crop_vector (_type_, optional): _description_. Defaults to None.
-
+            crop_vector (list, optional): List of [xmin, xmax, ymin, ymax] values 
+                to define cropping boundaries. Use None for any value to keep 
+                the original boundary. Defaults to None (no cropping).
+                
         Returns:
-            _type_: _description_
+            xr.Dataset: Cropped dataset
+            
+        Example:
+            >>> data = data.piv.crop([5, 15, -5, -15])  # Crop to x:[5,15], y:[-5,-15]
+            >>> data = data.piv.crop([None, 20, None, None])  # Crop only xmax to 20
         """
         if crop_vector is None:
             crop_vector = 4 * [None]
 
-        xmin, xmacc_x, ymin, ymacc_x = crop_vector
+        xmin, xmax, ymin, ymax = crop_vector
 
         xmin = self._obj.x.min() if xmin is None else xmin
-        xmacc_x = self._obj.x.macc_x() if xmacc_x is None else xmacc_x
+        xmax = self._obj.x.max() if xmax is None else xmax
         ymin = self._obj.y.min() if ymin is None else ymin
-        ymacc_x = self._obj.y.macc_x() if ymacc_x is None else ymacc_x
+        ymax = self._obj.y.max() if ymax is None else ymax
 
-        self._obj = self._obj.sel(x=slice(xmin, xmacc_x), y=slice(ymin, ymacc_x))
+        self._obj = self._obj.sel(x=slice(xmin, xmax), y=slice(ymin, ymax))
 
         return self._obj
 
     def pan(self, shift_x=0.0, shift_y=0.0):
-        """moves the field by shift_x,shift_y in the same units as x,y"""
+        """Shifts the coordinate system by specified amounts
+        
+        Args:
+            shift_x (float, optional): Amount to shift in x direction. Defaults to 0.0.
+            shift_y (float, optional): Amount to shift in y direction. Defaults to 0.0.
+            
+        Returns:
+            xr.Dataset: Dataset with shifted coordinates
+            
+        Example:
+            >>> data = data.piv.pan(10.0, -5.0)  # Shift x by +10, y by -5
+        """
         self._obj = self._obj.assign_coords(
             {"x": self._obj.x + shift_x, "y": self._obj.y + shift_y}
         )
         return self._obj
 
     def filterf(self, sigma: List[float]=[1.,1.,0], **kwargs):
-        """Gaussian filtering of velocity"""
+        """Applies Gaussian filtering to velocity fields
+        
+        Args:
+            sigma (List[float], optional): Standard deviation for Gaussian kernel 
+                in [y, x, t] dimensions. Defaults to [1., 1., 0] (spatial filtering only).
+            **kwargs: Additional keyword arguments passed to scipy.ndimage.gaussian_filter
+            
+        Returns:
+            xr.Dataset: Filtered dataset with smoothed velocity fields
+            
+        Example:
+            >>> data = data.piv.filterf(sigma=[2., 2., 0])  # Smooth with sigma=2 in space
+        """
 
         self._obj["u"] = xr.DataArray(
             gaussian_filter(
@@ -209,7 +238,7 @@ class PIVAccessor(object):
         return self._obj
 
     def vorticity(self):
-        """calculates vorticity of the data arracc_y (at one time instance) and
+        """calculates vorticity of the data array (at one time instance) and
         adds it to the attributes
 
         Input:
@@ -254,10 +283,10 @@ class PIVAccessor(object):
             self._obj: xr.Dataset with the new property ["w"] = divergence
         """
         du_dx, _ = np.gradient(
-            self._obj["u"], self._obj["x"], self._obj["y"], acc_x_is=(0, 1)
+            self._obj["u"], self._obj["x"], self._obj["y"], axis=(0, 1)
         )
         _, dv_dy = np.gradient(
-            self._obj["v"], self._obj["x"], self._obj["y"], acc_x_is=(0, 1)
+            self._obj["v"], self._obj["x"], self._obj["y"], axis=(0, 1)
         )
 
         if "t" in self._obj.coords:
@@ -272,7 +301,7 @@ class PIVAccessor(object):
 
     def acceleration(self):
         """calculates material derivative or acceleration of the
-        data arracc_y (single frame)
+        data array (single frame)
 
         Input:
             xarray with the variables u,v and dimensions x,y
@@ -286,11 +315,11 @@ class PIVAccessor(object):
         dv_dx = self._obj["v"].differentiate("x")
         dv_dy = self._obj["v"].differentiate("y")
 
-        acc_x = self._obj["u"] * du_dx + self._obj["v"] * du_dy
-        acc_y = self._obj["u"] * dv_dx + self._obj["v"] * dv_dy
+        accel_x = self._obj["u"] * du_dx + self._obj["v"] * du_dy
+        accel_y = self._obj["u"] * dv_dx + self._obj["v"] * dv_dy
 
         self._obj["w"] = xr.DataArray(
-            np.sqrt(acc_x**2 + acc_y**2), dims=["x", "y", "t"]
+            np.sqrt(accel_x**2 + accel_y**2), dims=["x", "y", "t"]
         )
 
         self._obj["w"].attrs["units"] = "1/delta_t"
@@ -362,6 +391,7 @@ class PIVAccessor(object):
         self._obj["w"] = np.sqrt(self._obj["w"])
         self._obj["w"].attrs["standard_name"] = "rms"
         self._obj["w"].attrs["units"] = "m/s"
+        return self._obj
 
     def Γ1(self, n, convCoords = True):
         """Makes use of Dask (kind of) to run Γ1_moving_window_function via Γ1_pad.
@@ -562,8 +592,8 @@ class PIVAccessor(object):
 
     def quiver(self, **kwargs):
         """graphics.quiver() as a flow_property"""
-        fig, acc_x = gquiver(self._obj, **kwargs)
-        return fig, acc_x
+        fig, ax = gquiver(self._obj, **kwargs)
+        return fig, ax
 
     def streamplot(self, **kwargs):
         """graphics.quiver(streamlines=True)"""

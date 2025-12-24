@@ -16,9 +16,9 @@ import warnings
 
 def quiver(
     data: xr.DataArray,
-    arrScale: float = 25.0,
+    arrow_scale: float = 25.0,
     threshold: float = None,
-    nthArr: int = 1,
+    nth_arrow: int = 1,
     aspectratio: str = "equal",
     colorbar: bool = False,
     colorbar_orient: str = "vertical",
@@ -27,30 +27,42 @@ def quiver(
     cmap: str = 'RdBu',
     **kwargs,
 ):
-    """creates quiver of xr.Dataset
-
+    """Creates quiver plot of velocity field from xarray Dataset
+    
     Args:
-        data (xr.DataArray): _description_
-        arrScale (float, optional): _description_. Defaults to 25.0.
-        threshold (float, optional): _description_. Defaults to None.
-        nthArr (int, optional): _description_. Defaults to 1.
-        aspectratio (str, optional): _description_. Defaults to "equal".
-        colorbar (bool, optional): _description_. Defaults to False.
-        colorbar_orient (str, optional): _description_. Defaults to "vertical".
-        units (List, optional): _description_. Defaults to [].
-        streamlines (bool, optional): _description_. Defaults to False.
-        cmap (str, optional): matplotlib.colormap, e.g. 'jet', 'hot', 'RdBu', 'Reds'
-
+        data (xr.DataArray): PIV velocity field data
+        arrow_scale (float, optional): Arrow scaling factor. Defaults to 25.0.
+        threshold (float, optional): Maximum velocity magnitude to display. Defaults to None.
+        nth_arrow (int, optional): Display every nth arrow for subsampling. Defaults to 1.
+        aspectratio (str, optional): Aspect ratio of the plot. Defaults to "equal".
+        colorbar (bool, optional): Whether to show colorbar. Defaults to False.
+        colorbar_orient (str, optional): Orientation of colorbar ('vertical' or 'horizontal'). 
+            Defaults to "vertical".
+        units (List, optional): List of units [pos_unit, pos_unit, vel_unit, vel_unit]. 
+            Defaults to [].
+        streamlines (bool, optional): Whether to overlay streamlines. Defaults to False.
+        cmap (str, optional): Matplotlib colormap name (e.g., 'jet', 'hot', 'RdBu', 'Reds'). 
+            Defaults to 'RdBu'.
+        **kwargs: Additional keyword arguments passed to xarray.plot.quiver
+        
     Returns:
-        _type_: _description_
+        tuple: (fig, ax) matplotlib figure and axes objects
     """
+    # Backward compatibility for old parameter names
+    if 'arrScale' in kwargs:
+        warnings.warn("'arrScale' is deprecated, use 'arrow_scale' instead", DeprecationWarning)
+        arrow_scale = kwargs.pop('arrScale')
+    if 'nthArr' in kwargs:
+        warnings.warn("'nthArr' is deprecated, use 'nth_arrow' instead", DeprecationWarning)
+        nth_arrow = kwargs.pop('nthArr')
+    
     data = dataset_to_array(data)
 
     pos_units = data.x.attrs["units"] if len(units) == 0 else units[0]
     vel_units = data.u.attrs["units"] if len(units) == 0 else units[2]
 
     # subsampling number of vectors
-    data = data.sel(x=data.x[::nthArr], y=data.y[::nthArr])  
+    data = data.sel(x=data.x[::nth_arrow], y=data.y[::nth_arrow])  
 
     # clip data to the threshold
     if threshold is not None:
@@ -75,7 +87,7 @@ def quiver(
         v="v",
         hue="s",
         units="width",
-        scale=np.max(data["s"].values * arrScale),
+        scale=np.max(data["s"].values * arrow_scale),
         headwidth=2,
         cmap=cmap,
         ax=ax,
@@ -83,7 +95,6 @@ def quiver(
     )
 
     if colorbar is False:
-        # cbar = fig.colorbar(Q, shrink=0.9, orientation=colbar_orient)
         cb = Q.colorbar
         if cb:
             cb.remove()
@@ -124,14 +135,14 @@ def quiver(
 
 
 def histogram(data, normed=False):
-    """creates two histograms of two velocity components
-
+    """Creates histograms of velocity components
+    
     Args:
-        data (_type_): _description_
-        normed (bool, optional): _description_. Defaults to False.
-
+        data (xr.Dataset): PIV dataset with u and v velocity components
+        normed (bool, optional): Whether to normalize the histogram. Defaults to False.
+        
     Returns:
-        _type_: _description_
+        tuple: (fig, ax) matplotlib figure and axes objects with two histogram subplots
     """
 
     u = np.asarray(data.u).flatten()
@@ -152,26 +163,30 @@ def histogram(data, normed=False):
 def contour_plot(
     data: xr.DataArray,
     threshold: float = None,
-    contourLevels: List[float] = None,
+    contour_levels: List[float] = None,
     colorbar: bool = False,
     logscale: bool = False,
     aspectratio: str = "equal",
     units: List[str] = [],
 ):
-    """creates contour plot of xr.DataArray
-
+    """Creates contour plot of scalar field from xarray Dataset
+    
     Args:
-        data (xr.DataArray): _description_
-        threshold (float, optional): _description_. Defaults to None.
-        contourLevels (List[float], optional): _description_. Defaults to None.
-        colorbar (bool, optional): _description_. Defaults to False.
-        logscale (bool, optional): _description_. Defaults to False.
-        aspectratio (str, optional): _description_. Defaults to "equal".
-        units (List[str], optional): _description_. Defaults to [].
-
+        data (xr.DataArray): PIV dataset with scalar field 'w' or vector fields
+        threshold (float, optional): Maximum value to clip the data. Defaults to None.
+        contour_levels (List[float], optional): Specific contour levels to plot. Defaults to None.
+        colorbar (bool, optional): Whether to show colorbar. Defaults to False.
+        logscale (bool, optional): Whether to use logarithmic scale. Defaults to False.
+        aspectratio (str, optional): Aspect ratio of the plot. Defaults to "equal".
+        units (List[str], optional): List of units for axes labels. Defaults to [].
+        
     Returns:
-        _type_: _description_
+        tuple: (fig, ax) matplotlib figure and axes objects
     """
+    # Backward compatibility
+    if 'contourLevels' in locals():
+        warnings.warn("'contourLevels' is deprecated, use 'contour_levels' instead", DeprecationWarning)
+        contour_levels = contourLevels
     data = dataset_to_array(data)
 
     if "w" not in data.var():
@@ -183,14 +198,14 @@ def contour_plot(
     f, ax = plt.subplots()
     # data.plot.contourf(x='x',y='y',row='y',col='x', ax=ax)
 
-    if contourLevels is None:
+    if contour_levels is None:
         levels = np.linspace(
             np.min(data["w"].values),
             np.max(data["w"].values),
             10,
         )
     else:
-        levels = contourLevels  # vector of levels to set
+        levels = contour_levels  # vector of levels to set
 
     if logscale:
         data["w"] = np.abs(data["w"])
@@ -223,25 +238,33 @@ def contour_plot(
 
 
 def showf(data, flow_property="ke", **kwargs):
-    """shows data as quiver over a scalar background
-
+    """Shows velocity field as quiver plot over a scalar background
+    
     Args:
-        data (_type_): _description_
-        flow_property (str, optional): _description_. Defaults to "ke".
+        data (xr.Dataset): PIV dataset with velocity fields
+        flow_property (str, optional): Scalar flow property to show as background 
+            (e.g., 'ke', 'vorticity', 'strain'). Defaults to "ke".
+        **kwargs: Additional keyword arguments passed to quiver and contour_plot
+        
+    Returns:
+        tuple: (fig, ax) matplotlib figure and axes objects
     """
     fig, ax = showscal(data, flow_property=flow_property, **kwargs)
     fig, ax = quiver(data, **kwargs)
 
 
 def showscal(data, flow_property="ke", **kwargs):
-    """creates contour plot of some scalar field of a flow property
-
+    """Creates contour plot of a scalar flow property field
+    
     Args:
-        data (_type_): _description_
-        flow_property (str, optional): _description_. Defaults to "ke".
-
+        data (xr.Dataset): PIV dataset with velocity or scalar fields
+        flow_property (str, optional): Flow property to visualize. 
+            Options: 'ke' (kinetic energy), 'vorticity', 'strain', 'divergence', etc.
+            Defaults to "ke".
+        **kwargs: Additional keyword arguments passed to contour_plot
+        
     Returns:
-        _type_: _description_
+        tuple: (fig, ax) matplotlib figure and axes objects
     """
     data = data.piv.vec2scal(flow_property=flow_property)
     fig, ax = contour_plot(data, **kwargs)
@@ -249,19 +272,25 @@ def showscal(data, flow_property="ke", **kwargs):
 
 
 def animate(data: xr.Dataset,
-            arrowscale: int = 1,
+            arrow_scale: int = 1,
             savepath: str = None,
             units: str = "pix/dt"):
-    """animates flow fields in the data and saves to MP4 format
-
+    """Animates flow fields and saves to MP4 format
+    
     Args:
-        data (xr.Dataset): _description_
-        arrowscale (int, optional): _description_. Defaults to 1.
-        savepath (str, optional): _description_. Defaults to None.
-
+        data (xr.Dataset): PIV dataset with time-series velocity fields
+        arrow_scale (int, optional): Arrow scaling factor for quiver plot. Defaults to 1.
+        savepath (str, optional): Path to save the animation MP4 file. Defaults to None.
+        units (str, optional): Units for velocity. Defaults to "pix/dt".
+        
     Returns:
-        _type_: _description_
+        FuncAnimation: matplotlib animation object
     """
+    # Backward compatibility
+    if arrow_scale != 1:  # Check if explicitly set
+        arrowscale = arrow_scale
+    else:
+        arrowscale = arrow_scale
     X, Y = np.meshgrid(data.x, data.y)
     X = X.T
     Y = Y.T

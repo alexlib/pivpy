@@ -4,6 +4,7 @@ import numpy as np
 import importlib.resources
 import pytest
 from pivpy import io
+import pivpy.pivpy  # Register the piv accessor for xarray.Dataset
 
 
 FILE1 = "Run000001.T000.D000.P000.H001.L.vec"
@@ -66,6 +67,23 @@ def test_vec2scal():
 
     data = data.piv.vec2scal(flow_property="strain")
     assert data["w"].attrs["standard_name"] == "strain"
+
+
+def test_vec2scal_custom_name():
+    """tests vec2scal with custom name parameter"""
+    data = io.create_sample_Dataset()
+    data = data.piv.vec2scal(flow_property="vorticity", name="vort")
+    assert "vort" in data
+    assert data["vort"].attrs["standard_name"] == "vorticity"
+    
+    # Add another scalar with different name
+    data = data.piv.vec2scal(flow_property="strain", name="strain_field")
+    assert "strain_field" in data
+    assert data["strain_field"].attrs["standard_name"] == "strain"
+    
+    # Both should exist
+    assert "vort" in data
+    assert "strain_field" in data
 
 
 def test_add():
@@ -145,6 +163,39 @@ def test_vorticity():
     data = io.create_sample_field()  # we need another flow field
     data.piv.vorticity()
     assert np.allclose(data["w"], 0.0)
+
+
+def test_vorticity_custom_name():
+    """tests vorticity with custom name"""
+    data = io.create_sample_field()
+    data.piv.vorticity(name="vort")
+    assert "vort" in data
+    assert data["vort"].attrs["standard_name"] == "vorticity"
+
+
+def test_multiple_scalars_in_dataset():
+    """tests storing multiple scalar fields in one dataset"""
+    data = io.create_sample_Dataset(n_frames=5, rows=5, cols=5)
+    # Add multiple scalars with different names
+    data = data.piv.vorticity(name="vort")
+    data = data.piv.strain(name="strain")
+    data = data.piv.kinetic_energy(name="ke")
+    data = data.piv.tke(name="tke")
+    data = data.piv.reynolds_stress(name="rey_stress")
+    
+    # Check all are present
+    assert "vort" in data
+    assert "strain" in data
+    assert "ke" in data
+    assert "tke" in data
+    assert "rey_stress" in data
+    
+    # Check attributes are correct
+    assert data["vort"].attrs["standard_name"] == "vorticity"
+    assert data["strain"].attrs["standard_name"] == "strain"
+    assert data["ke"].attrs["standard_name"] == "kinetic_energy"
+    assert data["tke"].attrs["standard_name"] == "TKE"
+    assert data["rey_stress"].attrs["standard_name"] == "Reynolds_stress"
 
 
 def test_strain():

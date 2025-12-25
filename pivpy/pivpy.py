@@ -177,7 +177,8 @@ class PIVAccessor(object):
                 will be masked/removed. If None, no upper clipping is performed. 
                 Defaults to None.
             by (str or None, optional): Variable name to use for clipping criterion.
-                Can be 'u', 'v', 'magnitude', or any scalar property name in the dataset.
+                Common values include 'u', 'v', or 'magnitude', but any scalar property 
+                name in the dataset is valid (e.g., 'w' for vorticity, 'tke', etc.).
                 If None, clips all variables independently. If 'magnitude', computes
                 velocity magnitude and uses it for filtering. Defaults to None.
             keep_attrs (bool, optional): If True, attributes will be preserved. 

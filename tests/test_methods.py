@@ -259,9 +259,9 @@ def test_filterf():
 
 
 def test_clip_no_by():
-    """tests clip without 'by' parameter - clips all variables independently"""
+    """Tests clip without 'by' parameter - clips all variables independently."""
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
-    # Sample data has u,v values around 1-5
+    # Sample data has u, v values around 1-5
     clipped = data.piv.clip(min=2.0, max=4.0)
     
     # Check that values are clipped
@@ -275,7 +275,7 @@ def test_clip_no_by():
 
 
 def test_clip_by_u():
-    """tests clip by U component - masks locations where U is out of range"""
+    """Tests clip by U component - masks locations where U is out of range."""
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
     
     # Clip based on u component
@@ -290,7 +290,7 @@ def test_clip_by_u():
 
 
 def test_clip_by_v():
-    """tests clip by V component - masks locations where V is out of range"""
+    """Tests clip by V component - masks locations where V is out of range."""
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
     
     # Clip based on v component
@@ -305,7 +305,7 @@ def test_clip_by_v():
 
 
 def test_clip_by_magnitude():
-    """tests clip by velocity magnitude - masks locations where magnitude is out of range"""
+    """Tests clip by velocity magnitude - masks locations where magnitude is out of range."""
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
     
     # Compute magnitude for comparison
@@ -323,7 +323,7 @@ def test_clip_by_magnitude():
 
 
 def test_clip_by_scalar_property():
-    """tests clip by a computed scalar property (vorticity)"""
+    """Tests clip by a computed scalar property (vorticity)."""
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
     
     # Compute vorticity first
@@ -342,7 +342,7 @@ def test_clip_by_scalar_property():
 
 
 def test_clip_min_only():
-    """tests clip with only min parameter"""
+    """Tests clip with only min parameter."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
     clipped = data.piv.clip(min=3.0)
     
@@ -352,7 +352,7 @@ def test_clip_min_only():
 
 
 def test_clip_max_only():
-    """tests clip with only max parameter"""
+    """Tests clip with only max parameter."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
     clipped = data.piv.clip(max=3.0)
     
@@ -362,7 +362,7 @@ def test_clip_max_only():
 
 
 def test_clip_error_no_params():
-    """tests that clip raises error when neither min nor max is provided"""
+    """Tests that clip raises error when neither min nor max is provided."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
     
     with pytest.raises(ValueError, match="At least one of 'min' or 'max' must be provided"):
@@ -370,7 +370,7 @@ def test_clip_error_no_params():
 
 
 def test_clip_error_invalid_by():
-    """tests that clip raises error when 'by' variable doesn't exist"""
+    """Tests that clip raises error when 'by' variable doesn't exist."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
     
     with pytest.raises(ValueError, match="Variable 'nonexistent' not found"):
@@ -378,7 +378,7 @@ def test_clip_error_invalid_by():
 
 
 def test_clip_keep_attrs_false():
-    """tests clip with keep_attrs=False"""
+    """Tests clip with keep_attrs=False."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
     data.attrs['test_attr'] = 'test_value'
     data['u'].attrs['u_attr'] = 'u_value'

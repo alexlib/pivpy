@@ -207,12 +207,13 @@ def streamplot(
     )
 
     if colorbar is False:
-        if strm.colorbar:
+        if strm.colorbar is not None:
             strm.colorbar.remove()
         plt.draw()
     else:
         if colorbar_orient == "horizontal":
-            strm.colorbar.remove()
+            if strm.colorbar is not None:
+                strm.colorbar.remove()
             cb = fig.colorbar(strm, orientation=colorbar_orient, ax=ax)
 
     ax.set_xlabel(f"x ({pos_units})")

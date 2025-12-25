@@ -71,6 +71,10 @@ def quiver(
 
     data["s"] = np.sqrt(data["u"] ** 2 + data["v"] ** 2)
     
+    # Sort y in increasing order if needed (streamplot requires increasing coordinates)
+    # This is needed when streamlines=True
+    if streamlines and len(data.y) > 1 and data.y[0] > data.y[-1]:
+        data = data.sortby('y')
     
 
     if len(plt.get_fignums()) == 0:  # if no figure is open

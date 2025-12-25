@@ -249,3 +249,112 @@ if 'mask' in data:
 - Implementation: GitHub Copilot
 - Review and guidance: @alexlib
 - Original issue: @nepomnyi
+
+---
+
+## Issue 3: Add Autocorrelation Plot Function
+
+### Problem
+Users needed a way to analyze temporal correlations in PIV data for various properties (u, v, vorticity, concentration, etc.). The pandas `autocorrelation_plot` function provides this capability but wasn't integrated into pivpy's plotting interface.
+
+### Solution
+Added `autocorrelation_plot()` function to the graphics module and as a method in the PIVAccessor class, allowing users to easily plot autocorrelation for any variable in their PIV dataset.
+
+### Changes Made
+
+#### New Function in `pivpy/graphics.py`
+- `autocorrelation_plot(data, variable="u", **kwargs)`: Creates autocorrelation plots for any data variable
+  - Accepts xarray Dataset with PIV data
+  - Flattens spatial dimensions to create 1D time series
+  - Uses pandas.plotting.autocorrelation_plot for computation and visualization
+  - Automatically extracts and displays units from variable attributes
+
+#### New Method in PIVAccessor (`pivpy/pivpy.py`)
+- `data.piv.autocorrelation_plot(variable="u", **kwargs)`: Accessor method for convenient usage
+
+#### New Test
+- `test_autocorrelation_plot()`: Tests both direct function call and accessor method
+
+#### Example Script
+- `examples/autocorrelation_example.py`: Comprehensive examples showing various use cases
+
+### Usage Examples
+
+**Basic usage with velocity components:**
+```python
+from pivpy import io, graphics, pivpy
+import matplotlib.pyplot as plt
+
+# Load PIV data
+data = io.load_vec('piv_data.vec')
+
+# Plot autocorrelation of u-component
+graphics.autocorrelation_plot(data, variable='u')
+plt.show()
+
+# Using accessor method
+data.piv.autocorrelation_plot(variable='v')
+plt.show()
+```
+
+**Autocorrelation of scalar fields:**
+```python
+# Compute vorticity and plot its autocorrelation
+data = data.piv.vec2scal('curl')
+graphics.autocorrelation_plot(data, variable='w')
+plt.show()
+
+# Or use accessor directly
+data.piv.autocorrelation_plot(variable='w')
+plt.show()
+```
+
+**Multi-panel comparison:**
+```python
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+# Compare autocorrelation of different properties
+plt.sca(axes[0, 0])
+graphics.autocorrelation_plot(data, variable='u')
+
+plt.sca(axes[0, 1])
+graphics.autocorrelation_plot(data, variable='v')
+
+plt.sca(axes[1, 0])
+graphics.autocorrelation_plot(data, variable='chc')
+
+# Vorticity
+data_vort = data.piv.vec2scal('curl')
+plt.sca(axes[1, 1])
+graphics.autocorrelation_plot(data_vort, variable='w')
+
+plt.tight_layout()
+plt.show()
+```
+
+### Benefits
+1. **Temporal Analysis**: Understand temporal correlations in PIV measurements
+2. **Flexible Variable Selection**: Works with any variable in the dataset (u, v, w, c, chc, etc.)
+3. **Consistent API**: Follows pivpy's design pattern with both module function and accessor method
+4. **Automatic Unit Handling**: Extracts and displays units from xarray attributes
+5. **Pandas Integration**: Leverages robust pandas autocorrelation implementation
+
+### Technical Details
+- Flattens the spatial dimensions of the data to create a 1D time series
+- Passes through kwargs to pandas.plotting.autocorrelation_plot for customization
+- Raises informative ValueError if specified variable doesn't exist
+- Automatically adds title with variable name and units
+
+### Testing
+- All graphics tests pass (9/9) ✓
+- New test specifically covers autocorrelation functionality ✓
+- Tested with velocity components (u, v) ✓
+- Tested with scalar fields (w, chc) ✓
+- Backward compatibility maintained ✓
+
+---
+
+## Related References
+- GitHub Issue: "add autocorrelation function"
+- Reference gist: https://gist.github.com/alexlib/46317e87e522c8f4e124ce6d63a3d038
+- Pandas autocorrelation documentation: https://pandas.pydata.org/docs/reference/api/pandas.plotting.autocorrelation_plot.html

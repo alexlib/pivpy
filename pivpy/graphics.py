@@ -9,6 +9,7 @@ import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 import xarray as xr
+import pandas as pd
 from pivpy.io import POS_UNITS, VEL_UNITS
 from typing import List
 import warnings
@@ -461,3 +462,67 @@ def dataset_to_array(data: xr.Dataset, t_index: int = 0):
     
     
     return data
+
+
+def autocorrelation_plot(
+    data: xr.Dataset,
+    variable: str = "u",
+    **kwargs,
+):
+    """Creates autocorrelation plot of a specified variable from xarray Dataset
+    
+    This function plots the autocorrelation of a time series extracted from the dataset.
+    The autocorrelation shows how correlated a signal is with itself at different time lags.
+    
+    Args:
+        data (xr.Dataset): PIV dataset with velocity or scalar fields
+        variable (str, optional): Variable name to plot autocorrelation for 
+            (e.g., 'u', 'v', 'w', 'c', or any other data variable). Defaults to "u".
+        **kwargs: Additional keyword arguments passed to pandas.plotting.autocorrelation_plot
+        
+    Returns:
+        matplotlib.axes.Axes: The axes object containing the autocorrelation plot
+        
+    Raises:
+        ValueError: If the specified variable is not found in the dataset
+        
+    Example:
+        >>> data = io.load_vec(filename)
+        >>> autocorrelation_plot(data, variable='u')
+        >>> autocorrelation_plot(data, variable='v')
+        >>> # For scalar fields like vorticity
+        >>> data = data.piv.vec2scal('curl')
+        >>> autocorrelation_plot(data, variable='w')
+        
+    Note:
+        The function flattens the spatial dimensions and uses the time series
+        for autocorrelation analysis. This is particularly useful for analyzing
+        temporal correlations in PIV data.
+    """
+    if variable not in data.data_vars:
+        available_vars = list(data.data_vars)
+        raise ValueError(
+            f"Variable '{variable}' not found in dataset. "
+            f"Available variables: {available_vars}"
+        )
+    
+    # Extract the variable as a pandas Series for autocorrelation
+    # Flatten the data to get a 1D time series
+    var_data = data[variable].values.flatten()
+    series = pd.Series(var_data)
+    
+    # Create the autocorrelation plot
+    ax = pd.plotting.autocorrelation_plot(series, **kwargs)
+    
+    # Get units if available
+    units = data[variable].attrs.get("units", "")
+    
+    # Update the plot title and labels
+    ax.set_title(f"Autocorrelation of {variable}")
+    ax.set_xlabel("Lag")
+    ax.set_ylabel("Autocorrelation")
+    
+    if units:
+        ax.set_title(f"Autocorrelation of {variable} ({units})")
+    
+    return ax

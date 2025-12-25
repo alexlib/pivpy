@@ -78,3 +78,16 @@ def test_average():
     d = io.create_sample_Dataset()
     d = d.piv.average
     d.piv.quiver()
+
+def test_autocorrelation_plot():
+    """tests autocorrelation plot
+    """
+    # Test with default variable 'u'
+    graphics.autocorrelation_plot(_d)
+    
+    # Test with variable 'v'
+    graphics.autocorrelation_plot(_d, variable='v')
+    
+    # Test with accessor
+    _d.piv.autocorrelation_plot(variable='u')
+    _d.piv.autocorrelation_plot(variable='v')

@@ -256,3 +256,135 @@ def test_filterf():
     dataset = dataset.piv.filterf([.5, .5, 0.]) # with sigma
     # ds["mag"] = np.hypot(ds["u"], ds["v"])
     # ds.plot.quiver(x='x',y='y',u='u',v='v',hue='mag',col='t',scale=150,cmap='RdBu')
+
+
+def test_clip_no_by():
+    """Tests clip without 'by' parameter - clips all variables independently."""
+    data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
+    # Sample data has u, v values around 1-5
+    clipped = data.piv.clip(min=2.0, max=4.0)
+    
+    # Check that values are clipped
+    assert clipped["u"].min() >= 2.0
+    assert clipped["u"].max() <= 4.0
+    assert clipped["v"].min() >= 2.0
+    assert clipped["v"].max() <= 4.0
+    
+    # Check attributes are preserved by default
+    assert clipped.attrs == data.attrs
+
+
+def test_clip_by_u():
+    """Tests clip by U component - masks locations where U is out of range."""
+    data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
+    
+    # Clip based on u component
+    clipped = data.piv.clip(min=2.0, max=4.0, by='u')
+    
+    # Check that locations where u was out of range are now NaN in all variables
+    u_out_of_range = (data["u"] < 2.0) | (data["u"] > 4.0)
+    
+    # Where u was out of range, both u and v should be NaN
+    assert np.all(np.isnan(clipped["u"].values[u_out_of_range.values]))
+    assert np.all(np.isnan(clipped["v"].values[u_out_of_range.values]))
+
+
+def test_clip_by_v():
+    """Tests clip by V component - masks locations where V is out of range."""
+    data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
+    
+    # Clip based on v component
+    clipped = data.piv.clip(min=2.0, max=4.0, by='v')
+    
+    # Check that locations where v was out of range are now NaN in all variables
+    v_out_of_range = (data["v"] < 2.0) | (data["v"] > 4.0)
+    
+    # Where v was out of range, both u and v should be NaN
+    assert np.all(np.isnan(clipped["u"].values[v_out_of_range.values]))
+    assert np.all(np.isnan(clipped["v"].values[v_out_of_range.values]))
+
+
+def test_clip_by_magnitude():
+    """Tests clip by velocity magnitude - masks locations where magnitude is out of range."""
+    data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
+    
+    # Compute magnitude for comparison
+    magnitude = np.sqrt(data["u"] ** 2 + data["v"] ** 2)
+    
+    # Clip based on magnitude
+    clipped = data.piv.clip(max=6.0, by='magnitude')
+    
+    # Check that locations where magnitude was > 6.0 are now NaN
+    mag_out_of_range = magnitude > 6.0
+    
+    # Where magnitude was too large, both u and v should be NaN
+    assert np.all(np.isnan(clipped["u"].values[mag_out_of_range.values]))
+    assert np.all(np.isnan(clipped["v"].values[mag_out_of_range.values]))
+
+
+def test_clip_by_scalar_property():
+    """Tests clip by a computed scalar property (vorticity)."""
+    data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
+    
+    # Compute vorticity first
+    data = data.piv.vorticity(name='w')
+    
+    # Clip based on vorticity
+    clipped = data.piv.clip(min=-10, max=10, by='w')
+    
+    # Check that locations where vorticity was out of range are now NaN
+    w_out_of_range = (data["w"] < -10) | (data["w"] > 10)
+    
+    # Where vorticity was out of range, all variables should be NaN
+    assert np.all(np.isnan(clipped["u"].values[w_out_of_range.values]))
+    assert np.all(np.isnan(clipped["v"].values[w_out_of_range.values]))
+    assert np.all(np.isnan(clipped["w"].values[w_out_of_range.values]))
+
+
+def test_clip_min_only():
+    """Tests clip with only min parameter."""
+    data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
+    clipped = data.piv.clip(min=3.0)
+    
+    # Check that values below min are clipped
+    assert clipped["u"].min() >= 3.0
+    assert clipped["v"].min() >= 3.0
+
+
+def test_clip_max_only():
+    """Tests clip with only max parameter."""
+    data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
+    clipped = data.piv.clip(max=3.0)
+    
+    # Check that values above max are clipped
+    assert clipped["u"].max() <= 3.0
+    assert clipped["v"].max() <= 3.0
+
+
+def test_clip_error_no_params():
+    """Tests that clip raises error when neither min nor max is provided."""
+    data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
+    
+    with pytest.raises(ValueError, match="At least one of 'min' or 'max' must be provided"):
+        data.piv.clip()
+
+
+def test_clip_error_invalid_by():
+    """Tests that clip raises error when 'by' variable doesn't exist."""
+    data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
+    
+    with pytest.raises(ValueError, match="Variable 'nonexistent' not found"):
+        data.piv.clip(min=0, by='nonexistent')
+
+
+def test_clip_keep_attrs_false():
+    """Tests clip with keep_attrs=False."""
+    data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
+    data.attrs['test_attr'] = 'test_value'
+    data['u'].attrs['u_attr'] = 'u_value'
+    
+    clipped = data.piv.clip(min=2.0, max=4.0, keep_attrs=False)
+    
+    # Attributes should be removed
+    assert len(clipped.attrs) == 0
+    assert len(clipped['u'].attrs) == 0

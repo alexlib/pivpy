@@ -82,12 +82,15 @@ def test_average():
 def test_autocorrelation_plot():
     """tests autocorrelation plot
     """
-    # Test with default variable 'u'
+    # Test with default variable 'u' and default spatial_average=True
     graphics.autocorrelation_plot(_d)
     
     # Test with variable 'v'
     graphics.autocorrelation_plot(_d, variable='v')
     
+    # Test with spatial_average=False (flatten all dimensions)
+    graphics.autocorrelation_plot(_d, variable='u', spatial_average=False)
+    
     # Test with accessor
     _d.piv.autocorrelation_plot(variable='u')
-    _d.piv.autocorrelation_plot(variable='v')
+    _d.piv.autocorrelation_plot(variable='v', spatial_average=False)

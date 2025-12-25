@@ -898,12 +898,15 @@ class PIVAccessor(object):
         """method for graphics.showscal"""
         gshowscal(self._obj, **kwargs)
 
-    def autocorrelation_plot(self, variable: str = "u", **kwargs):
+    def autocorrelation_plot(self, variable: str = "u", spatial_average: bool = True, **kwargs):
         """Creates autocorrelation plot of a specified variable
         
         Args:
             variable (str, optional): Variable name to plot autocorrelation for 
                 (e.g., 'u', 'v', 'w', 'c', or any other data variable). Defaults to "u".
+            spatial_average (bool, optional): If True and time dimension exists, compute 
+                spatial average before temporal autocorrelation. If False, flatten all 
+                dimensions. Defaults to True for proper temporal analysis.
             **kwargs: Additional keyword arguments passed to graphics.autocorrelation_plot
             
         Returns:
@@ -911,9 +914,10 @@ class PIVAccessor(object):
             
         Example:
             >>> data.piv.autocorrelation_plot(variable='u')
-            >>> data.piv.autocorrelation_plot(variable='v')
+            >>> data.piv.autocorrelation_plot(variable='v', spatial_average=False)
         """
-        return gautocorrelation_plot(self._obj, variable=variable, **kwargs)
+        return gautocorrelation_plot(self._obj, variable=variable, 
+                                     spatial_average=spatial_average, **kwargs)
 
     # @property
     # def vel_units(self):

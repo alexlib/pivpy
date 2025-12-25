@@ -155,6 +155,99 @@ class PIVAccessor(object):
         )
         return self._obj
 
+    def clip(
+        self,
+        min=None,
+        max=None,
+        *,
+        by: str = None,
+        keep_attrs: bool = True,
+    ):
+        """Clips values in the dataset based on specified thresholds
+        
+        This method limits values in the dataset to fall within [min, max] range.
+        It can clip the entire dataset or filter based on specific variables (U, V, 
+        or scalar properties like magnitude).
+        
+        Args:
+            min (float or None, optional): Minimum value threshold. Values below this 
+                will be masked/removed. If None, no lower clipping is performed. 
+                Defaults to None.
+            max (float or None, optional): Maximum value threshold. Values above this 
+                will be masked/removed. If None, no upper clipping is performed. 
+                Defaults to None.
+            by (str or None, optional): Variable name to use for clipping criterion.
+                Can be 'u', 'v', 'magnitude', or any scalar property name in the dataset.
+                If None, clips all variables independently. If 'magnitude', computes
+                velocity magnitude and uses it for filtering. Defaults to None.
+            keep_attrs (bool, optional): If True, attributes will be preserved. 
+                Defaults to True.
+                
+        Returns:
+            xr.Dataset: Dataset with clipped values. If 'by' is specified, returns
+                dataset with locations that don't meet the criteria set to NaN.
+                
+        Raises:
+            ValueError: If neither min nor max is provided
+            ValueError: If 'by' variable doesn't exist in the dataset and isn't 'magnitude'
+            
+        Examples:
+            >>> # Clip all variables to [-10, 10] range
+            >>> data = data.piv.clip(min=-10, max=10)
+            
+            >>> # Filter based on U velocity component
+            >>> data = data.piv.clip(min=-5, max=5, by='u')
+            
+            >>> # Filter based on velocity magnitude
+            >>> data = data.piv.clip(max=10, by='magnitude')
+            
+            >>> # Filter based on vorticity (after computing it)
+            >>> data = data.piv.vorticity(name='w')
+            >>> data = data.piv.clip(min=-100, max=100, by='w')
+        
+        See Also:
+            xarray.Dataset.clip : Similar method in xarray
+            numpy.clip : Equivalent function in NumPy
+        """
+        if min is None and max is None:
+            raise ValueError("At least one of 'min' or 'max' must be provided")
+        
+        if by is None:
+            # Clip all variables independently using xarray's built-in clip
+            return self._obj.clip(min=min, max=max, keep_attrs=keep_attrs)
+        
+        # Clip based on a specific variable
+        if by == "magnitude":
+            # Compute magnitude if not already in dataset
+            criterion = np.sqrt(self._obj["u"] ** 2 + self._obj["v"] ** 2)
+        else:
+            # Use existing variable
+            if by not in self._obj:
+                raise ValueError(
+                    f"Variable '{by}' not found in dataset. "
+                    f"Available variables: {list(self._obj.data_vars)}"
+                )
+            criterion = self._obj[by]
+        
+        # Create mask based on criterion
+        mask = xr.ones_like(criterion, dtype=bool)
+        if min is not None:
+            mask = mask & (criterion >= min)
+        if max is not None:
+            mask = mask & (criterion <= max)
+        
+        # Apply mask to all data variables (set non-matching locations to NaN)
+        result = self._obj.copy()
+        for var in result.data_vars:
+            result[var] = result[var].where(mask)
+        
+        if not keep_attrs:
+            result.attrs = {}
+            for var in result.data_vars:
+                result[var].attrs = {}
+        
+        return result
+
     def filterf(self, sigma: List[float]=[1.,1.,0], **kwargs):
         """Applies Gaussian filtering to velocity fields
         

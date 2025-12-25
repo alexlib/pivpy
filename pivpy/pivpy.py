@@ -19,6 +19,7 @@ from scipy.ndimage import gaussian_filter
 from pivpy.graphics import quiver as gquiver
 from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
+from pivpy.graphics import streamplot as gstreamplot
 from pivpy.compute_funcs import Γ1_moving_window_function, Γ2_moving_window_function
 
 # """ learn from this example
@@ -790,8 +791,9 @@ class PIVAccessor(object):
         return fig, ax
 
     def streamplot(self, **kwargs):
-        """graphics.quiver(streamlines=True)"""
-        gquiver(self._obj, streamlines=True, **kwargs)
+        """graphics.streamplot() as a flow_property"""
+        fig, ax = gstreamplot(self._obj, **kwargs)
+        return fig, ax
 
     def showf(self, **kwargs):
         """method for graphics.showf"""

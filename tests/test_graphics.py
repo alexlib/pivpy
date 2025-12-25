@@ -39,6 +39,13 @@ def test_quiver():
     _d.piv.quiver()
 
 
+def test_streamplot():
+    """ tests streamplot
+    """
+    graphics.streamplot(_d)
+    _d.piv.streamplot()
+
+
 def test_xarray_plot():
     """tests xarray plot use of pcolormesh 
     """

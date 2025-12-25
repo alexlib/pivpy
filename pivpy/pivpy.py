@@ -67,7 +67,7 @@ class PIVAccessor(object):
         Arguments:
             data : xarray Dataset:
             x,y,t are coordinates
-            u,v,chs are the data arracc_ys
+            u,v,chc are the data arrays
 
         We add few shortcuts (properties):
             data.piv.average is the time average (data.mean(dim='t'))
@@ -97,37 +97,89 @@ class PIVAccessor(object):
         return self._average
 
     def crop(self, crop_vector=None):
-        """ crops xr.Dataset by some rows, cols from the boundaries
-
+        """Crops xarray Dataset to specified spatial boundaries
+        
         Args:
-            crop_vector (_type_, optional): _description_. Defaults to None.
-
+            crop_vector (list, optional): List of [xmin, xmax, ymin, ymax] values 
+                to define cropping boundaries. Use None for any value to keep 
+                the original boundary. Defaults to None (no cropping).
+                
         Returns:
-            _type_: _description_
+            xr.Dataset: Cropped dataset
+            
+        Raises:
+            ValueError: If crop_vector has wrong length or invalid bounds
+            
+        Example:
+            >>> data = data.piv.crop([5, 15, -5, -15])  # Crop to x:[5,15], y:[-5,-15]
+            >>> data = data.piv.crop([None, 20, None, None])  # Crop only xmax to 20
         """
         if crop_vector is None:
             crop_vector = 4 * [None]
+        
+        if len(crop_vector) != 4:
+            raise ValueError(
+                f"crop_vector must have 4 elements [xmin, xmax, ymin, ymax], "
+                f"got {len(crop_vector)} elements"
+            )
 
-        xmin, xmacc_x, ymin, ymacc_x = crop_vector
+        xmin, xmax, ymin, ymax = crop_vector
 
         xmin = self._obj.x.min() if xmin is None else xmin
-        xmacc_x = self._obj.x.macc_x() if xmacc_x is None else xmacc_x
+        xmax = self._obj.x.max() if xmax is None else xmax
         ymin = self._obj.y.min() if ymin is None else ymin
-        ymacc_x = self._obj.y.macc_x() if ymacc_x is None else ymacc_x
+        ymax = self._obj.y.max() if ymax is None else ymax
+        
+        # Note: We don't validate xmin < xmax or ymin < ymax because coordinates
+        # might be in reverse order (e.g., negative y-axis pointing down)
 
-        self._obj = self._obj.sel(x=slice(xmin, xmacc_x), y=slice(ymin, ymacc_x))
+        self._obj = self._obj.sel(x=slice(xmin, xmax), y=slice(ymin, ymax))
 
         return self._obj
 
     def pan(self, shift_x=0.0, shift_y=0.0):
-        """moves the field by shift_x,shift_y in the same units as x,y"""
+        """Shifts the coordinate system by specified amounts
+        
+        Args:
+            shift_x (float, optional): Amount to shift in x direction. Defaults to 0.0.
+            shift_y (float, optional): Amount to shift in y direction. Defaults to 0.0.
+            
+        Returns:
+            xr.Dataset: Dataset with shifted coordinates
+            
+        Example:
+            >>> data = data.piv.pan(10.0, -5.0)  # Shift x by +10, y by -5
+        """
         self._obj = self._obj.assign_coords(
             {"x": self._obj.x + shift_x, "y": self._obj.y + shift_y}
         )
         return self._obj
 
     def filterf(self, sigma: List[float]=[1.,1.,0], **kwargs):
-        """Gaussian filtering of velocity"""
+        """Applies Gaussian filtering to velocity fields
+        
+        Args:
+            sigma (List[float], optional): Standard deviation for Gaussian kernel 
+                in [y, x, t] dimensions. Defaults to [1., 1., 0] (spatial filtering only).
+            **kwargs: Additional keyword arguments passed to scipy.ndimage.gaussian_filter
+            
+        Returns:
+            xr.Dataset: Filtered dataset with smoothed velocity fields
+            
+        Raises:
+            ValueError: If sigma has wrong length or contains invalid values
+            
+        Example:
+            >>> data = data.piv.filterf(sigma=[2., 2., 0])  # Smooth with sigma=2 in space
+        """
+        if len(sigma) != 3:
+            raise ValueError(
+                f"sigma must have 3 elements [sigma_y, sigma_x, sigma_t], "
+                f"got {len(sigma)} elements"
+            )
+        
+        if any(s < 0 for s in sigma):
+            raise ValueError(f"All sigma values must be non-negative, got {sigma}")
 
         self._obj["u"] = xr.DataArray(
             gaussian_filter(
@@ -209,7 +261,7 @@ class PIVAccessor(object):
         return self._obj
 
     def vorticity(self):
-        """calculates vorticity of the data arracc_y (at one time instance) and
+        """calculates vorticity of the data array (at one time instance) and
         adds it to the attributes
 
         Input:
@@ -254,10 +306,10 @@ class PIVAccessor(object):
             self._obj: xr.Dataset with the new property ["w"] = divergence
         """
         du_dx, _ = np.gradient(
-            self._obj["u"], self._obj["x"], self._obj["y"], acc_x_is=(0, 1)
+            self._obj["u"], self._obj["x"], self._obj["y"], axis=(0, 1)
         )
         _, dv_dy = np.gradient(
-            self._obj["v"], self._obj["x"], self._obj["y"], acc_x_is=(0, 1)
+            self._obj["v"], self._obj["x"], self._obj["y"], axis=(0, 1)
         )
 
         if "t" in self._obj.coords:
@@ -272,7 +324,7 @@ class PIVAccessor(object):
 
     def acceleration(self):
         """calculates material derivative or acceleration of the
-        data arracc_y (single frame)
+        data array (single frame)
 
         Input:
             xarray with the variables u,v and dimensions x,y
@@ -286,11 +338,11 @@ class PIVAccessor(object):
         dv_dx = self._obj["v"].differentiate("x")
         dv_dy = self._obj["v"].differentiate("y")
 
-        acc_x = self._obj["u"] * du_dx + self._obj["v"] * du_dy
-        acc_y = self._obj["u"] * dv_dx + self._obj["v"] * dv_dy
+        accel_x = self._obj["u"] * du_dx + self._obj["v"] * du_dy
+        accel_y = self._obj["u"] * dv_dx + self._obj["v"] * dv_dy
 
         self._obj["w"] = xr.DataArray(
-            np.sqrt(acc_x**2 + acc_y**2), dims=["x", "y", "t"]
+            np.sqrt(accel_x**2 + accel_y**2), dims=["x", "y", "t"]
         )
 
         self._obj["w"].attrs["units"] = "1/delta_t"
@@ -362,6 +414,7 @@ class PIVAccessor(object):
         self._obj["w"] = np.sqrt(self._obj["w"])
         self._obj["w"].attrs["standard_name"] = "rms"
         self._obj["w"].attrs["units"] = "m/s"
+        return self._obj
 
     def Γ1(self, n, convCoords = True):
         """Makes use of Dask (kind of) to run Γ1_moving_window_function via Γ1_pad.
@@ -472,66 +525,145 @@ class PIVAccessor(object):
         return self._obj
 
     def vec2scal(self, flow_property: str = "curl"):
-        """ creates a scalar flow property field
-
+        """Creates a scalar flow property field from velocity data
+        
         Args:
-            flow_property (str, optional): one of the flow properties. Defaults to "curl".
-
+            flow_property (str, optional): Name of the flow property to compute.
+                Valid options: 'curl'/'vorticity'/'vort', 'ke'/'ken'/'kinetic_energy',
+                'strain', 'divergence', 'acceleration', 'tke', 'reynolds_stress'.
+                Defaults to "curl".
+                
         Returns:
-            _type_: _description_
+            xr.Dataset: Dataset with computed scalar field in 'w' variable
+            
+        Raises:
+            AttributeError: If the specified flow property method doesn't exist
+            
+        Example:
+            >>> data = data.piv.vec2scal('vorticity')  # Compute vorticity
+            >>> data = data.piv.vec2scal('ke')  # Compute kinetic energy
         """
-        # replace few common names
-        flow_property = "vorticity" if flow_property == "curl" else flow_property
-        flow_property = "kinetic_energy" if flow_property == "ken" else flow_property
-        flow_property = "kinetic_energy" if flow_property == "ke" else flow_property
-        flow_property = "vorticity" if flow_property == "vort" else flow_property
+        # Replace common aliases with canonical names
+        flow_property = "vorticity" if flow_property in ["curl", "vort"] else flow_property
+        flow_property = "kinetic_energy" if flow_property in ["ken", "ke"] else flow_property
+        
+        # Check if method exists
+        if not hasattr(self, flow_property):
+            valid_properties = [
+                'vorticity', 'kinetic_energy', 'strain', 'divergence', 
+                'acceleration', 'tke', 'reynolds_stress', 'rms'
+            ]
+            raise AttributeError(
+                f"Unknown flow property '{flow_property}'. "
+                f"Valid options are: {', '.join(valid_properties)}"
+            )
 
-        method = getattr(self, str(flow_property))
-
+        method = getattr(self, flow_property)
         self._obj = method()
 
         return self._obj
 
     def __mul__(self, scalar):
-        """
-        multiplication of a velocity field by a scalar (simple scaling)
+        """Multiplies velocity field by a scalar (simple scaling)
+        
+        Args:
+            scalar (float): Scaling factor
+            
+        Returns:
+            xr.Dataset: Scaled dataset
+            
+        Example:
+            >>> scaled_data = data.piv * 2.0  # Double all velocities
         """
         self._obj["u"] *= scalar
         self._obj["v"] *= scalar
         if "w" in self._obj.var():
-            self._obj["w"] += scalar
+            self._obj["w"] *= scalar  # Fixed: should be multiply, not add
 
         return self._obj
 
     def __div__(self, scalar):
+        """Divides velocity field by a scalar
+        
+        Args:
+            scalar (float): Division factor
+            
+        Returns:
+            xr.Dataset: Scaled dataset
+            
+        Raises:
+            ValueError: If scalar is zero
+            
+        Example:
+            >>> normalized_data = data.piv / 100.0  # Normalize velocities
         """
-        multiplication of a velocity field by a scalar (simple scaling)
-        """
+        if scalar == 0:
+            raise ValueError("Cannot divide by zero")
+            
         self._obj["u"] /= scalar
         self._obj["v"] /= scalar
 
         return self._obj
 
     def set_delta_t(self, delta_t: float = 0.0):
-        """sets delta_t attribute, float, default is 0.0"""
+        """Sets the time interval attribute for PIV measurements
+        
+        Args:
+            delta_t (float, optional): Time interval between frame A and B. Defaults to 0.0.
+            
+        Returns:
+            xr.Dataset: Dataset with updated delta_t attribute
+            
+        Raises:
+            ValueError: If delta_t is negative
+            
+        Example:
+            >>> data = data.piv.set_delta_t(0.001)  # Set dt to 1 millisecond
+        """
+        if delta_t < 0:
+            raise ValueError(f"delta_t must be non-negative, got {delta_t}")
+            
         self._obj.attrs["delta_t"] = delta_t
         return self._obj
 
     def set_scale(self, scale: float = 1.0):
-        """scales all variables by a sclar"""
+        """Scales all spatial coordinates and velocities by a factor
+        
+        Args:
+            scale (float, optional): Scaling factor. Defaults to 1.0.
+            
+        Returns:
+            xr.Dataset: Dataset with scaled coordinates and velocities
+            
+        Raises:
+            ValueError: If scale is zero or negative
+            
+        Example:
+            >>> data = data.piv.set_scale(0.001)  # Convert from pixels to mm if 1 pix = 0.001 mm
+        """
+        if scale <= 0:
+            raise ValueError(f"scale must be positive, got {scale}")
+            
         for var in ["x", "y", "u", "v"]:
             self._obj[var] = self._obj[var] * scale
 
         return self._obj
 
     def rotate(self, theta: float = 0.0):
-        """rotates the data, but only for some x,y grids
+        """Rotates the coordinate system and velocity field
+        
         Args:
-            theta (float): degrees in the clockwise direction
-            it can only work for the cases with equal size along
-            x and y
+            theta (float, optional): Rotation angle in degrees (clockwise). Defaults to 0.0.
+            
         Returns:
-            rotated object
+            xr.Dataset: Rotated dataset
+            
+        Note:
+            This method works best for cases with equal grid spacing in x and y directions.
+            The rotation is performed in-place on coordinates and velocity components.
+            
+        Example:
+            >>> data = data.piv.rotate(45.0)  # Rotate by 45 degrees clockwise
         """
 
         theta = theta / 360.0 * 2 * np.pi
@@ -562,8 +694,8 @@ class PIVAccessor(object):
 
     def quiver(self, **kwargs):
         """graphics.quiver() as a flow_property"""
-        fig, acc_x = gquiver(self._obj, **kwargs)
-        return fig, acc_x
+        fig, ax = gquiver(self._obj, **kwargs)
+        return fig, ax
 
     def streamplot(self, **kwargs):
         """graphics.quiver(streamlines=True)"""

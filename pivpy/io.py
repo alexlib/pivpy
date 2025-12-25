@@ -608,40 +608,67 @@ def load_openpiv_txt(
     """Loads OpenPIV text output file
     
     Args:
-        filename (str): Path to OpenPIV text file with 5 columns (x, y, u, v, mask)
+        filename (str): Path to OpenPIV text file with 5 or 6 columns (x, y, u, v, flags, mask).
+            The function automatically detects the number of columns.
+            - 5 columns: x, y, u, v, flags (older format)
+            - 6 columns: x, y, u, v, flags, mask (newer format with mask)
         rows (int, optional): Number of rows in vector field. Defaults to None (auto-detect).
         cols (int, optional): Number of columns in vector field. Defaults to None (auto-detect).
         delta_t (float, optional): Time interval between frames. Defaults to None.
         frame (int, optional): Frame number. Defaults to 0.
         
     Returns:
-        xr.Dataset: PIVPy dataset with velocity fields
+        xr.Dataset: PIVPy dataset with velocity fields. Includes 'mask' DataArray if available
+            in the input file.
         
     Raises:
         ValueError: If coordinates are not properly sorted
         
     Example:
         >>> dataset = load_openpiv_txt('openpiv_output.txt')
+        >>> # For files with mask column:
+        >>> dataset = load_openpiv_txt('openpiv_with_mask.txt')
+        >>> print('mask' in dataset)  # True if mask column was present
     """
+    # Detect number of columns by reading first non-comment line
+    with open(filename, 'r') as f:
+        for line in f:
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#'):
+                # Count number of columns in first data line
+                n_cols = len(stripped.split())
+                break
+    
     if rows is None:  # means no headers
-        d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
+        # Load data based on detected number of columns
+        if n_cols >= 6:
+            d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4, 5))
+        else:
+            d = np.genfromtxt(filename, usecols=(0, 1, 2, 3, 4))
+            
         x, ix = unsorted_unique(d[:, 0])
         y, iy = unsorted_unique(d[:, 1])
 
         if ix[1] == 1:  # x grows first
-            d = d.reshape(len(y), len(x), 5).transpose(1, 0, 2)
+            d = d.reshape(len(y), len(x), n_cols if n_cols >= 6 else 5).transpose(1, 0, 2)
         elif iy[1] == 1:  # y grows first
-            d = d.reshape(len(y), len(x), 5)
+            d = d.reshape(len(y), len(x), n_cols if n_cols >= 6 else 5)
         else:
             raise ValueError(
                 'Data is not properly sorted. Either x or y coordinates must be '
                 'monotonically ordered. Check your OpenPIV file format.'
             )
     else:
-        d = np.genfromtxt(
-            filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
-        )
-        d = d.reshape((rows, cols, 5))
+        if n_cols >= 6:
+            d = np.genfromtxt(
+                filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4, 5)
+            )
+            d = d.reshape((rows, cols, 6))
+        else:
+            d = np.genfromtxt(
+                filename, skip_header=1, delimiter=",", usecols=(0, 1, 2, 3, 4)
+            )
+            d = d.reshape((rows, cols, 5))
 
         x = d[:, :, 0][0, :]
         y = d[:, :, 1][:, 0]
@@ -650,25 +677,34 @@ def load_openpiv_txt(
     v = d[:, :, 3]
     chc = d[:, :, 4]
 
-    dataset = xr.Dataset(
-        {
-            "u": xr.DataArray(
-                u[:, :, np.newaxis],
-                dims=("x", "y", "t"),
-                coords={"x": x, "y": y, "t": [frame]},
-            ),
-            "v": xr.DataArray(
-                v[:, :, np.newaxis],
-                dims=("x", "y", "t"),
-                coords={"x": x, "y": y, "t": [frame]},
-            ),
-            "chc": xr.DataArray(
-                chc[:, :, np.newaxis],
-                dims=("x", "y", "t"),
-                coords={"x": x, "y": y, "t": [frame]},
-            ),
-        }
-    )
+    dataset_dict = {
+        "u": xr.DataArray(
+            u[:, :, np.newaxis],
+            dims=("x", "y", "t"),
+            coords={"x": x, "y": y, "t": [frame]},
+        ),
+        "v": xr.DataArray(
+            v[:, :, np.newaxis],
+            dims=("x", "y", "t"),
+            coords={"x": x, "y": y, "t": [frame]},
+        ),
+        "chc": xr.DataArray(
+            chc[:, :, np.newaxis],
+            dims=("x", "y", "t"),
+            coords={"x": x, "y": y, "t": [frame]},
+        ),
+    }
+    
+    # Add mask if available (6th column)
+    if n_cols >= 6:
+        mask = d[:, :, 5]
+        dataset_dict["mask"] = xr.DataArray(
+            mask[:, :, np.newaxis],
+            dims=("x", "y", "t"),
+            coords={"x": x, "y": y, "t": [frame]},
+        )
+
+    dataset = xr.Dataset(dataset_dict)
 
     dataset = set_default_attrs(dataset)
     if delta_t is not None:

@@ -68,9 +68,29 @@ def test_load_vec():
 
 
 def test_loadopenpivtxt():
-    """tests loading openpivtxt file
+    """tests loading openpivtxt file (5 columns)
     """
-    io.load_openpiv_txt(openpiv_txt_file)
+    data = io.load_openpiv_txt(openpiv_txt_file)
+    assert "u" in data
+    assert "v" in data
+    assert "chc" in data
+    # Old format should not have mask
+    assert "mask" not in data
+
+
+def test_loadopenpivtxt_with_mask():
+    """tests loading openpivtxt file with mask column (6 columns)
+    """
+    # Test with a file that has 6 columns
+    openpiv_txt_file_with_mask = path / "openpiv_txt" / "Gamma1_Gamma2_tutorial_notebook" / "OpenPIVtxtFilePair0.txt"
+    data = io.load_openpiv_txt(openpiv_txt_file_with_mask)
+    assert "u" in data
+    assert "v" in data
+    assert "chc" in data
+    # New format should have mask
+    assert "mask" in data
+    # Check that mask has the right shape
+    assert data["mask"].shape == data["u"].shape
 
 def test_load_directory():
     """tests loading directory of Insight VEC, vc7, and Davis8 files

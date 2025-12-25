@@ -260,9 +260,13 @@ class PIVAccessor(object):
         self._obj["v"] -= other._obj["v"]
         return self._obj
 
-    def vorticity(self):
-        """calculates vorticity of the data array (at one time instance) and
-        adds it to the attributes
+    def vorticity(self, name: str = "w"):
+        """Calculates vorticity of the data array (at one time instance) and
+        adds it to the dataset
+        
+        Args:
+            name (str, optional): Name for the output scalar field. Defaults to "w".
+                Use different names to store multiple scalar fields in one dataset.
 
         Input:
             xarray with the variables u,v and dimensions x,y
@@ -270,40 +274,60 @@ class PIVAccessor(object):
         Output:
             xarray with the estimated vorticity as a scalar field with
             same dimensions
+            
+        Example:
+            >>> data.piv.vorticity()  # Creates data["w"] with vorticity
+            >>> data.piv.vorticity(name="vort")  # Creates data["vort"] with vorticity
 
         """
 
-        self._obj["w"] = self._obj["v"].differentiate("x") - self._obj[
+        self._obj[name] = self._obj["v"].differentiate("x") - self._obj[
             "u"
         ].differentiate("y")
 
-        self._obj["w"].attrs["units"] = "1/delta_t"
-        self._obj["w"].attrs["standard_name"] = "vorticity"
+        self._obj[name].attrs["units"] = "1/delta_t"
+        self._obj[name].attrs["standard_name"] = "vorticity"
 
         return self._obj
 
-    def strain(self):
-        """ calculates rate of strain of a two component field
+    def strain(self, name: str = "w"):
+        """Calculates rate of strain of a two component field
+        
+        Args:
+            name (str, optional): Name for the output scalar field. Defaults to "w".
+                Use different names to store multiple scalar fields in one dataset.
 
         Returns:
-            _type_: adds ["w"] = du_dx^2 + dv_dy^2 + 0.5*(du_dy+dv_dx)^2
+            xr.Dataset: Dataset with added scalar field = du_dx^2 + dv_dy^2 + 0.5*(du_dy+dv_dx)^2
+            
+        Example:
+            >>> data.piv.strain()  # Creates data["w"] with strain
+            >>> data.piv.strain(name="strain_rate")  # Creates data["strain_rate"]
         """
         du_dx = self._obj["u"].differentiate("x")
         du_dy = self._obj["u"].differentiate("y")
         dv_dx = self._obj["v"].differentiate("x")
         dv_dy = self._obj["v"].differentiate("y")
 
-        self._obj["w"] = du_dx**2 + dv_dy**2 + 0.5 * (du_dy + dv_dx) ** 2
-        self._obj["w"].attrs["units"] = "1/delta_t"
-        self._obj["w"].attrs["standard_name"] = "strain"
+        self._obj[name] = du_dx**2 + dv_dy**2 + 0.5 * (du_dy + dv_dx) ** 2
+        self._obj[name].attrs["units"] = "1/delta_t"
+        self._obj[name].attrs["standard_name"] = "strain"
 
         return self._obj
 
-    def divergence(self):
-        """ calculates divergence field
+    def divergence(self, name: str = "w"):
+        """Calculates divergence field
+        
+        Args:
+            name (str, optional): Name for the output scalar field. Defaults to "w".
+                Use different names to store multiple scalar fields in one dataset.
 
         Returns:
-            self._obj: xr.Dataset with the new property ["w"] = divergence
+            xr.Dataset: Dataset with the new property [name] = divergence
+            
+        Example:
+            >>> data.piv.divergence()  # Creates data["w"] with divergence
+            >>> data.piv.divergence(name="div")  # Creates data["div"] with divergence
         """
         du_dx, _ = np.gradient(
             self._obj["u"], self._obj["x"], self._obj["y"], axis=(0, 1)
@@ -313,24 +337,32 @@ class PIVAccessor(object):
         )
 
         if "t" in self._obj.coords:
-            self._obj["w"] = (("x", "y", "t"), dv_dy + du_dx)
+            self._obj[name] = (("x", "y", "t"), dv_dy + du_dx)
         else:
-            self._obj["w"] = (("x", "y"), dv_dy + du_dx)
+            self._obj[name] = (("x", "y"), dv_dy + du_dx)
 
-        self._obj["w"].attrs["units"] = "1/delta_t"
-        self._obj["w"].attrs["standard_name"] = "divergence"
+        self._obj[name].attrs["units"] = "1/delta_t"
+        self._obj[name].attrs["standard_name"] = "divergence"
 
         return self._obj
 
-    def acceleration(self):
-        """calculates material derivative or acceleration of the
+    def acceleration(self, name: str = "w"):
+        """Calculates material derivative or acceleration of the
         data array (single frame)
+        
+        Args:
+            name (str, optional): Name for the output scalar field. Defaults to "w".
+                Use different names to store multiple scalar fields in one dataset.
 
         Input:
             xarray with the variables u,v and dimensions x,y
 
         Output:
-            xarray with the estimated acceleration as a scalar field data['w']
+            xarray with the estimated acceleration as a scalar field data[name]
+            
+        Example:
+            >>> data.piv.acceleration()  # Creates data["w"] with acceleration
+            >>> data.piv.acceleration(name="accel")  # Creates data["accel"]
 
         """
         du_dx = self._obj["u"].differentiate("x")
@@ -341,24 +373,51 @@ class PIVAccessor(object):
         accel_x = self._obj["u"] * du_dx + self._obj["v"] * du_dy
         accel_y = self._obj["u"] * dv_dx + self._obj["v"] * dv_dy
 
-        self._obj["w"] = xr.DataArray(
+        self._obj[name] = xr.DataArray(
             np.sqrt(accel_x**2 + accel_y**2), dims=["x", "y", "t"]
         )
 
-        self._obj["w"].attrs["units"] = "1/delta_t"
-        self._obj["w"].attrs["standard_name"] = "acceleration"
+        self._obj[name].attrs["units"] = "1/delta_t"
+        self._obj[name].attrs["standard_name"] = "acceleration"
 
         return self._obj
 
-    def kinetic_energy(self):
-        """estimates turbulent kinetic energy"""
-        self._obj["w"] = self._obj["u"] ** 2 + self._obj["v"] ** 2
-        self._obj["w"].attrs["units"] = "(m/s)^2"
-        self._obj["w"].attrs["standard_name"] = "kinetic_energy"
+    def kinetic_energy(self, name: str = "w"):
+        """Estimates kinetic energy
+        
+        Args:
+            name (str, optional): Name for the output scalar field. Defaults to "w".
+                Use different names to store multiple scalar fields in one dataset.
+                
+        Returns:
+            xr.Dataset: Dataset with kinetic energy field
+            
+        Example:
+            >>> data.piv.kinetic_energy()  # Creates data["w"] with KE
+            >>> data.piv.kinetic_energy(name="ke")  # Creates data["ke"]
+        """
+        self._obj[name] = self._obj["u"] ** 2 + self._obj["v"] ** 2
+        self._obj[name].attrs["units"] = "(m/s)^2"
+        self._obj[name].attrs["standard_name"] = "kinetic_energy"
         return self._obj
 
-    def tke(self):
-        """estimates turbulent kinetic energy"""
+    def tke(self, name: str = "w"):
+        """Estimates turbulent kinetic energy
+        
+        Args:
+            name (str, optional): Name for the output scalar field. Defaults to "w".
+                Use different names to store multiple scalar fields in one dataset.
+                
+        Returns:
+            xr.Dataset: New dataset with TKE field (based on fluctuations from mean)
+            
+        Raises:
+            ValueError: If dataset has less than 2 time frames
+            
+        Example:
+            >>> data.piv.tke()  # Creates data["w"] with TKE
+            >>> data.piv.tke(name="tke")  # Creates data["tke"]
+        """
         if len(self._obj.t) < 2:
             raise ValueError(
                 "TKE is not defined for a single vector field, \
@@ -367,9 +426,9 @@ class PIVAccessor(object):
 
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
-        new_obj["w"] = new_obj["u"] ** 2 + new_obj["v"] ** 2
-        new_obj["w"].attrs["units"] = "(m/s)^2"
-        new_obj["w"].attrs["standard_name"] = "TKE"
+        new_obj[name] = new_obj["u"] ** 2 + new_obj["v"] ** 2
+        new_obj[name].attrs["units"] = "(m/s)^2"
+        new_obj[name].attrs["standard_name"] = "TKE"
 
         return new_obj
 
@@ -390,8 +449,23 @@ class PIVAccessor(object):
 
         return new_obj
 
-    def reynolds_stress(self):
-        """returns fluctuations as a new dataset"""
+    def reynolds_stress(self, name: str = "w"):
+        """Calculates Reynolds stress from velocity fluctuations
+        
+        Args:
+            name (str, optional): Name for the output scalar field. Defaults to "w".
+                Use different names to store multiple scalar fields in one dataset.
+                
+        Returns:
+            xr.Dataset: Dataset with Reynolds stress field (-<u'v'>)
+            
+        Raises:
+            ValueError: If dataset has less than 2 time frames
+            
+        Example:
+            >>> data.piv.reynolds_stress()  # Creates data["w"] with Reynolds stress
+            >>> data.piv.reynolds_stress(name="rey_stress")  # Creates data["rey_stress"]
+        """
 
         if len(self._obj.t) < 2:
             raise ValueError(
@@ -402,18 +476,30 @@ class PIVAccessor(object):
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
 
-        new_obj["w"] = -1 * new_obj["u"] * new_obj["v"]  # new scalar
-        self._obj["w"] = new_obj["w"].mean(dim="t")  # reynolds stress is -\rho < u' v'>
-        self._obj["w"].attrs["standard_name"] = "Reynolds_stress"
+        new_obj[name] = -1 * new_obj["u"] * new_obj["v"]  # new scalar
+        self._obj[name] = new_obj[name].mean(dim="t")  # reynolds stress is -\rho < u' v'>
+        self._obj[name].attrs["standard_name"] = "Reynolds_stress"
 
         return self._obj
 
-    def rms(self):
-        """Root mean square"""
-        self._obj = self.tke()
-        self._obj["w"] = np.sqrt(self._obj["w"])
-        self._obj["w"].attrs["standard_name"] = "rms"
-        self._obj["w"].attrs["units"] = "m/s"
+    def rms(self, name: str = "w"):
+        """Root mean square of velocity fluctuations
+        
+        Args:
+            name (str, optional): Name for the output scalar field. Defaults to "w".
+                Use different names to store multiple scalar fields in one dataset.
+                
+        Returns:
+            xr.Dataset: Dataset with RMS field (sqrt of TKE)
+            
+        Example:
+            >>> data.piv.rms()  # Creates data["w"] with RMS
+            >>> data.piv.rms(name="rms")  # Creates data["rms"]
+        """
+        self._obj = self.tke(name=name)
+        self._obj[name] = np.sqrt(self._obj[name])
+        self._obj[name].attrs["standard_name"] = "rms"
+        self._obj[name].attrs["units"] = "m/s"
         return self._obj
 
     def Γ1(self, n, convCoords = True):
@@ -524,24 +610,30 @@ class PIVAccessor(object):
 
         return self._obj
 
-    def vec2scal(self, flow_property: str = "curl"):
+    def vec2scal(self, flow_property: str = "curl", name: str = "w"):
         """Creates a scalar flow property field from velocity data
         
         Args:
             flow_property (str, optional): Name of the flow property to compute.
                 Valid options: 'curl'/'vorticity'/'vort', 'ke'/'ken'/'kinetic_energy',
-                'strain', 'divergence', 'acceleration', 'tke', 'reynolds_stress'.
+                'strain', 'divergence', 'acceleration', 'tke', 'reynolds_stress', 'rms'.
                 Defaults to "curl".
+            name (str, optional): Name for the output scalar field. Defaults to "w".
+                Use different names to store multiple scalar fields in one dataset.
                 
         Returns:
-            xr.Dataset: Dataset with computed scalar field in 'w' variable
+            xr.Dataset: Dataset with computed scalar field
             
         Raises:
             AttributeError: If the specified flow property method doesn't exist
             
         Example:
-            >>> data = data.piv.vec2scal('vorticity')  # Compute vorticity
-            >>> data = data.piv.vec2scal('ke')  # Compute kinetic energy
+            >>> data = data.piv.vec2scal('vorticity')  # Compute vorticity in data["w"]
+            >>> data = data.piv.vec2scal('ke', name='ke')  # Compute KE in data["ke"]
+            >>> # Store multiple scalars in one dataset:
+            >>> data = data.piv.vec2scal('vorticity', name='vort')
+            >>> data = data.piv.vec2scal('tke', name='tke')
+            >>> data = data.piv.vec2scal('reynolds_stress', name='rey_stress')
         """
         # Replace common aliases with canonical names
         flow_property = "vorticity" if flow_property in ["curl", "vort"] else flow_property
@@ -559,7 +651,7 @@ class PIVAccessor(object):
             )
 
         method = getattr(self, flow_property)
-        self._obj = method()
+        self._obj = method(name=name)
 
         return self._obj
 

@@ -134,6 +134,90 @@ def quiver(
     return fig, ax
 
 
+def streamplot(
+    data: xr.DataArray,
+    threshold: float = None,
+    aspectratio: str = "equal",
+    colorbar: bool = False,
+    colorbar_orient: str = "vertical",
+    units: List = [],
+    cmap: str = 'hot',
+    linewidth: float = 1.0,
+    density: float = 1.0,
+    **kwargs,
+):
+    """Creates streamplot of velocity field from xarray Dataset
+    
+    Args:
+        data (xr.DataArray): PIV velocity field data
+        threshold (float, optional): Maximum velocity magnitude to display. Defaults to None.
+        aspectratio (str, optional): Aspect ratio of the plot. Defaults to "equal".
+        colorbar (bool, optional): Whether to show colorbar. Defaults to False.
+        colorbar_orient (str, optional): Orientation of colorbar ('vertical' or 'horizontal'). 
+            Defaults to "vertical".
+        units (List, optional): List of units [pos_unit, pos_unit, vel_unit, vel_unit]. 
+            Defaults to [].
+        cmap (str, optional): Matplotlib colormap name (e.g., 'jet', 'hot', 'RdBu', 'Reds'). 
+            Defaults to 'hot'.
+        linewidth (float, optional): Width of streamlines. Defaults to 1.0.
+        density (float, optional): Density of streamlines. Defaults to 1.0.
+        **kwargs: Additional keyword arguments passed to xarray.plot.streamplot
+        
+    Returns:
+        tuple: (fig, ax) matplotlib figure and axes objects
+    """
+    data = dataset_to_array(data)
+
+    pos_units = data.x.attrs["units"] if len(units) == 0 else units[0]
+    vel_units = data.u.attrs["units"] if len(units) == 0 else units[2]
+
+    # clip data to the threshold
+    if threshold is not None:
+        data["u"] = xr.where(data["u"] > threshold, threshold, data["u"])
+        data["v"] = xr.where(data["v"] > threshold, threshold, data["v"])
+
+    data["s"] = np.sqrt(data["u"] ** 2 + data["v"] ** 2)
+    
+    # Sort y in increasing order if needed (streamplot requires increasing coordinates)
+    if len(data.y) > 1 and data.y[0] > data.y[-1]:
+        data = data.sortby('y')
+
+    if len(plt.get_fignums()) == 0:  # if no figure is open
+        fig, ax = plt.subplots()  # open a new figure
+    else:
+        fig = plt.gcf()
+        ax = fig.gca()
+
+    # streamplot itself
+    strm = data.plot.streamplot(
+        x="x",
+        y="y",
+        u="u",
+        v="v",
+        hue="s",
+        cmap=cmap,
+        linewidth=linewidth,
+        density=density,
+        ax=ax,
+        **kwargs,
+    )
+
+    if colorbar is False:
+        if strm.colorbar:
+            strm.colorbar.remove()
+        plt.draw()
+    else:
+        if colorbar_orient == "horizontal":
+            strm.colorbar.remove()
+            cb = fig.colorbar(strm, orientation=colorbar_orient, ax=ax)
+
+    ax.set_xlabel(f"x ({pos_units})")
+    ax.set_ylabel(f"y ({pos_units})")
+    ax.set_aspect(aspectratio)
+
+    return fig, ax
+
+
 def histogram(data, normed=False):
     """Creates histograms of velocity components
     

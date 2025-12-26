@@ -1,7 +1,89 @@
 # -*- coding: utf-8 -*-
 
 """
-Contains functions for reading flow fields in various formats
+PIV Data I/O Module with Plugin-Based Architecture
+
+This module provides functions for reading and writing PIV (Particle Image 
+Velocimetry) data in various formats. It features a modern plugin-based 
+architecture for extensibility while maintaining backward compatibility.
+
+High-Level API (Recommended)
+-----------------------------
+* `read_piv()` - Auto-detect format and read single file
+* `read_directory()` - Batch read directory of files
+* `save_piv()` - Save dataset to NetCDF, Zarr, or CSV
+* `register_reader()` - Register custom readers
+
+Legacy API (Backward Compatible)
+---------------------------------
+* `load_vec()` - Load Insight VEC files
+* `load_openpiv_txt()` - Load OpenPIV text files
+* `load_davis8_txt()` - Load Davis8 ASCII files
+* `load_vc7()` - Load LaVision VC7 binary files
+* `load_pivlab()` - Load PIVLab MAT files
+* `load_directory()` - Load directory (old API)
+
+Plugin Architecture
+-------------------
+The module uses a plugin-based architecture with:
+* `PIVReader` - Abstract base class for readers
+* `PIVReaderRegistry` - Registry for managing readers
+* `PIVMetadata` - Structured metadata storage
+
+Built-in Readers:
+* `InsightVECReader` - TSI Insight VEC files (TECPLOT format)
+* `OpenPIVReader` - OpenPIV text files (5-6 columns)
+* `Davis8Reader` - Davis8 ASCII format
+* `LaVisionVC7Reader` - LaVision VC7 binary files
+* `PIVLabReader` - PIVLab MAT files (HDF5)
+
+Examples
+--------
+Basic usage with auto-detection:
+
+    >>> import pivpy.io as io
+    >>> data = io.read_piv('velocity_field.vec')
+    >>> print(data['u'].shape)
+
+Read with explicit format:
+
+    >>> data = io.read_piv('field.txt', format='openpiv')
+
+Batch read directory:
+
+    >>> data = io.read_directory('data/', pattern='Run*', ext='.vec')
+    >>> print(f"Loaded {len(data['t'])} frames")
+
+Extract metadata without loading data:
+
+    >>> reader = io._REGISTRY.find_reader('field.vec')
+    >>> metadata = reader.read_metadata('field.vec')
+    >>> print(f"Grid size: {metadata.rows}x{metadata.cols}")
+
+Save to different formats:
+
+    >>> io.save_piv(data, 'output.nc', format='netcdf')
+    >>> io.save_piv(data, 'output.csv', format='csv', frame=0)
+
+Create custom reader:
+
+    >>> class MyReader(io.PIVReader):
+    ...     def can_read(self, filepath):
+    ...         return filepath.suffix == '.custom'
+    ...     def read_metadata(self, filepath):
+    ...         return io.PIVMetadata()
+    ...     def read(self, filepath, **kwargs):
+    ...         # Custom reading logic
+    ...         return dataset
+    >>> io.register_reader(MyReader())
+
+Utility Functions
+-----------------
+* `create_sample_field()` - Generate synthetic velocity field
+* `create_sample_Dataset()` - Generate multi-frame synthetic dataset
+* `from_arrays()` - Create dataset from NumPy arrays
+* `from_df()` - Create dataset from pandas DataFrame
+* `set_default_attrs()` - Apply standard attributes to dataset
 """
 
 import pathlib

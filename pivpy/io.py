@@ -100,11 +100,13 @@ from numpy.typing import ArrayLike
 try:
     from lvpyio import read_buffer
 except ImportError:
+    read_buffer = None
     warnings.warn("lvreader is not installed, use pip install lvpyio")
 
 try:
     import h5py
 except ImportError:
+    h5py = None
     warnings.warn("h5py is not installed, use pip install h5py to read PIVLab MAT files")
 
 
@@ -483,6 +485,11 @@ def load_vc7(
     Output:
         dataset : xarray.Dataset
     """
+    if read_buffer is None:
+        raise ImportError(
+            "lvpyio is required to read VC7 files. "
+            "Install it with: pip install lvpyio"
+        )
     buffer = read_buffer(str(filename))
     data = buffer[0]  # first component is a vector frame
     plane = 0  # don't understand the planes issue, simple vc7 is 0

@@ -31,7 +31,8 @@ lvpyio = ["lvpyio"]
 readim = ["readim"]
 netcdf = ["netcdf4"]
 vortexfitting = ["vortexfitting"]
-full = ["lvpyio", "readim", "netcdf4", "vortexfitting"]
+h5py = ["h5py"]
+full = ["lvpyio", "readim", "netcdf4", "vortexfitting", "h5py"]
 
 [project.urls]
 "Homepage" = "https://github.com/alexlib/pivpy"

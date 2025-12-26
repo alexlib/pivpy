@@ -1,8 +1,8 @@
-""" tests of pivpy.inter module """
+"""Tests of pivpy.interfacing module."""
 import pathlib
 import importlib.resources
 import numpy as np
-from pivpy import io, inter
+from pivpy import io, interfacing as inter
 
 # Ensure compatibility with different Python versions (3.9+ has 'files', 3.7 and 3.8 need 'path')
 try:

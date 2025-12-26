@@ -19,3 +19,13 @@ The ``pivpy.pivpy`` module
 ----------------------------------
 .. automodule:: pivpy.pivpy
     :members:
+
+The ``pivpy.interfacing`` module
+----------------------------------
+.. automodule:: pivpy.interfacing
+    :members:
+
+The ``pivpy.inter`` module (deprecated)
+---------------------------------------
+.. automodule:: pivpy.inter
+    :members:

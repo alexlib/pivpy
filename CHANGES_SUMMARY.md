@@ -46,7 +46,7 @@ This document summarizes notable maintenance and behavior changes made in PIVPy.
 - `streamplot()` handles descending axes by flipping coordinates/arrays before plotting.
 - Added `pivpy/graphics_utils.py` with `dataset_to_array()` used by plotting helpers.
 
-### Interop (`pivpy.inter`)
+### Interop (`pivpy.interfacing`)
 - `pivpyTOvf()` output orientation was corrected to match downstream expectations.
 
 ### Gamma1/Gamma2 (`pivpy.compute_funcs`)

@@ -585,13 +585,111 @@ class PIVLabReader(PIVReader):
         return set_default_attrs(ds)
 
 
+class NetCDFReader(PIVReader):
+    def can_read(self, filepath: Any) -> bool:
+        path = _to_path(filepath)
+        return path.exists() and path.suffix.lower() in {".nc", ".netcdf"}
+
+    def read_metadata(self, filepath: Any) -> PIVMetadata:
+        path = _to_path(filepath)
+        try:
+            ds = xr.open_dataset(path)
+        except Exception:
+            return PIVMetadata(frame=0)
+
+        delta_t = float(ds.attrs.get("delta_t", DELTA_T))
+        rows = int(ds.sizes.get("y", 0) or 0)
+        cols = int(ds.sizes.get("x", 0) or 0)
+        return PIVMetadata(
+            pos_units=POS_UNITS,
+            vel_units=VEL_UNITS,
+            time_units=TIME_UNITS,
+            delta_t=delta_t,
+            variables=["x", "y", "u", "v", "chc"],
+            rows=rows or None,
+            cols=cols or None,
+            frame=0,
+        )
+
+    def read(self, filepath: Any, frame: Optional[int] = None, **kwargs) -> xr.Dataset:
+        path = _to_path(filepath)
+        ds0 = xr.open_dataset(path)
+
+        # Optional frame selection if the file contains multiple time steps.
+        if frame is not None and "t" in ds0.dims and ds0.sizes.get("t", 1) > 1:
+            ds0 = ds0.isel(t=int(frame))
+
+        # Heuristics to find u/v and validity.
+        if "u" in ds0 and "v" in ds0:
+            u0, v0 = ds0["u"], ds0["v"]
+        elif "velocity_n" in ds0 and "velocity_z" in ds0:
+            u0, v0 = ds0["velocity_n"], ds0["velocity_z"]
+        elif "velocity_u" in ds0 and "velocity_v" in ds0:
+            u0, v0 = ds0["velocity_u"], ds0["velocity_v"]
+        else:
+            raise ValueError("Unsupported NetCDF schema")
+
+        chc0 = ds0["chc"] if "chc" in ds0 else (ds0["mask"] if "mask" in ds0 else xr.ones_like(u0))
+
+        # Provide x/y/t coordinates if they are missing.
+        xcoord = None
+        ycoord = None
+        if "x" in ds0.coords:
+            xcoord = np.asarray(ds0.coords["x"].values)
+        elif "grid_n" in ds0:
+            xcoord = np.asarray(ds0["grid_n"].values)
+        elif "x" in ds0.dims:
+            xcoord = np.arange(int(ds0.sizes["x"]))
+
+        if "y" in ds0.coords:
+            ycoord = np.asarray(ds0.coords["y"].values)
+        elif "grid_z" in ds0:
+            ycoord = np.asarray(ds0["grid_z"].values)
+        elif "y" in ds0.dims:
+            ycoord = np.arange(int(ds0.sizes["y"]))
+
+        if "t" in ds0.coords:
+            tcoord = np.asarray(ds0.coords["t"].values)
+        elif "t" in ds0.dims:
+            tcoord = np.arange(int(ds0.sizes["t"]), dtype=float)
+        else:
+            tcoord = np.asarray([0.0], dtype=float)
+
+        # Ensure we end up with ('y','x','t') ordering.
+        def _ensure_yxt(da: xr.DataArray) -> xr.DataArray:
+            dims = list(da.dims)
+            if "t" not in dims:
+                da = da.expand_dims({"t": tcoord})
+            if "x" not in da.dims or "y" not in da.dims:
+                raise ValueError("NetCDF variables must have x/y dimensions")
+            return da.transpose("y", "x", "t")
+
+        u = _ensure_yxt(u0)
+        v = _ensure_yxt(v0)
+        chc = _ensure_yxt(chc0)
+
+        ds = xr.Dataset(
+            data_vars={"u": u, "v": v, "chc": chc},
+            coords={
+                "x": ("x", xcoord if xcoord is not None else np.arange(u.sizes["x"])),
+                "y": ("y", ycoord if ycoord is not None else np.arange(u.sizes["y"])),
+                "t": ("t", tcoord),
+            },
+            attrs={
+                "delta_t": float(ds0.attrs.get("delta_t", DELTA_T)),
+                "files": [str(path)],
+            },
+        )
+        return set_default_attrs(ds)
+
+
 class PIVReaderRegistry:
     def __init__(self):
         self._readers: list[PIVReader] = []
         self._register_builtin_readers()
 
     def _register_builtin_readers(self) -> None:
-        self._readers = [InsightVECReader(), OpenPIVReader(), Davis8Reader(), LaVisionVC7Reader(), PIVLabReader()]
+        self._readers = [InsightVECReader(), OpenPIVReader(), Davis8Reader(), LaVisionVC7Reader(), PIVLabReader(), NetCDFReader()]
 
     def register(self, reader: PIVReader) -> None:
         self._readers.insert(0, reader)
@@ -638,6 +736,8 @@ def read_piv(filepath: Any, format: Optional[str] = None, **kwargs) -> xr.Datase
             reader = LaVisionVC7Reader()
         elif fmt in {"pivlab", "mat"}:
             reader = PIVLabReader()
+        elif fmt in {"netcdf", "nc"}:
+            reader = NetCDFReader()
         else:
             raise ValueError("Unsupported format")
     else:
@@ -691,8 +791,18 @@ def load_vec(filepath: Any) -> xr.Dataset:
     return read_piv(filepath)
 
 
-def load_openpiv_txt(filepath: Any) -> xr.Dataset:
-    return read_piv(filepath, format="openpiv")
+def load_openpiv_txt(filepath: Any = None, **kwargs) -> xr.Dataset:
+    # Backwards compatibility: older notebooks used `filename=`.
+    if filepath is None and "filename" in kwargs:
+        filepath = kwargs.pop("filename")
+    return read_piv(filepath, format="openpiv", **kwargs)
+
+
+def load_vc7(filepath: Any = None, **kwargs) -> xr.Dataset:
+    # Backwards compatibility for notebooks.
+    if filepath is None and "filename" in kwargs:
+        filepath = kwargs.pop("filename")
+    return read_piv(filepath, format="vc7", **kwargs)
 
 
 def load_directory(path: Any, basename: str = "*", ext: str = ".vec") -> xr.Dataset:

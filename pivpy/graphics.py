@@ -23,11 +23,12 @@ if TYPE_CHECKING:
 
 def quiver(
     data: xr.Dataset,
-    quiverKey: str = "Q",
+    quiverKey: str | float | int = "Q",
     scalingFactor: float = 1.0,
     widthFactor: float = 0.002,
     ax: plt.Axes | None = None,
     arrowColor: str = "k",
+    **kwargs,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
     Creates a quiver plot from the dataset
@@ -60,6 +61,34 @@ def quiver(
     """
     from pivpy.graphics_utils import dataset_to_array
 
+    # ------------------------------------------------------------------
+    # Backwards-compatible API shims (for older notebooks/examples)
+    # ------------------------------------------------------------------
+    # Old signature patterns commonly used:
+    # - quiver(ds, arrScale=10, nthArr=2, aspectratio=0.5, add_guide=False)
+    # - quiver(ds, 5)  # positional arrScale
+    # - quiver(ds, colorbar=True, cmap='Reds', width=0.0075, streamlines=True)
+    if isinstance(quiverKey, (int, float)):
+        # Treat the 2nd positional argument as arrScale.
+        if scalingFactor == 1.0 and "arrScale" not in kwargs:
+            scalingFactor = float(quiverKey)
+        quiverKey = "Q"
+
+    # Legacy aliases
+    if "arrScale" in kwargs and scalingFactor == 1.0:
+        scalingFactor = float(kwargs.pop("arrScale"))
+    if "width" in kwargs and widthFactor == 0.002:
+        widthFactor = float(kwargs.pop("width"))
+
+    nthArr = kwargs.pop("nthArr", None)
+    aspectratio = kwargs.pop("aspectratio", None)
+    add_guide = kwargs.pop("add_guide", True)
+    streamlines = bool(kwargs.pop("streamlines", False))
+    colorbar = bool(kwargs.pop("colorbar", False))
+    colorbar_orient = kwargs.pop("colorbar_orient", "vertical")
+    cmap = kwargs.pop("cmap", None)
+    units = kwargs.pop("units", None)
+
     if ax is None:
         fig, ax = plt.subplots()
     else:
@@ -67,31 +96,72 @@ def quiver(
 
     x, y, u, v = dataset_to_array(data)
 
+    # Subsample vectors for display
+    if nthArr is not None:
+        try:
+            step = int(nthArr)
+        except Exception:
+            step = 1
+        if step and step > 1:
+            x = x[::step, ::step]
+            y = y[::step, ::step]
+            u = u[::step, ::step]
+            v = v[::step, ::step]
+
     # Prefer xarray attrs if present; otherwise use empty strings.
     xUnits = str(getattr(data.get("x", None), "attrs", {}).get("units", ""))
     yUnits = str(getattr(data.get("y", None), "attrs", {}).get("units", ""))
+    if units and isinstance(units, (list, tuple)) and len(units) >= 2:
+        xUnits = str(units[0])
+        yUnits = str(units[1])
 
-    Q = ax.quiver(
-        x,
-        y,
-        u,
-        v,
-        scale=scalingFactor,
-        width=widthFactor,
-        color=arrowColor,
-    )
-    ax.set_aspect("equal")
-    ax.quiverkey(
-        Q,
-        0.9,
-        0.9,
-        1,
-        quiverKey,
-        labelpos="E",
-        coordinates="figure",
-    )
+    quiver_kwargs: dict = {
+        "scale": scalingFactor,
+        "width": widthFactor,
+    }
+
+    # If colorbar requested, color by vector magnitude
+    if colorbar:
+        mag = np.sqrt(u**2 + v**2)
+        Q = ax.quiver(x, y, u, v, mag, cmap=cmap, **quiver_kwargs, **kwargs)
+        plt.colorbar(Q, ax=ax, orientation=colorbar_orient)
+    else:
+        Q = ax.quiver(x, y, u, v, color=arrowColor, **quiver_kwargs, **kwargs)
+
+    # Aspect handling
+    if aspectratio is None:
+        ax.set_aspect("equal")
+    elif isinstance(aspectratio, str) and aspectratio.lower() == "auto":
+        ax.set_aspect("auto")
+    else:
+        try:
+            ax.set_aspect(float(aspectratio))
+        except Exception:
+            ax.set_aspect("equal")
+
+    if add_guide:
+        ax.quiverkey(
+            Q,
+            0.9,
+            0.9,
+            1,
+            str(quiverKey),
+            labelpos="E",
+            coordinates="figure",
+        )
     ax.set_xlabel(f"x [{xUnits}]")
     ax.set_ylabel(f"y [{yUnits}]")
+
+    if streamlines:
+        try:
+            # Use any remaining streamplot-like kwargs if provided.
+            sp_density = float(kwargs.pop("density", 1.0)) if "density" in kwargs else 1.0
+            sp_linewidth = float(kwargs.pop("linewidth", 1.0)) if "linewidth" in kwargs else 1.0
+            sp_arrowsize = float(kwargs.pop("arrowsize", 1.0)) if "arrowsize" in kwargs else 1.0
+            streamplot(data, density=sp_density, linewidth=sp_linewidth, arrowsize=sp_arrowsize, ax=ax)
+        except Exception:
+            # Keep quiver usable even if streamplot fails.
+            pass
 
     return fig, ax
 
@@ -267,8 +337,79 @@ def showf(data: xr.Dataset, **kwargs) -> tuple[plt.Figure, plt.Axes]:
     return quiver(data, **kwargs)
 
 
+def contour_plot(
+    data: xr.Dataset,
+    property: str = "mag",
+    ax: plt.Axes | None = None,
+    **kwargs,
+) -> tuple[plt.Figure, plt.Axes]:
+    """Contour/heatmap style plot for notebooks (compat shim).
+
+    Many legacy notebooks call ``graphics.contour_plot(ds, colorbar=True)``.
+    This helper defaults to plotting the vector magnitude ``mag`` computed from
+    ``u`` and ``v``.
+
+    Parameters
+    ----------
+    data:
+        Dataset containing at least ``u`` and ``v``.
+    property:
+        Variable to plot. Special value ``"mag"`` plots ``sqrt(u^2+v^2)``.
+    ax:
+        Optional matplotlib axis.
+    **kwargs:
+        Passed through to matplotlib. Recognized compat kwargs:
+        ``colorbar`` (bool), ``colorbar_orient`` ("vertical"/"horizontal"),
+        ``cmap``, ``levels``.
+    """
+
+    from pivpy.graphics_utils import dataset_to_array
+
+    colorbar = bool(kwargs.pop("colorbar", False))
+    colorbar_orient = kwargs.pop("colorbar_orient", "vertical")
+    cmap = kwargs.pop("cmap", None)
+    levels = kwargs.pop("levels", None)
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+
+    x, y, u, v = dataset_to_array(data)
+
+    if property == "mag":
+        z = np.sqrt(u**2 + v**2)
+    elif property in data:
+        da = data[property]
+        z = np.asarray(da.isel(t=0).values if "t" in da.dims else da.values)
+    else:
+        raise KeyError(f"Property {property} not found in dataset")
+
+    plot_kwargs: dict = {}
+    if cmap is not None:
+        plot_kwargs["cmap"] = cmap
+    if levels is not None:
+        plot_kwargs["levels"] = levels
+
+    # Use contourf if levels provided, otherwise pcolormesh.
+    if levels is not None:
+        m = ax.contourf(x, y, z, **plot_kwargs, **kwargs)
+    else:
+        m = ax.pcolormesh(x, y, z, shading="auto", **plot_kwargs, **kwargs)
+
+    if colorbar:
+        plt.colorbar(m, ax=ax, orientation=colorbar_orient)
+
+    ax.set_aspect("equal")
+    return fig, ax
+
+
 def histogram(data: xr.Dataset, bins: int = 50, ax: plt.Axes | None = None, **kwargs) -> tuple[plt.Figure, plt.Axes]:
     """Plot histograms of u and v for quick diagnostics."""
+
+    # Backwards compatibility: matplotlib removed `normed` in favor of `density`.
+    if "normed" in kwargs and "density" not in kwargs:
+        kwargs["density"] = kwargs.pop("normed")
 
     ds = data.isel(t=0) if "t" in data.dims else data
     u = np.asarray(ds["u"].values).ravel()

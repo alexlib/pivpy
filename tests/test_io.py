@@ -805,3 +805,87 @@ def test_read_single_row_or_column():
     assert dataset2['u'].shape == (10, 1, 1)
 
 
+def test_netcdf_reader_roundtrip():
+    """Exercise NetCDFReader via read_piv(format='netcdf'/'nc')."""
+    import tempfile
+    import os
+    import pytest
+
+    ds = io.create_sample_Dataset(n_frames=2, rows=3, cols=4)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fp = os.path.join(tmpdir, "sample.nc")
+        try:
+            ds.to_netcdf(fp)
+        except Exception as e:
+            pytest.skip(f"NetCDF write not available in this environment: {e}")
+
+        loaded = io.read_piv(fp, format="netcdf")
+        assert set(["u", "v", "chc"]).issubset(set(loaded.data_vars))
+        assert tuple(loaded["u"].dims) == ("y", "x", "t")
+        assert loaded.sizes["t"] == 2
+
+        loaded2 = io.read_piv(fp, format="nc")
+        assert loaded2.sizes["t"] == 2
+
+
+def test_openpiv_nan_and_mask_zeroing():
+    """Ensure OpenPIVReader normalizes NaNs and zeros masked-out velocities."""
+    import tempfile
+    import os
+    import pytest
+
+    # Create a minimal 2x2 OpenPIV-like file with 6 columns (mask) and NaNs.
+    # Columns: x y u v chc mask
+    # Reshape order in reader is (rows, cols) based on unique counts.
+    rows = [
+        "0 0 NaN 1.0 1 1",
+        "1 0 2.0 NaN 1 0",
+        "0 1 3.0 4.0 1 1",
+        "1 1 5.0 6.0 1 1",
+    ]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fp = os.path.join(tmpdir, "exp1_001_b.txt")
+        with open(fp, "w") as f:
+            f.write("\n".join(rows) + "\n")
+
+        # Sanity: auto-detection should find OpenPIVReader.
+        reader = io._REGISTRY.find_reader(fp)
+        assert reader is not None
+        assert isinstance(reader, io.OpenPIVReader)
+
+        ds = io.read_piv(fp)
+        assert "mask" in ds
+        # NaNs in u/v become 0.0
+        assert float(ds["u"].values[0, 0, 0]) == 0.0
+        assert float(ds["v"].values[0, 1, 0]) == 0.0
+        # mask==0 forces u/v to 0.0 at that location
+        assert float(ds["mask"].values[0, 1, 0]) == 0.0
+        assert float(ds["u"].values[0, 1, 0]) == 0.0
+        assert float(ds["v"].values[0, 1, 0]) == 0.0
+
+
+def test_from_arrays_validation_errors():
+    """Cover from_arrays input validation branches."""
+    import pytest
+
+    x, y = np.meshgrid(np.arange(3), np.arange(2))
+    u = np.ones((2, 3))
+    v = np.ones((2, 3))
+
+    with pytest.raises(ValueError, match="u and v must be 2D"):
+        io.from_arrays(x, y, u[:, :, None], v)
+
+    with pytest.raises(ValueError, match="mask must have same shape"):
+        io.from_arrays(x, y, u, v, mask=np.ones((1, 1)))
+
+
+def test_coords_from_mesh_requires_2d():
+    """Cover _coords_from_mesh error path."""
+    import pytest
+
+    with pytest.raises(ValueError, match="Expected 2D mesh"):
+        io._coords_from_mesh(np.arange(3), np.arange(3))
+
+

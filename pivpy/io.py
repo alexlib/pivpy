@@ -15,6 +15,20 @@ try:
 except ImportError:
     read_buffer = None
     warnings.warn("lvpyio is not installed, use pip install lvpyio")
+    warnings.warn("lvreader is not installed, use pip install lvpyio")
+
+try:
+    import h5py
+except ImportError:
+    warnings.warn("h5py is not installed, use pip install h5py to read PIVLab MAT files")
+
+
+# Defaults
+POS_UNITS: str = "pix"  # or mm, m, after scaling
+TIME_UNITS: str = "frame"  # "frame" if not scaled, can become 'sec' or 'msec', 'usec'
+# after scaling can be m/s, mm/s
+VEL_UNITS: str = POS_UNITS  # default is displacement in pix
+DELTA_T: np.float64 = 0.0  # default is 0. i.e. uknown, can be any float value
 
 
 def parse_header(filename):
@@ -757,3 +771,176 @@ def savevec(
 
     """
     save_vec(filename, x, y, u, v, s2n)
+def load_pivlab(
+    filename: pathlib.Path,
+    frame: int = None,
+) -> xr.Dataset:
+    """Loads PIVLab MAT file (MATLAB HDF5 format)
+    
+    PIVLab is a MATLAB toolbox for PIV analysis that saves results in HDF5-based MAT files.
+    The data structure uses a 'resultslist' array containing references to datasets:
+    - resultslist[:, 0]: x coordinates (meshgrid format)
+    - resultslist[:, 1]: y coordinates (meshgrid format)
+    - resultslist[:, 2]: u velocity component
+    - resultslist[:, 3]: v velocity component
+    - resultslist[:, 4]: typevector (mask: 1=valid, 0=invalid)
+    - resultslist[:, 5-10]: additional derived quantities (optional)
+    
+    Args:
+        filename (pathlib.Path): Path to PIVLab .mat file
+        frame (int, optional): Specific frame to load. If None, loads all frames. Defaults to None.
+        
+    Returns:
+        xr.Dataset: PIVPy dataset with velocity fields and coordinates.
+            If multiple frames exist and frame=None, returns dataset with time dimension.
+            If single frame or specific frame requested, returns single time slice.
+            
+    Raises:
+        ImportError: If h5py is not installed
+        IOError: If file cannot be read or doesn't contain expected PIVLab structure
+        ValueError: If resultslist structure is invalid
+        
+    Example:
+        >>> # Load all frames from a PIVLab file
+        >>> dataset = load_pivlab('pivlab_results.mat')
+        >>> print(dataset.dims)  # {'x': 169, 'y': 340, 't': 11}
+        >>> 
+        >>> # Load a specific frame
+        >>> dataset = load_pivlab('pivlab_results.mat', frame=5)
+        >>> print(dataset.dims)  # {'x': 169, 'y': 340, 't': 1}
+        
+    Note:
+        - Requires h5py package: pip install h5py
+        - PIVLab files are MATLAB v7.3 format (HDF5-based)
+        - Coordinates are extracted from the first frame and assumed constant across frames
+        - Invalid vectors (typevector==0) are preserved in the mask but not modified in u/v
+    """
+    # Ensure filename is a pathlib.Path object
+    filename = pathlib.Path(filename) if not isinstance(filename, pathlib.Path) else filename
+    
+    try:
+        import h5py
+    except ImportError:
+        raise ImportError(
+            "h5py is required to read PIVLab MAT files. "
+            "Install it with: pip install h5py"
+        )
+    
+    try:
+        with h5py.File(filename, 'r') as f:
+            # Check if resultslist exists
+            if 'resultslist' not in f:
+                raise IOError(
+                    f"File {filename} does not contain 'resultslist'. "
+                    "This may not be a valid PIVLab MAT file."
+                )
+            
+            resultslist = f['resultslist']
+            n_frames = resultslist.shape[0]
+            
+            # Validate structure
+            if resultslist.shape[1] < 5:
+                raise ValueError(
+                    f"resultslist has {resultslist.shape[1]} columns, expected at least 5 "
+                    "(x, y, u, v, typevector)"
+                )
+            
+            # Determine which frames to load
+            if frame is not None:
+                if frame < 0 or frame >= n_frames:
+                    raise ValueError(
+                        f"Frame {frame} out of range. File contains {n_frames} frames (0-{n_frames-1})"
+                    )
+                frames_to_load = [frame]
+            else:
+                frames_to_load = list(range(n_frames))
+            
+            # Load data for each frame
+            datasets = []
+            for frame_idx in frames_to_load:
+                # Extract references and load data
+                x_ref = resultslist[frame_idx, 0]
+                y_ref = resultslist[frame_idx, 1]
+                u_ref = resultslist[frame_idx, 2]
+                v_ref = resultslist[frame_idx, 3]
+                mask_ref = resultslist[frame_idx, 4]
+                
+                # Dereference and load arrays
+                x = np.array(f[x_ref])
+                y = np.array(f[y_ref])
+                u = np.array(f[u_ref])
+                v = np.array(f[v_ref])
+                typevector = np.array(f[mask_ref])
+                
+                # Extract coordinate vectors from meshgrid
+                # PIVLab uses a non-standard meshgrid convention where:
+                # - The 'x' array has x-values varying along rows (axis 0)
+                # - The 'y' array has y-values varying along columns (axis 1)
+                # For PIVPy's (y, x, t) convention, we swap them:
+                x_coords = y[0, :]  # y array's first row gives x coordinates
+                y_coords = x[:, 0]  # x array's first column gives y coordinates
+                
+                # Create dataset for this frame
+                u_xr = xr.DataArray(
+                    u[:, :, np.newaxis],
+                    dims=("y", "x", "t"),
+                    coords={"x": x_coords, "y": y_coords, "t": [frame_idx]},
+                )
+                v_xr = xr.DataArray(
+                    v[:, :, np.newaxis],
+                    dims=("y", "x", "t"),
+                    coords={"x": x_coords, "y": y_coords, "t": [frame_idx]},
+                )
+                # Use typevector as chc (choice/mask): 1=valid, 0=invalid
+                chc_xr = xr.DataArray(
+                    typevector[:, :, np.newaxis],
+                    dims=("y", "x", "t"),
+                    coords={"x": x_coords, "y": y_coords, "t": [frame_idx]},
+                )
+                
+                frame_dataset = xr.Dataset({"u": u_xr, "v": v_xr, "chc": chc_xr})
+                datasets.append(frame_dataset)
+            
+            # Read calibration if available
+            calxy = 1.0
+            caluv = 1.0
+            if 'calxy' in f:
+                calxy = float(np.array(f['calxy']).flat[0])
+            if 'caluv' in f:
+                caluv = float(np.array(f['caluv']).flat[0])
+    
+    except (IOError, ValueError):
+        # Re-raise our own exceptions
+        raise
+    except (KeyError, h5py.h5r.ReferenceError) as e:
+        raise IOError(
+            f"Error reading PIVLab file {filename}: Invalid file structure - {str(e)}"
+        )
+    except Exception as e:
+        raise IOError(f"Error reading PIVLab file {filename}: {str(e)}")
+    
+    # Combine frames if multiple
+    if len(datasets) > 1:
+        combined = xr.concat(datasets, dim="t")
+    else:
+        combined = datasets[0]
+    
+    # Set default attributes
+    combined = set_default_attrs(combined)
+    combined.attrs["files"].append(str(filename))
+    
+    # Apply calibration factors if not default
+    if calxy != 1.0:
+        combined.coords["x"] = combined.coords["x"] * calxy
+        combined.coords["y"] = combined.coords["y"] * calxy
+    if caluv != 1.0:
+        combined["u"] = combined["u"] * caluv
+        combined["v"] = combined["v"] * caluv
+    
+    return combined
+
+
+# def sorted_unique(array):
+#     """Returns not sorted sorted_unique"""
+#     uniq, index = np.unique(array, return_index=True)
+#     return uniq[index.argsort()]

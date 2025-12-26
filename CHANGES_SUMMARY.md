@@ -249,3 +249,143 @@ if 'mask' in data:
 - Implementation: GitHub Copilot
 - Review and guidance: @alexlib
 - Original issue: @nepomnyi
+
+---
+
+## Issue 3: Add Autocorrelation Plot Function
+
+### Problem
+Users needed a way to analyze temporal correlations in PIV data for various properties (u, v, vorticity, concentration, etc.). The pandas `autocorrelation_plot` function provides this capability but wasn't integrated into pivpy's plotting interface.
+
+### Solution
+Added `autocorrelation_plot()` function to the graphics module and as a method in the PIVAccessor class, allowing users to easily plot autocorrelation for any variable in their PIV dataset. The function supports both proper temporal autocorrelation analysis (via spatial averaging) and the original flattened behavior from the reference gist.
+
+### Changes Made
+
+#### New Function in `pivpy/graphics.py`
+- `autocorrelation_plot(data, variable="u", spatial_average=True, **kwargs)`: Creates autocorrelation plots for any data variable
+  - Accepts xarray Dataset with PIV data
+  - When `spatial_average=True` (default): Computes spatial average over x, y dimensions first, then analyzes temporal autocorrelation (proper temporal analysis)
+  - When `spatial_average=False`: Flattens all dimensions (original gist behavior, may mix spatial and temporal variations)
+  - Uses pandas.plotting.autocorrelation_plot for computation and visualization
+  - Automatically extracts and displays units from variable attributes
+  - Handles datasets with and without time dimension appropriately
+
+#### New Method in PIVAccessor (`pivpy/pivpy.py`)
+- `data.piv.autocorrelation_plot(variable="u", spatial_average=True, **kwargs)`: Accessor method for convenient usage
+
+#### New Test
+- `test_autocorrelation_plot()`: Tests both direct function call and accessor method, with both spatial_average modes
+
+#### Example Script
+- `examples/autocorrelation_example.py`: Comprehensive examples showing various use cases including both modes
+
+### Usage Examples
+
+**Basic usage with proper temporal analysis (default):**
+```python
+from pivpy import io, graphics, pivpy
+import matplotlib.pyplot as plt
+
+# Load PIV data with multiple time frames
+data = io.create_sample_Dataset(n_frames=20, rows=10, cols=10)
+
+# Plot temporal autocorrelation (spatial average first)
+graphics.autocorrelation_plot(data, variable='u', spatial_average=True)
+plt.show()
+
+# Using accessor method
+data.piv.autocorrelation_plot(variable='v')  # spatial_average=True by default
+plt.show()
+```
+
+**Flattened mode (original gist behavior):**
+```python
+# Plot autocorrelation with all dimensions flattened
+graphics.autocorrelation_plot(data, variable='u', spatial_average=False)
+plt.show()
+
+# Using accessor
+data.piv.autocorrelation_plot(variable='v', spatial_average=False)
+plt.show()
+```
+
+**Autocorrelation of scalar fields:**
+```python
+# Compute vorticity and plot its autocorrelation
+data = data.piv.vec2scal('curl')
+graphics.autocorrelation_plot(data, variable='w')
+plt.show()
+
+# Or use accessor directly
+data.piv.autocorrelation_plot(variable='w')
+plt.show()
+```
+
+**Multi-panel comparison:**
+```python
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+# Compare autocorrelation of different properties
+plt.sca(axes[0, 0])
+graphics.autocorrelation_plot(data, variable='u', spatial_average=True)
+
+plt.sca(axes[0, 1])
+graphics.autocorrelation_plot(data, variable='v', spatial_average=True)
+
+plt.sca(axes[1, 0])
+graphics.autocorrelation_plot(data, variable='u', spatial_average=False)
+
+# Vorticity
+data_vort = data.piv.vec2scal('curl')
+plt.sca(axes[1, 1])
+graphics.autocorrelation_plot(data_vort, variable='w')
+
+plt.tight_layout()
+plt.show()
+```
+
+### Benefits
+1. **Temporal Analysis**: Understand temporal correlations in PIV measurements
+2. **Flexible Variable Selection**: Works with any variable in the dataset (u, v, w, c, chc, etc.)
+3. **Proper Temporal Autocorrelation**: Default spatial_average=True provides correct temporal analysis
+4. **Backward Compatible**: spatial_average=False provides original gist behavior
+5. **Consistent API**: Follows pivpy's design pattern with both module function and accessor method
+6. **Automatic Unit Handling**: Extracts and displays units from xarray attributes
+7. **Pandas Integration**: Leverages robust pandas autocorrelation implementation
+
+### Technical Details
+- When `spatial_average=True` and time dimension 't' exists:
+  - Computes mean over spatial dimensions (x, y)
+  - Creates proper temporal autocorrelation from resulting time series
+  - Adds "(spatial avg)" to plot title for clarity
+- When `spatial_average=False` or no time dimension:
+  - Flattens all dimensions to create 1D series
+  - Computes autocorrelation on flattened data (may mix spatial/temporal)
+- Passes through kwargs to pandas.plotting.autocorrelation_plot for customization
+- Raises informative ValueError if specified variable doesn't exist
+- Automatically adds title with variable name and units
+
+### Code Review Feedback Addressed
+Initial implementation flattened all dimensions unconditionally, which mixed spatial and temporal variations. Updated to:
+1. Add `spatial_average` parameter (default True)
+2. Compute spatial average first when requested for proper temporal analysis
+3. Maintain original flattened behavior as option
+4. Document both modes clearly in docstrings and examples
+
+### Testing
+- All graphics tests pass (9/9) ✓
+- New test specifically covers autocorrelation functionality ✓
+- Tested with velocity components (u, v) ✓
+- Tested with scalar fields (w, chc) ✓
+- Tested both spatial_average modes ✓
+- Tested with single-frame and multi-frame datasets ✓
+- Error handling verified ✓
+- Backward compatibility maintained ✓
+
+---
+
+## Related References
+- GitHub Issue: "add autocorrelation function"
+- Reference gist: https://gist.github.com/alexlib/46317e87e522c8f4e124ce6d63a3d038
+- Pandas autocorrelation documentation: https://pandas.pydata.org/docs/reference/api/pandas.plotting.autocorrelation_plot.html

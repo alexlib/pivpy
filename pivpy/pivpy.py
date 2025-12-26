@@ -20,6 +20,7 @@ from pivpy.graphics import quiver as gquiver
 from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
 from pivpy.graphics import streamplot as gstreamplot
+from pivpy.graphics import autocorrelation_plot as gautocorrelation_plot
 from pivpy.compute_funcs import Γ1_moving_window_function, Γ2_moving_window_function
 
 # """ learn from this example
@@ -896,6 +897,27 @@ class PIVAccessor(object):
     def showscal(self, **kwargs):
         """method for graphics.showscal"""
         gshowscal(self._obj, **kwargs)
+
+    def autocorrelation_plot(self, variable: str = "u", spatial_average: bool = True, **kwargs):
+        """Creates autocorrelation plot of a specified variable
+        
+        Args:
+            variable (str, optional): Variable name to plot autocorrelation for 
+                (e.g., 'u', 'v', 'w', 'c', or any other data variable). Defaults to "u".
+            spatial_average (bool, optional): If True and time dimension exists, compute 
+                spatial average before temporal autocorrelation. If False, flatten all 
+                dimensions. Defaults to True for proper temporal analysis.
+            **kwargs: Additional keyword arguments passed to graphics.autocorrelation_plot
+            
+        Returns:
+            matplotlib.axes.Axes: The axes object containing the autocorrelation plot
+            
+        Example:
+            >>> data.piv.autocorrelation_plot(variable='u')
+            >>> data.piv.autocorrelation_plot(variable='v', spatial_average=False)
+        """
+        return gautocorrelation_plot(self._obj, variable=variable, 
+                                     spatial_average=spatial_average, **kwargs)
 
     # @property
     # def vel_units(self):

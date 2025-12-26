@@ -9,6 +9,7 @@ import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 import xarray as xr
+import pandas as pd
 from pivpy.io import POS_UNITS, VEL_UNITS
 from typing import List
 import warnings
@@ -461,3 +462,88 @@ def dataset_to_array(data: xr.Dataset, t_index: int = 0):
     
     
     return data
+
+
+def autocorrelation_plot(
+    data: xr.Dataset,
+    variable: str = "u",
+    spatial_average: bool = True,
+    **kwargs,
+):
+    """Creates autocorrelation plot of a specified variable from xarray Dataset
+    
+    This function plots the autocorrelation of a time series extracted from the dataset.
+    The autocorrelation shows how correlated a signal is with itself at different time lags.
+    
+    Args:
+        data (xr.Dataset): PIV dataset with velocity or scalar fields
+        variable (str, optional): Variable name to plot autocorrelation for 
+            (e.g., 'u', 'v', 'w', 'c', or any other data variable). Defaults to "u".
+        spatial_average (bool, optional): If True and time dimension exists, compute 
+            spatial average before temporal autocorrelation. If False, flatten all 
+            dimensions. Defaults to True for proper temporal analysis.
+        **kwargs: Additional keyword arguments passed to pandas.plotting.autocorrelation_plot
+        
+    Returns:
+        matplotlib.axes.Axes: The axes object containing the autocorrelation plot
+        
+    Raises:
+        ValueError: If the specified variable is not found in the dataset
+        
+    Example:
+        >>> data = io.load_vec(filename)
+        >>> # Temporal autocorrelation (spatial average over time)
+        >>> autocorrelation_plot(data, variable='u', spatial_average=True)
+        >>> # Autocorrelation of flattened data (all dimensions)
+        >>> autocorrelation_plot(data, variable='u', spatial_average=False)
+        >>> # For scalar fields like vorticity
+        >>> data = data.piv.vec2scal('curl')
+        >>> autocorrelation_plot(data, variable='w')
+        
+    Note:
+        When spatial_average=True and time dimension 't' exists, the function 
+        computes the spatial average over x and y dimensions first, then analyzes 
+        temporal autocorrelation. This provides proper temporal correlation analysis.
+        When spatial_average=False, all dimensions are flattened, which may mix 
+        spatial and temporal variations.
+    """
+    if variable not in data.data_vars:
+        available_vars = list(data.data_vars)
+        raise ValueError(
+            f"Variable '{variable}' not found in dataset. "
+            f"Available variables: {available_vars}"
+        )
+    
+    # Extract the variable
+    var_data = data[variable]
+    
+    # Determine how to extract the time series
+    if spatial_average and 't' in var_data.dims:
+        # Compute spatial average to get proper temporal series
+        spatial_dims = [dim for dim in var_data.dims if dim != 't']
+        if spatial_dims:
+            var_data = var_data.mean(dim=spatial_dims)
+        series_data = var_data.values
+    else:
+        # Flatten all dimensions (original behavior from gist)
+        series_data = var_data.values.flatten()
+    
+    # Create pandas Series
+    series = pd.Series(series_data)
+    
+    # Create the autocorrelation plot
+    ax = pd.plotting.autocorrelation_plot(series, **kwargs)
+    
+    # Get units if available
+    units = data[variable].attrs.get("units", "")
+    
+    # Update the plot title and labels
+    title_suffix = " (spatial avg)" if (spatial_average and 't' in data[variable].dims) else ""
+    ax.set_title(f"Autocorrelation of {variable}{title_suffix}")
+    ax.set_xlabel("Lag")
+    ax.set_ylabel("Autocorrelation")
+    
+    if units:
+        ax.set_title(f"Autocorrelation of {variable}{title_suffix} ({units})")
+    
+    return ax

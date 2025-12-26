@@ -154,3 +154,40 @@ def test_to_nc():
     data = io.load_directory(path / "Insight" )
     data.to_netcdf("tmp.nc")
 
+
+def test_load_pivlab():
+    """Test loading PIVLab MAT file"""
+    pivlab_file = path / "pivlab" / "test_pivlab.mat"
+    
+    # Test loading all frames
+    data = io.load_pivlab(pivlab_file)
+    assert "u" in data
+    assert "v" in data
+    assert "chc" in data
+    assert data["u"].shape[2] == 2  # 2 frames in test file
+    assert data["t"].shape[0] == 2
+    assert np.allclose(data["t"], [0, 1])
+    
+    # Check grid dimensions (10x8 in test file)
+    assert data["u"].shape[0] == 10  # y dimension
+    assert data["u"].shape[1] == 8   # x dimension
+    
+    # Check that mask has expected values (mostly 1, with one 0)
+    assert np.sum(data["chc"].values == 1) > np.sum(data["chc"].values == 0)
+    
+    # Test loading a specific frame
+    data_frame0 = io.load_pivlab(pivlab_file, frame=0)
+    assert data_frame0["t"].shape[0] == 1
+    assert data_frame0["t"].values[0] == 0
+    
+    data_frame1 = io.load_pivlab(pivlab_file, frame=1)
+    assert data_frame1["t"].shape[0] == 1
+    assert data_frame1["t"].values[0] == 1
+    
+    # Check that velocities are reasonable (not all zeros or NaNs)
+    assert not np.all(np.isnan(data["u"].values))
+    assert not np.all(data["u"].values == 0)
+    assert not np.all(np.isnan(data["v"].values))
+    assert not np.all(data["v"].values == 0)
+
+

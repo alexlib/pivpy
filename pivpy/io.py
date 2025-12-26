@@ -888,9 +888,12 @@ def load_pivlab(
                 typevector = np.array(f[mask_ref])
                 
                 # Extract coordinate vectors from meshgrid
-                # PIVLab stores as meshgrid, we need 1D coordinate vectors
-                x_coords = x[0, :]
-                y_coords = y[:, 0]
+                # PIVLab uses a non-standard meshgrid convention where:
+                # - The 'x' array has x-values varying along rows (axis 0)
+                # - The 'y' array has y-values varying along columns (axis 1)
+                # For PIVPy's (y, x, t) convention, we swap them:
+                x_coords = y[0, :]  # y array's first row gives x coordinates
+                y_coords = x[:, 0]  # x array's first column gives y coordinates
                 
                 # Create dataset for this frame
                 u_xr = xr.DataArray(

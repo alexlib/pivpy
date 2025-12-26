@@ -6,3 +6,4 @@ matplotlib
 pytest
 typing-extensions
 vortexfitting
+h5py

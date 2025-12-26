@@ -20,7 +20,8 @@ dependencies = [
         "xarray",
         "matplotlib",
         "pytest",
-        "vortexfitting"
+        "vortexfitting",
+        "h5py"
 ]
 
 keywords=["example documentation tutorial"]

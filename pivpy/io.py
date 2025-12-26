@@ -3,10 +3,53 @@ This module contains functions to load data from various PIV software packages.
 """
 import numpy as np
 import xarray as xr
-from pathlib import Path
-import h5py
-from typing import Union, Tuple
-import re
+import pandas as pd
+from numpy.typing import ArrayLike
+
+try:
+    from lvpyio import read_buffer
+except ImportError:
+    read_buffer = None
+    warnings.warn("lvreader is not installed, use pip install lvpyio")
+
+try:
+    import h5py
+except ImportError:
+    h5py = None
+    warnings.warn("h5py is not installed, use pip install h5py to read PIVLab MAT files")
+
+
+# Defaults
+POS_UNITS: str = "pix"  # or mm, m, after scaling
+TIME_UNITS: str = "frame"  # "frame" if not scaled, can become 'sec' or 'msec', 'usec'
+# after scaling can be m/s, mm/s
+VEL_UNITS: str = POS_UNITS  # default is displacement in pix
+DELTA_T: np.float64 = 0.0  # default is 0. i.e. uknown, can be any float value
+
+
+def unsorted_unique(arr: ArrayLike) -> ArrayLike:
+    """creates a sorted unique numpy array"""
+    arr1, c = np.unique(arr, return_index=True)
+    out = arr1[c.argsort()]
+    return out, c
+
+
+def set_default_attrs(dataset: xr.Dataset) -> xr.Dataset:
+    """Defines default attributes:
+
+    # xr.DataSet.x.attrs["units"] = POS_UNITS
+    POS_UNITS: str = "pix" # or mm, m, after scaling
+
+
+    # None if not known, can become 'sec' or 'msec', 'usec'
+    # the time units are for the sequence of PIV realizations
+    # useful for animations of the DataSet and averaging
+    # xr.DataSet.t.attrs["units"] = TIME_UNITS
+    TIME_UNITS: str = None
+
+    # after scaling can be m/s, mm/s, default is POS_UNITS
+    # xr.DataSet.u.attrs["units"] = VEL_UNITS
+    VEL_UNITS: str =  POS_UNITS
 
 
 def load_txt(filename: str) -> xr.Dataset:
@@ -167,7 +210,49 @@ def load_mat(filename: str) -> xr.Dataset:
 
 def load_hdf5(filename: str) -> xr.Dataset:
     """
-    Load PIV data from an HDF5 file.
+    if read_buffer is None:
+        raise ImportError(
+            "lvpyio is required to read VC7 files. "
+            "Install it with: pip install lvpyio"
+        )
+    buffer = read_buffer(str(filename))
+    data = buffer[0]  # first component is a vector frame
+    plane = 0  # don't understand the planes issue, simple vc7 is 0
+
+    u = data.components["U0"][plane]
+    v = data.components["V0"][plane]
+
+    mask = np.logical_not(data.masks[plane] & data.enabled[plane])
+    u[mask] = 0.0
+    v[mask] = 0.0
+
+    # scale
+    u = data.scales.i.offset + u * data.scales.i.slope
+    v = data.scales.i.offset + v * data.scales.i.slope
+
+    x = np.arange(u.shape[1])
+    y = np.arange(u.shape[0])
+
+    x = data.scales.x.offset + (x + 0.5) * data.scales.x.slope * data.grid.x
+    y = data.scales.y.offset + (y + 0.5) * data.scales.y.slope * data.grid.y
+
+    x, y = np.meshgrid(x, y)
+    dataset = from_arrays(x, y, u, v, mask, frame=frame)
+
+    dataset["t"].assign_coords({"t": dataset.t + frame})
+
+    dataset.attrs["files"].append(str(filename))
+    dataset.attrs["delta_t"] = data.attributes["FrameDt"]
+
+    return dataset
+
+
+def load_directory(
+    path: pathlib.Path,
+    basename: str = "*",
+    ext: str = ".vec",
+) -> xr.Dataset:
+    """Loads all velocity field files from a directory into a single xarray Dataset
     
     Parameters
     ----------

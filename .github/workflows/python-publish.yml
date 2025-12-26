@@ -34,6 +34,8 @@ jobs:
       id: get_version
       run: |
         VERSION=${GITHUB_REF#refs/tags/}
+        # Remove 'v' prefix if present (e.g., v1.0.0 -> 1.0.0)
+        VERSION=${VERSION#v}
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         echo "Extracted version: $VERSION"
     - name: Update version in pyproject.toml
@@ -41,19 +43,28 @@ jobs:
         python -c "
         import tomllib
         import tomli_w
+        import sys
         
-        # Read pyproject.toml
-        with open('pyproject.toml', 'rb') as f:
-            data = tomllib.load(f)
-        
-        # Update version
-        version = '${{ steps.get_version.outputs.VERSION }}'
-        data['project']['version'] = version
-        print(f'Updated version to: {version}')
-        
-        # Write back
-        with open('pyproject.toml', 'wb') as f:
-            tomli_w.dump(data, f)
+        try:
+            # Read pyproject.toml
+            with open('pyproject.toml', 'rb') as f:
+                data = tomllib.load(f)
+            
+            # Update version
+            version = '${{ steps.get_version.outputs.VERSION }}'
+            if 'project' not in data:
+                print('Error: [project] section not found in pyproject.toml', file=sys.stderr)
+                sys.exit(1)
+            
+            data['project']['version'] = version
+            print(f'Updated version to: {version}')
+            
+            # Write back
+            with open('pyproject.toml', 'wb') as f:
+                tomli_w.dump(data, f)
+        except Exception as e:
+            print(f'Error updating version: {e}', file=sys.stderr)
+            sys.exit(1)
         "
     - name: Build package
       run: python -m build

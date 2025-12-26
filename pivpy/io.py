@@ -872,7 +872,7 @@ def load_pivlab(
             
             # Load data for each frame
             datasets = []
-            for i, frame_idx in enumerate(frames_to_load):
+            for frame_idx in frames_to_load:
                 # Extract references and load data
                 x_ref = resultslist[frame_idx, 0]
                 y_ref = resultslist[frame_idx, 1]
@@ -924,6 +924,13 @@ def load_pivlab(
             if 'caluv' in f:
                 caluv = float(np.array(f['caluv']).flat[0])
     
+    except (IOError, ValueError):
+        # Re-raise our own exceptions
+        raise
+    except (KeyError, h5py.h5r.ReferenceError) as e:
+        raise IOError(
+            f"Error reading PIVLab file {filename}: Invalid file structure - {str(e)}"
+        )
     except Exception as e:
         raise IOError(f"Error reading PIVLab file {filename}: {str(e)}")
     

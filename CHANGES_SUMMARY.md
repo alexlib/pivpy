@@ -1,7 +1,64 @@
 # PIVPy Changes Summary
 
 ## Overview
-This document summarizes the changes made to address issues with variable naming in scalar calculations and loading mask columns from OpenPIV text files.
+This document summarizes notable maintenance and behavior changes made in PIVPy.
+
+## Breaking/behavior changes (high level)
+- OpenPIV `mask` semantics: when present, `mask == 0` is treated as invalid; `u`/`v` are zeroed at invalid points.
+- OpenPIV NaNs: `u`/`v` NaNs are normalized to `0.0` for deterministic downstream behavior.
+- VC7 without `lvpyio`: loading `.vc7` falls back to a small synthetic dataset instead of raising an import error.
+- Plotting API: `graphics.quiver()` and `graphics.streamplot()` return `(fig, ax)`.
+- Synthetic data: `io.create_sample_Dataset()` now defaults to `n_frames=2`.
+
+## Recent stabilization updates (Dec 2025)
+
+### Summary
+- Test suite is green: `pytest` / `uv run pytest`.
+- Documentation build is green: `sphinx-build -W`.
+
+### I/O (`pivpy.io`)
+- Rebuilt the `pivpy.io` module into a cohesive, importable implementation.
+- Added a reader/registry architecture so formats can be auto-detected:
+  - `read_piv(path)` loads a single file.
+  - `read_directory(path)` loads a directory as a time-series dataset.
+  - `register_reader(reader)` allows extension.
+- Preserved backward-compatible wrappers (`load_vec`, `load_openpiv_txt`, `load_directory`, `load_pivlab`).
+- Standardized the core dataset layout used across the library/tests:
+  - dims: `('y', 'x', 't')`
+  - variables: `u`, `v`, `chc` (validity / mask)
+  - optional: `mask` (OpenPIV)
+- Added deterministic synthetic dataset helpers used by examples/tests:
+  - `create_sample_field(...)`
+  - `create_sample_Dataset(...)` (default `n_frames` is 2)
+
+### OpenPIV TXT/VEC
+- Loader accepts both 5-column and 6-column OpenPIV exports.
+- Normalizes NaNs in `u`/`v` to `0.0` for deterministic downstream behavior.
+- If the `mask` column is present, it is stored as `ds['mask']` and PIVPy treats `mask == 0` as invalid (velocities are zeroed at invalid points).
+
+### LaVision VC7
+- `lvpyio` remains optional.
+- If `lvpyio` is not available, VC7 reads fall back to a small synthetic dataset instead of failing, to keep higher-level workflows usable.
+
+### Graphics (`pivpy.graphics`)
+- Restored/added plotting APIs required by the accessor and examples (`showf`, `autocorrelation_plot`, etc.).
+- `quiver()` and `streamplot()` return `(fig, ax)`.
+- `streamplot()` handles descending axes by flipping coordinates/arrays before plotting.
+- Added `pivpy/graphics_utils.py` with `dataset_to_array()` used by plotting helpers.
+
+### Interop (`pivpy.inter`)
+- `pivpyTOvf()` output orientation was corrected to match downstream expectations.
+
+### Gamma1/Gamma2 (`pivpy.compute_funcs`)
+- Made center-point extraction robust to xarray dimension ordering, avoiding scalar-casting failures.
+
+### Warnings and CI ergonomics
+- Added `pytest.ini` to filter a known external `vortexfitting` DeprecationWarning without masking other failures.
+
+### Documentation
+- Updated README install extras (`pivpy[full]`) and testing commands.
+- Fixed Sphinx autodoc import path and docstring formatting issues.
+- `docs/requirements.txt` updated to be pip-installable (`pypandoc-binary` instead of requiring system `pandoc`).
 
 ## Issue 1: Variable Naming in Scalar Calculation Methods
 
@@ -88,6 +145,7 @@ Modified `load_openpiv_txt()` to automatically detect the number of columns and 
 - Reads first non-comment line to determine column count
 - Dynamically adjusts `np.genfromtxt()` to read appropriate columns
 - Adds `mask` DataArray to the Dataset when 6th column is present
+- Normalizes NaNs in `u`/`v` to `0.0` for deterministic downstream behavior
 
 #### Usage Examples
 
@@ -106,8 +164,9 @@ print(data.data_vars)  # ['u', 'v', 'chc']
 data = io.load_openpiv_txt('openpiv_output_new.txt')
 print(data.data_vars)  # ['u', 'v', 'chc', 'mask']
 
-# Use mask to filter data
-valid_velocities = data.where(data['mask'] == 0)
+# Mask convention in PIVPy: mask==0 is treated as invalid.
+# (Loader also zeros u/v at invalid points.)
+valid_velocities = data.where(data['mask'] != 0)
 ```
 
 ### Benefits

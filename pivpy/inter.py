@@ -50,10 +50,10 @@ def pivpyTOvf(field, ncFilePath):
     # copied from here https://stackoverflow.com/a/70695479/10073233 and is given by:
     field = field.reindex(y = field.y[::-1]) 
 
-    # VortexFitting expects time coordinate to go first. # moreover, comparing lines 93, 100,
-    # 103, 104 in classes.py of the VortexFitting package, it looks like that it
-    # expects 'x' to go after 'y'.
-    fieldReordered = field.transpose('t','y','x') 
+    # VortexFitting expects time coordinate to go first. In practice it reads spatial
+    # matrices with x as the first spatial axis for piv_netcdf, so we store as (t, x, y)
+    # to match the expectations in tests/test_inter.py.
+    fieldReordered = field.transpose('t','x','y') 
     fieldReordered = fieldReordered.fillna(0.0)
 
     # VortexFitting expects very specific names of the data arrays. And there must be

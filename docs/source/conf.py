@@ -13,8 +13,9 @@
 import os
 import sys
 
-# sys.path.insert(0, os.path.abspath('.'))
-# sys.path.insert(0, os.path.abspath('..'))
+# Make the project importable for autodoc without requiring installation.
+# conf.py lives in docs/source, so the repo root is two levels up.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 sys.path.append(os.path.abspath("sphinxext"))
 
@@ -25,7 +26,12 @@ copyright = "2019, Turbulence Structure Laboratory"
 author = "Turbulence Structure Laboratory"
 
 # The full version, including alpha/beta/rc tags
-release = "0.0.16"
+try:
+    from importlib.metadata import version as _pkg_version
+
+    release = _pkg_version("pivpy")
+except Exception:
+    release = "0.0.20"
 
 
 # -- General configuration ---------------------------------------------------

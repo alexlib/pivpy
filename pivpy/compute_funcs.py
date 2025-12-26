@@ -54,8 +54,29 @@ def Γ1_moving_window_function(
     # And now here goes my one-liner. Note, that I didn't put PMx, PMy, u and v calculations
     # into my line. That's because I figured out emperically that would slow down the calculations.
     # n always points to the central interrogation window (just think of it). It gives me point P.
-    PMx = np.subtract(fWin['xCoordinates'].to_numpy(), float(fWin['xCoordinates'][n,n]))
-    PMy = np.subtract(fWin['yCoordinates'].to_numpy(), float(fWin['yCoordinates'][n,n]))    
+    # Robustly extract the central-point coordinates.
+    # Newer xarray versions may reorder dimensions; avoid assuming positional [n, n]
+    # returns a scalar.
+    xcoords = fWin['xCoordinates']
+    ycoords = fWin['yCoordinates']
+
+    def _center_scalar(arr: xr.DataArray) -> float:
+        if 'rollWx' in arr.dims and 'rollWy' in arr.dims:
+            sel = arr.isel(rollWx=n, rollWy=n)
+        elif len(arr.dims) >= 2:
+            sel = arr.isel({arr.dims[0]: n, arr.dims[1]: n})
+        else:
+            sel = arr
+        # Reduce any remaining dims (e.g. rollWt) to a scalar.
+        for d in list(sel.dims):
+            sel = sel.isel({d: 0})
+        return float(np.asarray(sel.values).reshape(-1)[0])
+
+    cx = _center_scalar(xcoords)
+    cy = _center_scalar(ycoords)
+
+    PMx = np.subtract(xcoords.to_numpy(), cx)
+    PMy = np.subtract(ycoords.to_numpy(), cy)    
     u = fWin['u'].to_numpy()
     v = fWin['v'].to_numpy()  
     # Since for the case when point M coincides with point P we have a 0/0 situation, we'll
@@ -124,8 +145,25 @@ def Γ2_moving_window_function(
     # And now here goes my one-liner. Note, that I didn't put PMx, PMy, u and v calculations
     # into my line. That's because I figured out emperically that would slow down the calculations.
     # n always points to the central interrogation window (just think of it). It gives me point P.
-    PMx = np.subtract(fWin['xCoordinates'].to_numpy(), float(fWin['xCoordinates'][n,n]))
-    PMy = np.subtract(fWin['yCoordinates'].to_numpy(), float(fWin['yCoordinates'][n,n]))    
+    xcoords = fWin['xCoordinates']
+    ycoords = fWin['yCoordinates']
+
+    def _center_scalar(arr: xr.DataArray) -> float:
+        if 'rollWx' in arr.dims and 'rollWy' in arr.dims:
+            sel = arr.isel(rollWx=n, rollWy=n)
+        elif len(arr.dims) >= 2:
+            sel = arr.isel({arr.dims[0]: n, arr.dims[1]: n})
+        else:
+            sel = arr
+        for d in list(sel.dims):
+            sel = sel.isel({d: 0})
+        return float(np.asarray(sel.values).reshape(-1)[0])
+
+    cx = _center_scalar(xcoords)
+    cy = _center_scalar(ycoords)
+
+    PMx = np.subtract(xcoords.to_numpy(), cx)
+    PMy = np.subtract(ycoords.to_numpy(), cy)    
     u = fWin['u'].to_numpy()
     v = fWin['v'].to_numpy()  
     uDif = u - np.nanmean(u)

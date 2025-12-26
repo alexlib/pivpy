@@ -160,7 +160,7 @@ def load_directory(path, basename=""):
     See more: loadvec
     """
     files = [f for f in os.listdir(path) if f.endswith(".vc7")]
-    variables, units, rows, cols, dt, frame = parse_header(files[0])
+    variables, units, rows, cols, dt, frame, _ = parse_header(files[0])
 
     data = []
     for i, f in enumerate(files):

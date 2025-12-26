@@ -18,19 +18,53 @@ Merging the three packages:
 3. https://github.com/ronshnapp/vecpy
 
 
-### How do I get set up? ###
+## How do I get set up?
 
-Use `pip`:  
+Recommended: use `uv` (fast, reproducible)  
 
-    pip install pivpy[all]
+Create a virtualenv and install:
 
-to include also `lvpyio` if you work with Lavision files
+    uv venv
+    uv pip install pivpy
+
+Install with optional dependencies (including `lvpyio` for LaVision VC7):
+
+    uv pip install 'pivpy[full]'
+
+Alternative: use `pip`:
 
     pip install pivpy
 
+or with optional dependencies:
+
+    pip install 'pivpy[full]'
+
 if you use OpenPIV, PIVlab, etc. 
 
-#### For developers, local use: 
+Quick start (auto-detect file format):
+
+    from pivpy import io
+    ds = io.read_piv('your_file.vec')
+
+Legacy loaders (still supported):
+
+    ds = io.load_vec('your_file.vec')
+    ds = io.load_openpiv_txt('your_file.txt')
+
+### For developers, local use:
+
+Using `uv` (recommended):
+
+    git clone https://github.com/alexlib/pivpy .
+    cd pivpy
+    uv venv
+    uv pip install -e .
+
+Editable install with optional dependencies:
+
+    uv pip install -e '.[full]'
+
+Alternative (conda):
 
     git clone https://github.com/alexlib/pivpy .
     cd pivpy
@@ -40,7 +74,7 @@ if you use OpenPIV, PIVlab, etc.
     pip install -e .
 
    
-### What packages are required and which are optional
+## What packages are required and which are optional
 
 1. `lvpyio` by Lavision Inc. if you use vc7 files
 2. `netcdf4` if you want to store NetCDF4 files by xarray
@@ -49,7 +83,7 @@ if you use OpenPIV, PIVlab, etc.
 5. `numpy`, `scipy`, `matplotlib`, `xarray` are must and installed with the `pivpy`
 
  
-### Contributors
+## Contributors
 
 1. @alexlib
 2. @ronshnapp - original steps
@@ -57,35 +91,38 @@ if you use OpenPIV, PIVlab, etc.
 4. @nepomnyi - connection to VortexFitting and new algorithms 
 
     
-### How to get started? 
+## How to get started?
 
 Look into the [getting started Jupyter notebook](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.ipynb)
 
 and additional notebooks:
 [Notebooks](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/)
 
-### How to test? ### 
+## How to test?
 
 From a command line just use:
 
-    pip install pytest
     pytest
+
+With `uv`:
+
+    uv run pytest -q
     
-### Documentation on Github:
+## Documentation on Github
 
 [PIVPy on ReadTheDocs](http://pivpy.readthedocs.io)
 
-### How to help? ###
+## How to help?
 
 Read the ToDo file and pick one item to program. Use Fork-Develop-Pull Request model to 
 contribute
 
-### How to write tutorials and add those to the documentation ###
+## How to write tutorials and add those to the documentation
 
 Using great tutorial http://sphinx-ipynb.readthedocs.org/en/latest/howto.html we now can 
 prepare IPython notebooks (see in /docs/source) and convert those to .rst files, then 
 
-    python setup.py sphinx-build
-    sphinx-build -b html docs/source/ docs/build/html
+    uv pip install -r docs/requirements.txt
+    uv run sphinx-build -b html docs/source/ docs/build/html
     
 generates ```docs/build/html``` directory with the documentation

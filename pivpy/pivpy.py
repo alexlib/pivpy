@@ -9,7 +9,7 @@ try:
     from typing_extensions import Literal
 except ImportError:
     from typing import Literal
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import xarray as xr
@@ -291,6 +291,816 @@ class PIVAccessor(object):
         )
 
         return self._obj
+
+    def addnoisef(
+        self,
+        eps: float = 0.1,
+        opt: Literal["add", "mul"] = "add",
+        nc: float = 0.0,
+        seed: Optional[int] = None,
+    ):
+        """Adds normally-distributed white noise to velocity fields.
+
+        This method is inspired by PIVMat's `addnoisef`.
+
+        Args:
+            eps: Noise level. For additive mode, noise std is `eps * std(u,v)`.
+                 For multiplicative mode, velocity is multiplied by `(1 + eps * noise)`.
+            opt: 'add' for additive noise or 'mul' for multiplicative noise.
+            nc: Optional Gaussian smoothing length scale for the noise, in the same
+                units as the dataset coordinates ("mesh units"). If 0, no smoothing.
+            seed: Optional RNG seed for reproducibility.
+
+        Returns:
+            xr.Dataset: Dataset with noisy u/v.
+        """
+
+        if eps is None or float(eps) == 0.0:
+            return self._obj
+
+        opt_l = str(opt).lower()
+        if not (opt_l.startswith("add") or opt_l.startswith("mul")):
+            raise ValueError("opt must be 'add' or 'mul'")
+
+        if "u" not in self._obj or "v" not in self._obj:
+            raise ValueError("Dataset must contain 'u' and 'v' variables")
+
+        u0 = np.asarray(self._obj["u"].values)
+        v0 = np.asarray(self._obj["v"].values)
+        if u0.ndim != 3 or v0.ndim != 3:
+            raise ValueError("Expected 'u' and 'v' to have dims ('y','x','t')")
+
+        # Use a single reference scale for both components.
+        ref_std = float(np.nanstd(np.stack([u0, v0], axis=0)))
+        if not np.isfinite(ref_std) or ref_std == 0.0:
+            ref_std = 1.0
+
+        rng = np.random.default_rng(seed)
+
+        # Convert smoothing length (in coordinate units) to gaussian sigma (in grid points).
+        sigma_yx = None
+        if nc is not None and float(nc) != 0.0:
+            try:
+                x = np.asarray(self._obj.coords["x"].values, dtype=float)
+                y = np.asarray(self._obj.coords["y"].values, dtype=float)
+                dx = float(np.nanmedian(np.diff(x))) if x.size >= 2 else 1.0
+                dy = float(np.nanmedian(np.diff(y))) if y.size >= 2 else 1.0
+                dx = abs(dx) if dx != 0 else 1.0
+                dy = abs(dy) if dy != 0 else 1.0
+                sigma_yx = (abs(float(nc)) / dy, abs(float(nc)) / dx)
+            except Exception:
+                sigma_yx = (abs(float(nc)), abs(float(nc)))
+
+        u = u0.copy()
+        v = v0.copy()
+
+        for ti in range(u.shape[2]):
+            nu = rng.standard_normal(size=u.shape[:2])
+            nv = rng.standard_normal(size=v.shape[:2])
+
+            if sigma_yx is not None:
+                nu = gaussian_filter(nu, sigma=sigma_yx, mode="nearest")
+                nv = gaussian_filter(nv, sigma=sigma_yx, mode="nearest")
+                # Keep noise level roughly independent of smoothing.
+                s_nu = float(np.nanstd(nu))
+                s_nv = float(np.nanstd(nv))
+                if s_nu > 0:
+                    nu = nu / s_nu
+                if s_nv > 0:
+                    nv = nv / s_nv
+
+            if opt_l.startswith("add"):
+                u[:, :, ti] = u[:, :, ti] + nu * float(eps) * ref_std
+                v[:, :, ti] = v[:, :, ti] + nv * float(eps) * ref_std
+            else:
+                u[:, :, ti] = u[:, :, ti] * (1.0 + nu * float(eps))
+                v[:, :, ti] = v[:, :, ti] * (1.0 + nv * float(eps))
+
+        self._obj["u"].values[...] = u
+        self._obj["v"].values[...] = v
+        return self._obj
+
+    def averf(
+        self,
+        opt: str = "",
+        *,
+        return_std_rms: bool = False,
+    ):
+        """Average (and optionally std/rms) of vector/scalar fields over time.
+
+        This method is inspired by PIVMat's `averf`.
+
+        By default, zero elements are treated as invalid and are excluded from
+        the computations. To include zeros, pass opt containing '0'.
+
+        Args:
+            opt: Option string. If it contains '0', zeros are included.
+            return_std_rms: If True, also returns (std, rms) as scalar fields.
+
+        Returns:
+            If return_std_rms is False: averaged dataset (single-frame, t=0).
+            If True: (avg_dataset, std_dataset, rms_dataset).
+        """
+
+        include_zeros = "0" in str(opt)
+
+        ds = self._obj
+        if "t" not in ds.dims:
+            raise ValueError("averf requires a time dimension 't'")
+
+        def _mean_excluding_zeros(arr: np.ndarray) -> np.ndarray:
+            # arr is (y, x, t)
+            valid = np.isfinite(arr)
+            if not include_zeros:
+                valid = valid & (arr != 0)
+            out = np.zeros(arr.shape[:2], dtype=float)
+            if include_zeros:
+                out = np.nanmean(arr, axis=2)
+                out = np.nan_to_num(out, nan=0.0)
+                return out
+            denom = valid.sum(axis=2)
+            num = np.where(valid, arr, 0.0).sum(axis=2)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                out = num / denom
+            out = np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
+            return out
+
+        # Vector field mode if u/v exist, else scalar mode if w exists.
+        if "u" in ds and "v" in ds:
+            u0 = np.asarray(ds["u"].values, dtype=float)
+            v0 = np.asarray(ds["v"].values, dtype=float)
+            if u0.ndim != 3 or v0.ndim != 3:
+                raise ValueError("Expected 'u' and 'v' to have dims ('y','x','t')")
+
+            u_mean = _mean_excluding_zeros(u0)
+            v_mean = _mean_excluding_zeros(v0)
+
+            avg = ds.isel(t=[0]).copy(deep=True)
+            avg = avg.drop_vars([v for v in avg.data_vars if v not in {"u", "v", "chc", "mask"}], errors="ignore")
+            avg["u"] = xr.DataArray(u_mean[:, :, None], dims=("y", "x", "t"), attrs=ds["u"].attrs)
+            avg["v"] = xr.DataArray(v_mean[:, :, None], dims=("y", "x", "t"), attrs=ds["v"].attrs)
+            avg = avg.assign_coords(t=np.asarray([0.0], dtype=float))
+            avg.attrs = dict(ds.attrs)
+
+            if not return_std_rms:
+                return avg
+
+            # STD and RMS as scalar fields (combined magnitude) like PIVMat.
+            finite = np.isfinite(u0) & np.isfinite(v0)
+            if include_zeros:
+                valid = finite
+            else:
+                valid = finite & (u0 != 0) & (v0 != 0)
+
+            denom = valid.sum(axis=2).astype(float)
+            denom_safe = np.where(denom == 0, np.nan, denom)
+
+            du = u0 - u_mean[:, :, None]
+            dv = v0 - v_mean[:, :, None]
+
+            std_sq = np.where(valid, du * du + dv * dv, 0.0).sum(axis=2) / denom_safe
+            rms_sq = np.where(valid, u0 * u0 + v0 * v0, 0.0).sum(axis=2) / denom_safe
+            std_field = np.sqrt(std_sq)
+            rms_field = np.sqrt(rms_sq)
+            std_field = np.nan_to_num(std_field, nan=0.0)
+            rms_field = np.nan_to_num(rms_field, nan=0.0)
+
+            std_ds = ds.isel(t=[0]).copy(deep=True)
+            rms_ds = ds.isel(t=[0]).copy(deep=True)
+            std_ds = std_ds.drop_vars(list(std_ds.data_vars), errors="ignore")
+            rms_ds = rms_ds.drop_vars(list(rms_ds.data_vars), errors="ignore")
+
+            units = ds["u"].attrs.get("units", "")
+            std_ds["w"] = xr.DataArray(std_field[:, :, None], dims=("y", "x", "t"), attrs={"standard_name": "standard_deviation", "units": units})
+            rms_ds["w"] = xr.DataArray(rms_field[:, :, None], dims=("y", "x", "t"), attrs={"standard_name": "root_mean_square", "units": units})
+            std_ds = std_ds.assign_coords(t=np.asarray([0.0], dtype=float))
+            rms_ds = rms_ds.assign_coords(t=np.asarray([0.0], dtype=float))
+            std_ds.attrs = dict(ds.attrs)
+            rms_ds.attrs = dict(ds.attrs)
+            return avg, std_ds, rms_ds
+
+        if "w" in ds:
+            w0 = np.asarray(ds["w"].values, dtype=float)
+            if w0.ndim != 3:
+                raise ValueError("Expected 'w' to have dims ('y','x','t')")
+            w_mean = _mean_excluding_zeros(w0)
+            avg = ds.isel(t=[0]).copy(deep=True)
+            avg = avg.drop_vars([v for v in avg.data_vars if v != "w"], errors="ignore")
+            avg["w"] = xr.DataArray(w_mean[:, :, None], dims=("y", "x", "t"), attrs=ds["w"].attrs)
+            avg = avg.assign_coords(t=np.asarray([0.0], dtype=float))
+            avg.attrs = dict(ds.attrs)
+            if not return_std_rms:
+                return avg
+
+            finite = np.isfinite(w0)
+            valid = finite if include_zeros else (finite & (w0 != 0))
+            denom = valid.sum(axis=2).astype(float)
+            denom_safe = np.where(denom == 0, np.nan, denom)
+            dw = w0 - w_mean[:, :, None]
+            std_sq = np.where(valid, dw * dw, 0.0).sum(axis=2) / denom_safe
+            rms_sq = np.where(valid, w0 * w0, 0.0).sum(axis=2) / denom_safe
+            std_field = np.nan_to_num(np.sqrt(std_sq), nan=0.0)
+            rms_field = np.nan_to_num(np.sqrt(rms_sq), nan=0.0)
+
+            units = ds["w"].attrs.get("units", "")
+            std_ds = ds.isel(t=[0]).copy(deep=True)
+            rms_ds = ds.isel(t=[0]).copy(deep=True)
+            std_ds = std_ds.drop_vars(list(std_ds.data_vars), errors="ignore")
+            rms_ds = rms_ds.drop_vars(list(rms_ds.data_vars), errors="ignore")
+            std_ds["w"] = xr.DataArray(std_field[:, :, None], dims=("y", "x", "t"), attrs={"standard_name": "standard_deviation", "units": units})
+            rms_ds["w"] = xr.DataArray(rms_field[:, :, None], dims=("y", "x", "t"), attrs={"standard_name": "root_mean_square", "units": units})
+            std_ds = std_ds.assign_coords(t=np.asarray([0.0], dtype=float))
+            rms_ds = rms_ds.assign_coords(t=np.asarray([0.0], dtype=float))
+            std_ds.attrs = dict(ds.attrs)
+            rms_ds.attrs = dict(ds.attrs)
+            return avg, std_ds, rms_ds
+
+        raise ValueError("Dataset must contain either ('u','v') or 'w' to use averf")
+
+    def azaverf(
+        self,
+        x0: float = 0.0,
+        y0: float = 0.0,
+        *,
+        center_units: Literal["phys", "mesh"] = "phys",
+        rmax: Optional[float] = None,
+        keepzero: bool = False,
+        return_profiles: bool = False,
+        var: Optional[str] = None,
+        frame: Optional[int] = None,
+    ):
+        """Azimuthal average of a vector/scalar field.
+
+        This method is inspired by PIVMat's `azaverf`.
+
+        Modes:
+        - Vector mode (default): uses 'u' and 'v' and returns either an azimuthally
+          averaged field (u/v) or radial profiles (r, ur, ut).
+        - Scalar mode: specify `var` (e.g. 'w') to average that scalar and return
+          either an averaged field or profiles (r, p).
+
+        Notes:
+        - By default, zero elements are treated as invalid and are excluded.
+          Set `keepzero=True` to include zeros.
+        - Binning is performed with bin width approximately equal to the grid spacing.
+
+        Args:
+            x0, y0: Center location.
+            center_units: 'phys' for coordinate units (default) or 'mesh' for index
+                units (0-based indices in x/y arrays).
+            rmax: Optional maximum radius (same units as coordinates, unless
+                center_units='mesh' in which case it's in index units).
+            keepzero: Include zero-valued samples in averages.
+            return_profiles: If True, return profiles instead of a field.
+            var: Scalar variable name to azimuthally-average. If None, uses vector mode.
+            frame: Optional integer time index to process a single frame.
+
+        Returns:
+            If return_profiles is False:
+                xr.Dataset with azimuthally-averaged field (same dims as input).
+            If return_profiles is True:
+                Vector mode: (r, ur, ut)
+                Scalar mode: (r, p)
+            where profiles are numpy arrays and include one column per time step.
+        """
+
+        ds = self._obj
+        if "x" not in ds.coords or "y" not in ds.coords:
+            raise ValueError("azaverf requires 'x' and 'y' coordinates")
+
+        x = np.asarray(ds.coords["x"].values, dtype=float)
+        y = np.asarray(ds.coords["y"].values, dtype=float)
+        if x.size < 2 or y.size < 2:
+            raise ValueError("azaverf requires at least 2 points in x and y")
+
+        dx = float(np.nanmedian(np.diff(x)))
+        dy = float(np.nanmedian(np.diff(y)))
+        dx_abs = abs(dx) if dx != 0 else 1.0
+        dy_abs = abs(dy) if dy != 0 else 1.0
+        dr = dx_abs
+        if not np.isfinite(dr) or dr == 0.0:
+            dr = 1.0
+
+        if center_units == "mesh":
+            # x0/y0 are 0-based indices into x/y.
+            x0_phys = float(x[0] + x0 * dx)
+            y0_phys = float(y[0] + y0 * dy)
+            rmax_phys = None if rmax is None else float(rmax) * dr
+        elif center_units == "phys":
+            x0_phys = float(x0)
+            y0_phys = float(y0)
+            rmax_phys = None if rmax is None else float(rmax)
+        else:
+            raise ValueError("center_units must be 'phys' or 'mesh'")
+
+        X, Y = np.meshgrid(x, y)
+        dX = X - x0_phys
+        dY = Y - y0_phys
+        R = np.sqrt(dX * dX + dY * dY)
+        if rmax_phys is not None:
+            Rmask = R <= rmax_phys
+        else:
+            Rmask = np.ones_like(R, dtype=bool)
+
+        # Bin index: 0 corresponds to r in [0, dr)
+        bin_idx = np.floor(R / dr).astype(int)
+        # Exclude center where projections are undefined.
+        not_center = R > 0
+
+        if "t" in ds.dims:
+            t_indices = list(range(int(ds.sizes["t"])))
+        else:
+            # Treat as single frame.
+            t_indices = [0]
+
+        if frame is not None:
+            frame_i = int(frame)
+            t_indices = [frame_i]
+
+        # Decide scalar vs vector mode.
+        scalar_mode = var is not None
+        if scalar_mode:
+            if var not in ds:
+                raise ValueError(f"Scalar variable '{var}' not found in dataset")
+        else:
+            if "u" not in ds or "v" not in ds:
+                raise ValueError("Vector mode azaverf requires 'u' and 'v'")
+
+        maxbin = int(np.nanmax(bin_idx[Rmask])) if np.any(Rmask) else 0
+        # Preallocate profiles across time.
+        if scalar_mode:
+            prof = np.full((maxbin + 1, len(t_indices)), np.nan, dtype=float)
+            counts_any = np.zeros((maxbin + 1,), dtype=int)
+        else:
+            prof_ur = np.full((maxbin + 1, len(t_indices)), np.nan, dtype=float)
+            prof_ut = np.full((maxbin + 1, len(t_indices)), np.nan, dtype=float)
+            counts_any = np.zeros((maxbin + 1,), dtype=int)
+
+        # Flatten helpers.
+        bin_flat = bin_idx.ravel()
+        R_flat = R.ravel()
+        dX_flat = dX.ravel()
+        dY_flat = dY.ravel()
+        base_mask_flat = (Rmask & not_center).ravel()
+
+        for k, ti in enumerate(t_indices):
+            if "t" in ds.dims:
+                if scalar_mode:
+                    A = np.asarray(ds[var].isel(t=ti).values, dtype=float)
+                else:
+                    U = np.asarray(ds["u"].isel(t=ti).values, dtype=float)
+                    V = np.asarray(ds["v"].isel(t=ti).values, dtype=float)
+            else:
+                if scalar_mode:
+                    A = np.asarray(ds[var].values, dtype=float)
+                else:
+                    U = np.asarray(ds["u"].values, dtype=float)
+                    V = np.asarray(ds["v"].values, dtype=float)
+
+            if scalar_mode:
+                A_flat = A.ravel()
+                finite = np.isfinite(A_flat)
+                valid = base_mask_flat & finite
+                if not keepzero:
+                    valid = valid & (A_flat != 0)
+                if not np.any(valid):
+                    continue
+                cnt = np.bincount(bin_flat[valid], minlength=maxbin + 1)
+                s = np.bincount(bin_flat[valid], weights=A_flat[valid], minlength=maxbin + 1)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    p = s / cnt
+                prof[:, k] = p
+                counts_any = np.maximum(counts_any, cnt)
+            else:
+                U_flat = U.ravel()
+                V_flat = V.ravel()
+                finite = np.isfinite(U_flat) & np.isfinite(V_flat)
+                valid = base_mask_flat & finite
+                if not keepzero:
+                    valid = valid & (U_flat != 0) & (V_flat != 0)
+                if not np.any(valid):
+                    continue
+
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    ur_pt = (U_flat * dX_flat + V_flat * dY_flat) / R_flat
+                    ut_pt = (-U_flat * dY_flat + V_flat * dX_flat) / R_flat
+
+                cnt = np.bincount(bin_flat[valid], minlength=maxbin + 1)
+                sur = np.bincount(bin_flat[valid], weights=ur_pt[valid], minlength=maxbin + 1)
+                sut = np.bincount(bin_flat[valid], weights=ut_pt[valid], minlength=maxbin + 1)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    ur = sur / cnt
+                    ut = sut / cnt
+                prof_ur[:, k] = ur
+                prof_ut[:, k] = ut
+                counts_any = np.maximum(counts_any, cnt)
+
+        nonzero_bins = np.nonzero(counts_any)[0]
+        if nonzero_bins.size == 0:
+            if return_profiles:
+                if scalar_mode:
+                    return np.asarray([]), np.asarray([[]])
+                return np.asarray([]), np.asarray([[]]), np.asarray([[]])
+            # Return zeros field of same shape.
+            out = ds.copy(deep=True)
+            if scalar_mode:
+                out[var] = out[var] * 0
+            else:
+                out["u"] = out["u"] * 0
+                out["v"] = out["v"] * 0
+            return out
+
+        first_bin = int(nonzero_bins[0])
+        last_bin = int(nonzero_bins[-1])
+        r_vec = (np.arange(first_bin, last_bin + 1, dtype=float) * dr)
+
+        if return_profiles:
+            if scalar_mode:
+                return r_vec, prof[first_bin : last_bin + 1, :]
+            return r_vec, prof_ur[first_bin : last_bin + 1, :], prof_ut[first_bin : last_bin + 1, :]
+
+        # Build azimuthally averaged field.
+        out = ds.copy(deep=True)
+
+        # Reconstruct per-frame fields from profiles.
+        bin2 = bin_idx.copy()
+        in_range = (bin2 >= first_bin) & (bin2 <= last_bin) & not_center & Rmask
+        # Prepare output arrays.
+        if "t" in ds.dims:
+            t_full = int(ds.sizes["t"])
+            if frame is None:
+                t_out_indices = list(range(t_full))
+                prof_cols = {ti: idx for idx, ti in enumerate(t_indices)}
+            else:
+                t_out_indices = [int(frame)]
+                prof_cols = {int(frame): 0}
+        else:
+            t_out_indices = [0]
+            prof_cols = {0: 0}
+
+        if scalar_mode:
+            # Set values by bin, outside range -> 0.
+            if "t" in ds.dims:
+                for ti in t_out_indices:
+                    col = prof_cols.get(ti, None)
+                    if col is None:
+                        out[var].isel(t=ti).values[...] = 0.0
+                        continue
+                    p_full = np.zeros((maxbin + 1,), dtype=float)
+                    p_slice = prof[:, col]
+                    p_full[:] = np.nan_to_num(p_slice, nan=0.0)
+                    w_new = np.zeros_like(R)
+                    w_new[in_range] = p_full[bin2[in_range]]
+                    out[var].isel(t=ti).values[...] = w_new
+            else:
+                p_full = np.zeros((maxbin + 1,), dtype=float)
+                p_full[:] = np.nan_to_num(prof[:, 0], nan=0.0)
+                w_new = np.zeros_like(R)
+                w_new[in_range] = p_full[bin2[in_range]]
+                out[var].values[...] = w_new
+            return out
+
+        # Vector mode.
+        if "t" in ds.dims:
+            for ti in t_out_indices:
+                col = prof_cols.get(ti, None)
+                if col is None:
+                    out["u"].isel(t=ti).values[...] = 0.0
+                    out["v"].isel(t=ti).values[...] = 0.0
+                    continue
+                ur_full = np.zeros((maxbin + 1,), dtype=float)
+                ut_full = np.zeros((maxbin + 1,), dtype=float)
+                ur_full[:] = np.nan_to_num(prof_ur[:, col], nan=0.0)
+                ut_full[:] = np.nan_to_num(prof_ut[:, col], nan=0.0)
+                ur_grid = np.zeros_like(R)
+                ut_grid = np.zeros_like(R)
+                ur_grid[in_range] = ur_full[bin2[in_range]]
+                ut_grid[in_range] = ut_full[bin2[in_range]]
+
+                u_new = np.zeros_like(R)
+                v_new = np.zeros_like(R)
+                # u = ur * cos(theta) - ut * sin(theta) where cos=dx/r, sin=dy/r
+                u_new[in_range] = ur_grid[in_range] * (dX[in_range] / R[in_range]) - ut_grid[in_range] * (dY[in_range] / R[in_range])
+                v_new[in_range] = ur_grid[in_range] * (dY[in_range] / R[in_range]) + ut_grid[in_range] * (dX[in_range] / R[in_range])
+                out["u"].isel(t=ti).values[...] = u_new
+                out["v"].isel(t=ti).values[...] = v_new
+        else:
+            ur_full = np.zeros((maxbin + 1,), dtype=float)
+            ut_full = np.zeros((maxbin + 1,), dtype=float)
+            ur_full[:] = np.nan_to_num(prof_ur[:, 0], nan=0.0)
+            ut_full[:] = np.nan_to_num(prof_ut[:, 0], nan=0.0)
+            ur_grid = np.zeros_like(R)
+            ut_grid = np.zeros_like(R)
+            ur_grid[in_range] = ur_full[bin2[in_range]]
+            ut_grid[in_range] = ut_full[bin2[in_range]]
+            u_new = np.zeros_like(R)
+            v_new = np.zeros_like(R)
+            u_new[in_range] = ur_grid[in_range] * (dX[in_range] / R[in_range]) - ut_grid[in_range] * (dY[in_range] / R[in_range])
+            v_new[in_range] = ur_grid[in_range] * (dY[in_range] / R[in_range]) + ut_grid[in_range] * (dX[in_range] / R[in_range])
+            out["u"].values[...] = u_new
+            out["v"].values[...] = v_new
+
+        return out
+
+    def phaseaverf(
+        self,
+        period,
+        *,
+        opt: str = "",
+        method: Literal["linear", "nearest"] = "linear",
+    ):
+        """Phase average a vector/scalar dataset over a period.
+
+        This method is inspired by PIVMat's `phaseaverf`.
+
+        Rules:
+        - If `period` is an integer P: returns P phase-averaged fields, where phase i
+          is the average of frames i, i+P, i+2P, ...
+        - If `period` is a non-integer float: first re-samples linearly in time, then
+          averages. The result has length floor(period).
+        - If `period` is a sequence: performs loop averaging with step=period[-1],
+          starting at each value in the sequence.
+
+        The output is returned as a Dataset concatenated along 't' with length equal to
+        the number of phases.
+
+        Args:
+            period: int | float | sequence of floats.
+            opt: Passed to averf. By default, zeros are excluded; pass '0' to include.
+            method: Interpolation method for non-integer periods.
+
+        Returns:
+            xr.Dataset: phase-averaged dataset with dim 't' == n_phases.
+        """
+
+        ds = self._obj
+        if "t" not in ds.dims:
+            raise ValueError("phaseaverf requires a time dimension 't'")
+
+        n_frames = int(ds.sizes.get("t", 0) or 0)
+        if n_frames <= 0:
+            raise ValueError("Empty time dimension")
+
+        # Work in index space (0..n_frames-1) to make non-integer periods well-defined.
+        tini = np.arange(n_frames, dtype=float)
+
+        def _avg_for_points(points: np.ndarray) -> xr.Dataset:
+            points = np.asarray(points, dtype=float)
+            points = points[(points >= 0) & (points <= n_frames - 1)]
+            if points.size == 0:
+                # Return a 0-field with the same layout (single frame)
+                zero = ds.isel(t=[0]).copy(deep=True)
+                for v in list(zero.data_vars):
+                    zero[v].values[...] = 0.0
+                return zero.assign_coords(t=np.asarray([0.0], dtype=float))
+            sub = ds.piv.resamplef(tini=tini, tfin=points, method=method)
+            return sub.piv.averf(opt)
+
+        phases: list[xr.Dataset] = []
+
+        # Determine period type.
+        if np.isscalar(period):
+            p = float(period)
+            if abs(p - float(int(round(p)))) < 1e-10:
+                P = int(np.floor(p))
+                if P <= 0:
+                    raise ValueError("period must be positive")
+                for i in range(P):
+                    # Fast path: integer stride selection, no interpolation needed.
+                    sub = ds.isel(t=slice(i, None, P))
+                    phases.append(sub.piv.averf(opt))
+            else:
+                P = int(np.floor(p))
+                if P <= 0:
+                    raise ValueError("period must be >= 1")
+                for i in range(P):
+                    points = np.arange(float(i), float(n_frames), p)
+                    phases.append(_avg_for_points(points))
+        else:
+            tvec = np.asarray(period, dtype=float).ravel()
+            if tvec.size == 0:
+                raise ValueError("period sequence must be non-empty")
+            step = float(tvec[-1])
+            if step <= 0:
+                raise ValueError("period step (last element) must be positive")
+            for start in tvec:
+                points = np.arange(float(start), float(n_frames), step)
+                phases.append(_avg_for_points(points))
+
+        out = xr.concat(phases, dim="t")
+        out = out.assign_coords(t=np.arange(out.sizes["t"], dtype=float))
+        out.attrs = dict(ds.attrs)
+        return out
+
+    def resamplef(
+        self,
+        tini,
+        tfin,
+        *,
+        method: Literal["linear", "nearest"] = "linear",
+    ):
+        """(Temporal) re-sampling of vector/scalar fields.
+
+        This method is inspired by PIVMat's `resamplef`.
+
+        The dataset is re-sampled from initial times `tini` to new times `tfin`
+        using interpolation along the time dimension.
+
+        Requirements (as in PIVMat):
+        - len(tini) == len(ds.t)
+        - tini is strictly increasing
+        - all tfin values are within [tini[0], tini[-1]]
+
+        Args:
+            tini: 1D sequence of initial times (length == number of frames).
+            tfin: 1D sequence of target times.
+            method: Interpolation method.
+
+        Returns:
+            xr.Dataset: resampled dataset with dim 't' == len(tfin) and coords 't' == tfin.
+        """
+
+        ds = self._obj
+        if "t" not in ds.dims:
+            raise ValueError("resamplef requires a time dimension 't'")
+
+        tini_arr = np.asarray(tini, dtype=float).ravel()
+        tfin_arr = np.asarray(tfin, dtype=float).ravel()
+
+        n_frames = int(ds.sizes.get("t", 0) or 0)
+        if tini_arr.size != n_frames:
+            raise ValueError("Size of tini must coincide with the dataset time dimension")
+
+        if tini_arr.size < 2:
+            raise ValueError("tini must contain at least 2 points")
+
+        if np.any(np.diff(tini_arr) <= 0):
+            raise ValueError("tini must be strictly increasing")
+
+        if tfin_arr.size == 0:
+            raise ValueError("tfin must be non-empty")
+
+        if float(np.min(tfin_arr)) < float(tini_arr[0]) or float(np.max(tfin_arr)) > float(tini_arr[-1]):
+            raise ValueError("Some values of tfin fall outside the bounds of tini")
+
+        # Interpolate in a dedicated coordinate to avoid assumptions about existing ds.t.
+        ds_time = ds.assign_coords(_resample_time=("t", tini_arr)).swap_dims({"t": "_resample_time"})
+        out = ds_time.interp(_resample_time=tfin_arr, method=method)
+        out = out.swap_dims({"_resample_time": "t"}).assign_coords(t=tfin_arr)
+        out = out.drop_vars("_resample_time")
+        out.attrs = dict(ds.attrs)
+        return out
+
+    def spaverf(
+        self,
+        opt: str = "xy",
+        *,
+        var: Optional[str] = None,
+    ):
+        """Spatial average over X and/or Y of a vector/scalar field.
+
+        This method is inspired by PIVMat's `spaverf`.
+
+        Args:
+            opt: 'x', 'y', or 'xy' (default). If opt contains '0', zeros are
+                included in the mean; otherwise zeros are excluded (treated as invalid).
+                Examples: 'xy', 'x0', 'y0', 'xy0'.
+            var: Scalar variable name to average (e.g. 'w'). If None, averages
+                vector components 'u' and 'v'.
+
+        Returns:
+            xr.Dataset: Dataset with spatially-averaged variable(s), broadcast back
+            to the original shape.
+        """
+
+        ds = self._obj
+        opt_l = str(opt).lower() if opt is not None else "xy"
+        include_zeros = "0" in opt_l
+        axis = opt_l.replace("0", "") or "xy"
+
+        if axis not in {"x", "y", "xy"}:
+            raise ValueError("Invalid axis; expected 'x', 'y', or 'xy' (optionally with '0')")
+
+        def _mean_broadcast(da: xr.DataArray, reduce_dims: list[str]) -> xr.DataArray:
+            if include_zeros:
+                mean = da.mean(dim=reduce_dims, skipna=True)
+            else:
+                mean = da.where(da != 0).mean(dim=reduce_dims, skipna=True)
+                mean = mean.fillna(0.0)
+            # Broadcast back to original y/x/t shape.
+            return mean.broadcast_like(da)
+
+        if var is None:
+            if "u" not in ds or "v" not in ds:
+                raise ValueError("Vector mode spaverf requires 'u' and 'v'")
+            vars_to_process = ["u", "v"]
+        else:
+            if var not in ds:
+                raise ValueError(f"Scalar variable '{var}' not found in dataset")
+            vars_to_process = [var]
+
+        reduce_dims: list[str]
+        if axis == "x":
+            reduce_dims = ["x"]
+        elif axis == "y":
+            reduce_dims = ["y"]
+        else:
+            reduce_dims = ["y", "x"]
+
+        out = ds.copy(deep=True)
+        for name in vars_to_process:
+            da = out[name]
+            # Ensure y/x exist; allow missing t (single frame).
+            if "y" not in da.dims or "x" not in da.dims:
+                raise ValueError(f"Variable '{name}' must have spatial dims 'y' and 'x'")
+            out[name] = _mean_broadcast(da, reduce_dims)
+            out[name].attrs = dict(ds[name].attrs)
+
+        out.attrs = dict(ds.attrs)
+        return out
+
+    def subaverf(
+        self,
+        opt: str = "e",
+        *,
+        var: Optional[str] = None,
+    ):
+        """Subtract an ensemble (temporal) or spatial average from a field.
+
+        This method is inspired by PIVMat's `subaverf`.
+
+        - If `opt` contains 'e' (default): subtract the ensemble/temporal mean
+          computed by `averf`.
+        - Otherwise: subtract a spatial mean computed by `spaverf` using `opt`
+          as the axis selector ('x', 'y', 'xy', optionally with '0').
+
+        By default, the subtraction preserves invalid zeros: locations that are
+        exactly zero in the original data remain zero after subtraction.
+
+        Args:
+            opt: Option string. Default 'e'.
+            var: Scalar variable name (e.g. 'w'). If None, operates on 'u' and 'v'.
+
+        Returns:
+            xr.Dataset: Dataset with mean-subtracted variable(s).
+        """
+
+        ds = self._obj
+        opt_l = str(opt).lower() if opt is not None else "e"
+        ensemble = "e" in opt_l
+
+        if var is None:
+            if "u" not in ds or "v" not in ds:
+                raise ValueError("Vector mode subaverf requires 'u' and 'v'")
+            vars_to_process = ["u", "v"]
+        else:
+            if var not in ds:
+                raise ValueError(f"Scalar variable '{var}' not found in dataset")
+            vars_to_process = [var]
+
+        out = ds.copy(deep=True)
+
+        if ensemble:
+            # Allow '0' to be passed through to averf if user included it.
+            opt_for_averf = opt_l.replace("e", "")
+            mean_ds = ds.piv.averf(opt_for_averf)
+
+            for name in vars_to_process:
+                da = ds[name]
+                mean_da = mean_ds[name]
+
+                # Broadcast mean to all time steps.
+                if "t" in da.dims and "t" in mean_da.dims and mean_da.sizes.get("t", 1) == 1:
+                    mean_b = mean_da.isel(t=0).broadcast_like(da)
+                else:
+                    mean_b = mean_da.broadcast_like(da)
+
+                new = da - mean_b
+
+                # Preserve invalid zeros (PIVMat multiplies by logical(original)).
+                if "t" in da.dims:
+                    new = new.where(da != 0, 0.0)
+                else:
+                    new = new.where(da != 0, 0.0)
+
+                out[name] = new
+                out[name].attrs = dict(ds[name].attrs)
+
+            out.attrs = dict(ds.attrs)
+            return out
+
+        # Spatial subtraction mode.
+        spatial_mean = ds.piv.spaverf(opt_l, var=var)
+        for name in vars_to_process:
+            da = ds[name]
+            mean_da = spatial_mean[name]
+            new = da - mean_da
+            new = new.where(da != 0, 0.0)
+            out[name] = new
+            out[name].attrs = dict(ds[name].attrs)
+
+        out.attrs = dict(ds.attrs)
+        return out
 
     def fill_nans(self, method: Literal["linear", "nearest", "cubic"] = "nearest"):
         """

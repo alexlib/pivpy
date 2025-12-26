@@ -51,6 +51,38 @@ Legacy loaders (still supported):
     ds = io.load_vec('your_file.vec')
     ds = io.load_openpiv_txt('your_file.txt')
 
+## PIVMat-inspired methods
+
+PIVPy exposes many post-processing operations via the xarray accessor `Dataset.piv`.
+Several common PIVMat toolbox methods are available with similar names/behavior:
+
+    import pivpy.pivpy  # registers the .piv accessor
+    from pivpy import io
+
+    ds = io.create_sample_Dataset(n_frames=10)
+
+    # Add noise (similar to PIVMat addnoisef)
+    ds_noisy = ds.copy().piv.addnoisef(eps=0.1, opt='add', nc=0.0, seed=0)
+
+    # Ensemble (temporal) average and optional std/rms (similar to PIVMat averf)
+    avg = ds.piv.averf()
+    avg, std, rms = ds.piv.averf(return_std_rms=True)
+
+    # Spatial averages (similar to PIVMat spaverf)
+    ds_xy = ds.piv.spaverf('xy')   # excludes zeros by default
+    ds_x0 = ds.piv.spaverf('x0')   # include zeros
+
+    # Subtract ensemble/spatial average (similar to PIVMat subaverf)
+    fluct = ds.piv.subaverf('e')
+    fluct_x = ds.piv.subaverf('x0')
+
+    # Azimuthal averaging (similar to PIVMat azaverf)
+    r, ur, ut = ds.isel(t=0).piv.azaverf(0.0, 0.0, return_profiles=True)
+
+    # Temporal resampling and phase average (similar to PIVMat resamplef/phaseaverf)
+    ds_r = ds.piv.resamplef(tini=range(ds.sizes['t']), tfin=[0.5, 1.5, 2.5])
+    phased = ds.piv.phaseaverf(12)
+
 ### For developers, local use:
 
 Using `uv` (recommended):

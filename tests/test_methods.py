@@ -2,6 +2,7 @@
 import pathlib
 import numpy as np
 import importlib.resources
+import xarray as xr
 import pytest
 from pivpy import io
 import pivpy.pivpy  # Register the piv accessor for xarray.Dataset
@@ -256,6 +257,258 @@ def test_filterf():
     dataset = dataset.piv.filterf([.5, .5, 0.]) # with sigma
     # ds["mag"] = np.hypot(ds["u"], ds["v"])
     # ds.plot.quiver(x='x',y='y',u='u',v='v',hue='mag',col='t',scale=150,cmap='RdBu')
+
+
+def test_addnoisef_eps_zero_no_change():
+    ds = io.create_sample_Dataset(n_frames=2, rows=5, cols=6, noise_sigma=0.0)
+    before_u = ds["u"].values.copy()
+    before_v = ds["v"].values.copy()
+    ds = ds.piv.addnoisef(eps=0.0, seed=0)
+    assert np.allclose(ds["u"].values, before_u)
+    assert np.allclose(ds["v"].values, before_v)
+
+
+def test_addnoisef_additive_reproducible():
+    ds1 = io.create_sample_Dataset(n_frames=2, rows=5, cols=6, noise_sigma=0.0)
+    ds2 = io.create_sample_Dataset(n_frames=2, rows=5, cols=6, noise_sigma=0.0)
+    ds1 = ds1.piv.addnoisef(eps=0.1, opt="add", nc=0.0, seed=123)
+    ds2 = ds2.piv.addnoisef(eps=0.1, opt="add", nc=0.0, seed=123)
+    assert np.allclose(ds1["u"].values, ds2["u"].values)
+    assert np.allclose(ds1["v"].values, ds2["v"].values)
+    assert not np.allclose(ds1["u"].values, io.create_sample_Dataset(n_frames=2, rows=5, cols=6, noise_sigma=0.0)["u"].values)
+
+
+def test_addnoisef_multiplicative_runs():
+    ds = io.create_sample_Dataset(n_frames=2, rows=5, cols=6, noise_sigma=0.0)
+    ds = ds.piv.addnoisef(eps=0.05, opt="mul", nc=2.0, seed=0)
+    assert ds["u"].shape == (5, 6, 2)
+    assert ds["v"].shape == (5, 6, 2)
+
+
+def test_averf_default_excludes_zeros():
+    ds = io.create_sample_Dataset(n_frames=3, rows=2, cols=2, noise_sigma=0.0)
+    # Make one sample invalid by setting both components to zero at t=1
+    u_ref = float(ds["u"].values[0, 0, 0])
+    v_ref = float(ds["v"].values[0, 0, 0])
+    ds["u"].values[0, 0, 1] = 0.0
+    ds["v"].values[0, 0, 1] = 0.0
+
+    avg_excl = ds.piv.averf()  # default excludes zeros
+    assert avg_excl["u"].shape == (2, 2, 1)
+    assert np.allclose(avg_excl["u"].values[0, 0, 0], u_ref)
+    assert np.allclose(avg_excl["v"].values[0, 0, 0], v_ref)
+
+
+def test_averf_opt0_includes_zeros():
+    ds = io.create_sample_Dataset(n_frames=3, rows=2, cols=2, noise_sigma=0.0)
+    u_ref = float(ds["u"].values[0, 0, 0])
+    v_ref = float(ds["v"].values[0, 0, 0])
+    ds["u"].values[0, 0, 1] = 0.0
+    ds["v"].values[0, 0, 1] = 0.0
+
+    avg_incl = ds.piv.averf("0")
+    assert np.allclose(avg_incl["u"].values[0, 0, 0], (2.0 * u_ref + 0.0) / 3.0)
+    assert np.allclose(avg_incl["v"].values[0, 0, 0], (2.0 * v_ref + 0.0) / 3.0)
+
+
+def test_averf_returns_std_and_rms():
+    ds = io.create_sample_Dataset(n_frames=3, rows=3, cols=4, noise_sigma=0.0)
+    ds["u"].values[0, 0, 1] = 0.0
+    ds["v"].values[0, 0, 1] = 0.0
+    avg, std, rms = ds.piv.averf(return_std_rms=True)
+    assert avg["u"].shape == (3, 4, 1)
+    assert "w" in std
+    assert "w" in rms
+    assert std["w"].shape == (3, 4, 1)
+    assert rms["w"].shape == (3, 4, 1)
+    assert np.all(std["w"].values >= 0)
+    assert np.all(rms["w"].values >= 0)
+
+
+def test_azaverf_vector_profiles_solid_body_rotation():
+    # Solid-body rotation: u=-y, v=x around origin => ur=0, ut=r.
+    x = np.linspace(-5.0, 5.0, 21)
+    y = np.linspace(-5.0, 5.0, 21)
+    X, Y = np.meshgrid(x, y)
+    u = -Y
+    v = X
+    ds = io.from_arrays(X, Y, u, v, frame=0)
+
+    r, ur, ut = ds.piv.azaverf(0.0, 0.0, return_profiles=True)
+    # Profiles are (nr, nt); here nt=1
+    assert ur.shape[1] == 1
+    assert ut.shape[1] == 1
+    # Expect near-zero radial component away from center
+    if r.size:
+        assert np.nanmean(np.abs(ur[:, 0])) < 1e-6
+        # Tangential speed should approximately match radius
+        # (ignore the first bin which may have few samples)
+        if r.size > 2:
+            assert np.nanmean(np.abs(ut[2:, 0] - r[2:])) < 0.2
+
+
+def test_azaverf_scalar_profiles():
+    # Scalar field depending only on radius should preserve that profile.
+    x = np.linspace(-4.0, 4.0, 17)
+    y = np.linspace(-4.0, 4.0, 17)
+    X, Y = np.meshgrid(x, y)
+    r0 = np.sqrt(X * X + Y * Y)
+    u = np.zeros_like(X)
+    v = np.zeros_like(X)
+    ds = io.from_arrays(X, Y, u, v, frame=0)
+    ds["s"] = (("y", "x", "t"), (r0[:, :, None]))
+
+    r, p = ds.piv.azaverf(0.0, 0.0, var="s", return_profiles=True, keepzero=True)
+    assert p.shape[1] == 1
+    if r.size > 2:
+        assert np.nanmean(np.abs(p[2:, 0] - r[2:])) < 0.2
+
+
+def test_phaseaverf_integer_period_groups_frames():
+    ds = io.create_sample_Dataset(n_frames=6, rows=2, cols=2, noise_sigma=0.0)
+    # Add a time-dependent offset so grouping matters.
+    for ti in range(6):
+        ds["u"].isel(t=ti).values[...] = ds["u"].isel(t=ti).values + float(ti)
+        ds["v"].isel(t=ti).values[...] = ds["v"].isel(t=ti).values + float(2 * ti)
+
+    out = ds.piv.phaseaverf(2)
+    assert out["u"].shape == (2, 2, 2)
+    # Phase 0 averages t=0,2,4 => mean offset is 2
+    base_u = io.create_sample_Dataset(n_frames=1, rows=2, cols=2, noise_sigma=0.0)["u"].values[:, :, 0]
+    base_v = io.create_sample_Dataset(n_frames=1, rows=2, cols=2, noise_sigma=0.0)["v"].values[:, :, 0]
+    assert np.allclose(out["u"].isel(t=0).values, base_u + 2.0)
+    assert np.allclose(out["v"].isel(t=0).values, base_v + 4.0)
+    # Phase 1 averages t=1,3,5 => mean offset is 3
+    assert np.allclose(out["u"].isel(t=1).values, base_u + 3.0)
+    assert np.allclose(out["v"].isel(t=1).values, base_v + 6.0)
+
+
+def test_phaseaverf_float_period_interpolates():
+    # Build a dataset where u(t)=t (same everywhere), so interpolation is predictable.
+    n = 6
+    x = np.linspace(0.0, 1.0, 3)
+    y = np.linspace(0.0, 1.0, 2)
+    X, Y = np.meshgrid(x, y)
+    u0 = np.zeros_like(X)
+    v0 = np.zeros_like(X)
+    ds = io.from_arrays(X, Y, u0, v0, frame=0)
+    # Expand to time and set u(t)=t
+    frames = []
+    for ti in range(n):
+        d = io.from_arrays(X, Y, u0 + float(ti), v0, frame=ti)
+        frames.append(d)
+    ds = xr.concat(frames, dim="t")
+
+    out = ds.piv.phaseaverf(2.5)
+    assert out.sizes["t"] == 2
+    # Phase 0 samples points [0,2.5,5], but averf excludes zeros by default,
+    # so the 0-sample is ignored and mean becomes (2.5+5)/2 = 3.75.
+    assert np.allclose(out["u"].isel(t=0).values.mean(), 3.75)
+    # Phase 1 samples points [1,3.5] => mean = 2.25
+    assert np.allclose(out["u"].isel(t=1).values.mean(), 2.25)
+
+
+def test_spaverf_xy_constant_includes_zeros_with_opt0():
+    ds = io.create_sample_Dataset(n_frames=1, rows=3, cols=4, noise_sigma=0.0)
+    out = ds.piv.spaverf("xy0")
+    mu = float(ds["u"].isel(t=0).values.mean())
+    mv = float(ds["v"].isel(t=0).values.mean())
+    assert np.allclose(out["u"].isel(t=0).values, mu)
+    assert np.allclose(out["v"].isel(t=0).values, mv)
+
+
+def test_spaverf_xy_excludes_zeros_by_default():
+    ds = io.create_sample_Dataset(n_frames=1, rows=3, cols=4, noise_sigma=0.0)
+    ds["u"].values[0, 0, 0] = 0.0
+    ds["v"].values[0, 0, 0] = 0.0
+    out = ds.piv.spaverf("xy")
+
+    u = ds["u"].isel(t=0).values
+    v = ds["v"].isel(t=0).values
+    mu = float(u[u != 0].mean())
+    mv = float(v[v != 0].mean())
+    assert np.allclose(out["u"].isel(t=0).values, mu)
+    assert np.allclose(out["v"].isel(t=0).values, mv)
+
+
+def test_spaverf_x_broadcasts_over_x():
+    ds = io.create_sample_Dataset(n_frames=2, rows=4, cols=5, noise_sigma=0.0)
+    out = ds.piv.spaverf("x0")
+    # Should be uniform in x (for each y,t)
+    assert np.allclose(out["u"].isel(x=0).values, out["u"].isel(x=-1).values)
+    # And should match mean over x
+    expected = ds["u"].mean(dim="x")
+    assert np.allclose(out["u"].values, expected.broadcast_like(ds["u"]).values)
+
+
+def test_spaverf_scalar_var():
+    ds = io.create_sample_Dataset(n_frames=1, rows=3, cols=4, noise_sigma=0.0)
+    ds = ds.piv.vorticity(name="w")
+    out = ds.piv.spaverf("y0", var="w")
+    # uniform in y for each x,t
+    assert np.allclose(out["w"].isel(y=0).values, out["w"].isel(y=-1).values)
+
+
+def test_subaverf_ensemble_removes_time_mean():
+    ds = io.create_sample_Dataset(n_frames=6, rows=3, cols=4, noise_sigma=0.0)
+    # Make u vary in time so ensemble subtraction is meaningful.
+    for ti in range(ds.sizes["t"]):
+        ds["u"].isel(t=ti).values[...] = ds["u"].isel(t=ti).values + float(ti)
+        ds["v"].isel(t=ti).values[...] = ds["v"].isel(t=ti).values - float(2 * ti)
+
+    out = ds.piv.subaverf("e")
+    # Mean over time should be ~0 everywhere.
+    assert np.allclose(out["u"].mean(dim="t").values, 0.0)
+    assert np.allclose(out["v"].mean(dim="t").values, 0.0)
+
+
+def test_subaverf_spatial_x_removes_x_mean():
+    ds = io.create_sample_Dataset(n_frames=2, rows=4, cols=5, noise_sigma=0.0)
+    # Force an x-dependent bias.
+    bias = np.arange(ds.sizes["x"], dtype=float)[None, :, None]
+    ds["u"].values[...] = ds["u"].values + bias
+    out = ds.piv.subaverf("x0")
+    # After subtracting x-mean, mean along x should be ~0.
+    assert np.allclose(out["u"].mean(dim="x").values, 0.0)
+
+
+def test_subaverf_preserves_zero_locations():
+    ds = io.create_sample_Dataset(n_frames=3, rows=3, cols=4, noise_sigma=0.0)
+    ds["u"].values[0, 0, 1] = 0.0
+    ds["v"].values[0, 0, 1] = 0.0
+    out = ds.piv.subaverf("e")
+    assert out["u"].values[0, 0, 1] == 0.0
+    assert out["v"].values[0, 0, 1] == 0.0
+
+
+def test_resamplef_linear_interpolation():
+    # Build dataset with u(t)=t everywhere so interpolation is predictable.
+    x = np.linspace(0.0, 1.0, 4)
+    y = np.linspace(0.0, 1.0, 3)
+    X, Y = np.meshgrid(x, y)
+    frames = []
+    for ti in range(5):
+        frames.append(io.from_arrays(X, Y, np.full_like(X, float(ti)), np.zeros_like(X), frame=ti))
+    ds = xr.concat(frames, dim="t")
+
+    tini = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    tfin = np.array([0.5, 1.5, 2.5, 3.5])
+    out = ds.piv.resamplef(tini, tfin)
+    assert out.sizes["t"] == 4
+    assert np.allclose(out["u"].isel(t=0).values.mean(), 0.5)
+    assert np.allclose(out["u"].isel(t=1).values.mean(), 1.5)
+    assert np.allclose(out["u"].isel(t=2).values.mean(), 2.5)
+    assert np.allclose(out["u"].isel(t=3).values.mean(), 3.5)
+
+
+def test_resamplef_validation_errors():
+    ds = io.create_sample_Dataset(n_frames=3, rows=2, cols=2)
+    with pytest.raises(ValueError):
+        ds.piv.resamplef([0.0, 1.0], [0.5])  # length mismatch
+    with pytest.raises(ValueError):
+        ds.piv.resamplef([0.0, 0.0, 1.0], [0.5])  # not strictly increasing
+    with pytest.raises(ValueError):
+        ds.piv.resamplef([0.0, 1.0, 2.0], [-1.0])  # out of bounds
 
 
 def test_clip_no_by():

@@ -60,6 +60,16 @@ This document summarizes notable maintenance and behavior changes made in PIVPy.
 - Fixed Sphinx autodoc import path and docstring formatting issues.
 - `docs/requirements.txt` updated to be pip-installable (`pypandoc-binary` instead of requiring system `pandoc`).
 
+### PIVMat-inspired methods (Dec 2025)
+- Added several PIVMat-style field operations on the xarray accessor `Dataset.piv`:
+  - `addnoisef(eps=..., opt='add'|'mul', nc=..., seed=...)`
+  - `averf(opt='', return_std_rms=False)`
+  - `spaverf(opt='x'|'y'|'xy' (+ optional '0'), var=None)`
+  - `subaverf(opt='e' or spatial axis, var=None)`
+  - `azaverf(x0, y0, center_units='phys'|'mesh', rmax=..., keepzero=..., return_profiles=..., var=..., frame=...)`
+  - `resamplef(tini, tfin, method='linear'|'nearest')`
+  - `phaseaverf(period, opt='', method='linear'|'nearest')` (refactored to use `resamplef` for interpolation cases)
+
 ## Issue 1: Variable Naming in Scalar Calculation Methods
 
 ### Problem

@@ -1,251 +1,287 @@
 """
-pivpy.graphics
-==============
-This module is responsible for plotting and visualization 
-using matplotlib and xarray built-in methods
+This module contains all graphical tools for PIVPy
 """
-
-from pathlib import Path
-from typing import Union
+import warnings
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
+import numpy as np
 import xarray as xr
 
-from pivpy.pivpy import dataset_to_array
+if TYPE_CHECKING:
+    from matplotlib.quiver import Quiver
 
 
 def quiver(
     data: xr.Dataset,
-    arrScale: int = 20,
-    threshold: float = None,
-    width: float = 0.0025,
-    bg_image: Union[Path, xr.DataArray] = None,
-    bg_alpha: float = 1.0,
-    fig_ax=None,
-    colorbar=False,
-    clim=None,
-    **kwargs,
-):
+    quiverKey: str = "Q",
+    scalingFactor: float = 1.0,
+    widthFactor: float = 0.002,
+    ax: plt.Axes | None = None,
+    arrowColor: str = "k",
+) -> "Quiver":
     """
-    piv.quiver(data) creates quiver plot
-    Inputs:
-        data - an xarray Dataset with dimensions (x,y) and
-                    data arrays (u,v,w,chc). Typically piv.vec
+    Creates a quiver plot from the dataset
 
-        arrScale - use to adjust arrow scale (default is 20)
-        threshold - if provided, creates a filtered quiver plot
-                   removing vectors based on a property provided
-                   as the third input, e.g. threshold = ('chc',0.1)
-                   will only display vectors where chc > 0.1
+    Parameters
+    ----------
+    data : xr.Dataset
+        dataset with u, v, x, y
+    quiverKey : str, optional
+        key for the quiver plot, by default "Q"
+    scalingFactor : float, optional
+        scaling factor for the arrows, by default 1.0
+    widthFactor : float, optional
+        width factor for the arrows, by default 0.002
+    ax : plt.Axes | None, optional
+        matplotlib axes, by default None
+    arrowColor : str, optional
+        color of the arrows, by default "k"
 
-        width : float - arrow width
-        bg_image : xarray, optional. It is used for the background image
-        bg_alpha : transparency of the image
-        **kwargs : can be used to pass additional arguments to matplotlib
-                   quiver function, e.g. cmap='gray', clim = [0,1], etc.
+    Returns
+    -------
+    Quiver
+        matplotlib quiver object
+
+    Examples
+    --------
+    >>> from pivpy import io, graphics
+    >>> d = io.loadvec("test.vec")
+    >>> graphics.quiver(d)
     """
+    from pivpy.graphics_utils import dataset_to_array
 
-    data = dataset_to_array(data)
+    if ax is None:
+        _, ax = plt.subplots()
 
-    # Import here to avoid circular import with io.py
-    if len(units) == 0:
-        try:
-            from pivpy.io import POS_UNITS, VEL_UNITS
-            pos_units = data.x.attrs.get("units", POS_UNITS)
-            vel_units = data.u.attrs.get("units", VEL_UNITS)
-        except ImportError:
-            # Fallback if io module doesn't define these constants
-            pos_units = data.x.attrs.get("units", "pix")
-            vel_units = data.u.attrs.get("units", "pix")
-    else:
-        pos_units = units[0]
-        vel_units = units[2]
+    x, y, u, v = dataset_to_array(data)
+    
+    # Import here to avoid circular import
+    try:
+        from pivpy.io import POS_UNITS, VEL_UNITS
+    except ImportError:
+        POS_UNITS = {"m": 1, "mm": 1e3, "um": 1e6, "micron": 1e6}
+        VEL_UNITS = {"m/s": 1, "mm/s": 1e3, "um/s": 1e6, "micron/s": 1e6}
 
-    # if only some arrows are requested
-    if threshold is not None:
-        attr, level = threshold
-        data = data.where(data[attr] > level, drop=True)
+    xUnits = data.attrs.get("xUnits", "m")
+    yUnits = data.attrs.get("yUnits", "m")
+    velUnits = data.attrs.get("velUnits", "m/s")
+    velUnitsScaling = VEL_UNITS.get(velUnits, 1.0)
+    xUnitsScaling = POS_UNITS.get(xUnits, 1.0)
+    yUnitsScaling = POS_UNITS.get(yUnits, 1.0)
 
-    if fig_ax is None:
-        _, ax = plt.subplots(figsize=(10, 8))
-    else:
-        ax = fig_ax
+    # convert to the right units
+    x = x * xUnitsScaling
+    y = y * yUnitsScaling
+    u = u * velUnitsScaling
+    v = v * velUnitsScaling
 
-    if bg_image is not None:
-        if isinstance(bg_image, Path):
-            img = plt.imread(bg_image)
-            ax.imshow(img, alpha=bg_alpha, cmap=kwargs.pop("cmap", "gray"))
-        else:
-            bg_image.plot.imshow(ax=ax, alpha=bg_alpha, add_colorbar=False)
-
-    # Create quiver plot with the data
-    if colorbar:
-        # Calculate magnitude for color mapping
-        import numpy as np
-
-        magnitude = np.sqrt(data.u**2 + data.v**2)
-        Q = ax.quiver(
-            data.x,
-            data.y,
-            data.u,
-            data.v,
-            magnitude,
-            scale=arrScale,
-            width=width,
-            **kwargs,
-        )
-        cbar = plt.colorbar(Q, ax=ax)
-        cbar.set_label(f"Velocity magnitude [{vel_units}]")
-
-        if clim is not None:
-            Q.set_clim(clim)
-    else:
-        ax.quiver(
-            data.x, data.y, data.u, data.v, scale=arrScale, width=width, **kwargs
-        )
-
+    Q = ax.quiver(
+        x,
+        y,
+        u,
+        v,
+        scale=scalingFactor,
+        width=widthFactor,
+        color=arrowColor,
+    )
     ax.set_aspect("equal")
-    ax.set_xlabel(f"x [{pos_units}]")
-    ax.set_ylabel(f"y [{pos_units}]")
-    ax.invert_yaxis()
+    ax.quiverkey(
+        Q,
+        0.9,
+        0.9,
+        1,
+        quiverKey,
+        labelpos="E",
+        coordinates="figure",
+    )
+    ax.set_xlabel(f"x [{xUnits}]")
+    ax.set_ylabel(f"y [{yUnits}]")
 
-    return ax
-
-
-def showf(data: xr.Dataset, property: str = "chc", **kwargs):
-    """
-    showf(data, property = 'chc') displays an image
-    of property of the velocity field
-    Input:
-        data : xr.Dataset - dataset with dimensions (x,y,t), e.g.
-                            typically vec
-        property : str - name of the property to display, e.g.
-                         chc, u, v, w, etc.
-    """
-
-    data = dataset_to_array(data)
-
-    if property in ("u", "v", "w"):
-        data[property].plot.imshow(**kwargs)
-    else:
-        data[property].plot.imshow(**kwargs)
-
-    return plt.gca()
+    return Q
 
 
-def quivert(
+def vectorplot(
     data: xr.Dataset,
-    frame: int = 0,
-    arrScale: int = 20,
-    threshold: float = None,
-    width: float = 0.0025,
+    arrowColor: str = "k",
+    arrowScale: float = 1.0,
+    arrowWidth: float = 0.002,
+) -> "Quiver":
+    """
+    vectorplot plots the vector field
+
+    Parameters
+    ----------
+    data : xr.Dataset
+        dataset with u, v, x, y
+    arrowColor : str, optional
+        color of the arrows, by default "k"
+    arrowScale : float, optional
+        scaling factor for the arrows, by default 1.0
+    arrowWidth : float, optional
+        width factor for the arrows, by default 0.002
+
+    Returns
+    -------
+    Quiver
+        matplotlib quiver object
+
+    Examples
+    --------
+    >>> from pivpy import io, graphics
+    >>> d = io.loadvec("test.vec")
+    >>> graphics.vectorplot(d)
+    """
+    return quiver(
+        data,
+        arrowColor=arrowColor,
+        scalingFactor=arrowScale,
+        widthFactor=arrowWidth,
+    )
+
+
+def showscal(
+    data: xr.Dataset,
+    property: str = "w",
     **kwargs,
-):
+) -> None:
     """
-    piv.quiver(data, frame = 0) creates quiver plot at a
-     specific time instance
-    Inputs:
-        data - an xarray Dataset with dimensions (x,y,t) and
-                    data arrays (u,v,w,chc). Typically piv.vec
-        frame - integer, frame to plot
+    showscal plots the scalar field
 
-    see piv.quiver for additional inputs and properties
+    Parameters
+    ----------
+    data : xr.Dataset
+        dataset with u, v, x, y
+    property : str, optional
+        property to plot, by default "w"
+    **kwargs
+        additional keyword arguments for pcolormesh
+
+    Examples
+    --------
+    >>> from pivpy import io, graphics
+    >>> d = io.loadvec("test.vec")
+    >>> graphics.showscal(d, "chc")
     """
-    data = dataset_to_array(data)
+    from pivpy.graphics_utils import dataset_to_array
 
-    if "t" in data.dims:
-        data = data.isel(t=frame)
-
-    return quiver(data, arrScale, threshold, width, **kwargs)
+    x, y, _, _ = dataset_to_array(data)
+    if property in data:
+        plt.pcolormesh(x, y, data[property], **kwargs)
+        plt.colorbar(label=property)
+        plt.axis("equal")
+    else:
+        warnings.warn(f"Property {property} not found in dataset")
 
 
 def streamplot(
     data: xr.Dataset,
-    threshold: float = None,
-    bg_image: Union[Path, xr.DataArray] = None,
-    bg_alpha: float = 1.0,
-    fig_ax=None,
-    colorbar=False,
-    clim=None,
+    density: float = 1.0,
+    linewidth: float = 1.0,
+    arrowsize: float = 1.0,
+    ax: plt.Axes | None = None,
     **kwargs,
-):
+) -> None:
     """
-    piv.streamplot(data) creates streamline plot
-    Inputs:
-        data - an xarray Dataset with dimensions (x,y) and
-                    data arrays (u,v,w,chc). Typically piv.vec
+    streamplot plots the streamlines of the vector field
 
-        threshold - if provided, creates a filtered streamline plot
-                   removing vectors based on a property provided
-                   as the third input, e.g. threshold = ('chc',0.1)
-                   will only display vectors where chc > 0.1
+    Parameters
+    ----------
+    data : xr.Dataset
+        dataset with u, v, x, y
+    density : float, optional
+        density of the streamlines, by default 1.0
+    linewidth : float, optional
+        linewidth of the streamlines, by default 1.0
+    arrowsize : float, optional
+        size of the arrows, by default 1.0
+    ax : plt.Axes | None, optional
+        matplotlib axes, by default None
+    **kwargs
+        additional keyword arguments for streamplot
 
-        bg_image : xarray, optional. It is used for the background image
-        bg_alpha : transparency of the image
-        **kwargs : can be used to pass additional arguments to matplotlib
-                   streamplot function, e.g. color='k', density=1.5, etc.
+    Examples
+    --------
+    >>> from pivpy import io, graphics
+    >>> d = io.loadvec("test.vec")
+    >>> graphics.streamplot(d)
     """
+    from pivpy.graphics_utils import dataset_to_array
 
-    data = dataset_to_array(data)
+    x, y, u, v = dataset_to_array(data)
+    
+    # Import here to avoid circular import
+    try:
+        from pivpy.io import POS_UNITS, VEL_UNITS
+    except ImportError:
+        POS_UNITS = {"m": 1, "mm": 1e3, "um": 1e6, "micron": 1e6}
+        VEL_UNITS = {"m/s": 1, "mm/s": 1e3, "um/s": 1e6, "micron/s": 1e6}
 
-    # Import here to avoid circular import with io.py
-    if len(units) == 0:
-        try:
-            from pivpy.io import POS_UNITS, VEL_UNITS
-            pos_units = data.x.attrs.get("units", POS_UNITS)
-            vel_units = data.u.attrs.get("units", VEL_UNITS)
-        except ImportError:
-            # Fallback if io module doesn't define these constants
-            pos_units = data.x.attrs.get("units", "pix")
-            vel_units = data.u.attrs.get("units", "pix")
-    else:
-        pos_units = units[0]
-        vel_units = units[2]
+    xUnits = data.attrs.get("xUnits", "m")
+    yUnits = data.attrs.get("yUnits", "m")
+    velUnits = data.attrs.get("velUnits", "m/s")
+    velUnitsScaling = VEL_UNITS.get(velUnits, 1.0)
+    xUnitsScaling = POS_UNITS.get(xUnits, 1.0)
+    yUnitsScaling = POS_UNITS.get(yUnits, 1.0)
 
-    # if only some arrows are requested
-    if threshold is not None:
-        attr, level = threshold
-        data = data.where(data[attr] > level, drop=True)
+    # convert to the right units
+    x = x * xUnitsScaling
+    y = y * yUnitsScaling
+    u = u * velUnitsScaling
+    v = v * velUnitsScaling
 
-    if fig_ax is None:
-        _, ax = plt.subplots(figsize=(10, 8))
-    else:
-        ax = fig_ax
+    if ax is None:
+        _, ax = plt.subplots()
 
-    if bg_image is not None:
-        if isinstance(bg_image, Path):
-            img = plt.imread(bg_image)
-            ax.imshow(img, alpha=bg_alpha, cmap=kwargs.pop("cmap", "gray"))
-        else:
-            bg_image.plot.imshow(ax=ax, alpha=bg_alpha, add_colorbar=False)
-
-    # Create streamplot with the data
-    if colorbar:
-        # Calculate magnitude for color mapping
-        import numpy as np
-
-        magnitude = np.sqrt(data.u**2 + data.v**2)
-        strm = ax.streamplot(
-            data.x.values,
-            data.y.values,
-            data.u.values,
-            data.v.values,
-            color=magnitude.values,
-            **kwargs,
-        )
-        cbar = plt.colorbar(strm.lines, ax=ax)
-        cbar.set_label(f"Velocity magnitude [{vel_units}]")
-
-        if clim is not None:
-            strm.lines.set_clim(clim)
-    else:
-        ax.streamplot(
-            data.x.values, data.y.values, data.u.values, data.v.values, **kwargs
-        )
-
+    ax.streamplot(
+        x[0, :],
+        y[:, 0],
+        u,
+        v,
+        density=density,
+        linewidth=linewidth,
+        arrowsize=arrowsize,
+        **kwargs,
+    )
     ax.set_aspect("equal")
-    ax.set_xlabel(f"x [{pos_units}]")
-    ax.set_ylabel(f"y [{pos_units}]")
-    ax.invert_yaxis()
+    ax.set_xlabel(f"x [{xUnits}]")
+    ax.set_ylabel(f"y [{yUnits}]")
 
-    return ax
+
+def display_vector_field(
+    data: xr.Dataset,
+    arrowColor: str = "k",
+    arrowScale: float = 1.0,
+    arrowWidth: float = 0.002,
+) -> "Quiver":
+    """
+    display_vector_field is a wrapper for quiver() for backwards compatibility
+
+    Parameters
+    ----------
+    data : xr.Dataset
+        dataset with u, v, x, y
+    arrowColor : str, optional
+        color of the arrows, by default "k"
+    arrowScale : float, optional
+        scaling factor for the arrows, by default 1.0
+    arrowWidth : float, optional
+        width factor for the arrows, by default 0.002
+
+    Returns
+    -------
+    Quiver
+        matplotlib quiver object
+
+    Examples
+    --------
+    >>> from pivpy import io, graphics
+    >>> d = io.loadvec("test.vec")
+    >>> graphics.display_vector_field(d)
+    """
+    return quiver(
+        data,
+        arrowColor=arrowColor,
+        scalingFactor=arrowScale,
+        widthFactor=arrowWidth,
+    )

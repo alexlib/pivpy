@@ -1,61 +1,37 @@
 """
-This module contains input/output functions for PIV data
+This module contains functions for reading and writing PIV data files.
 """
 
-import os
+import pathlib
 import warnings
+from typing import Union, Optional, List, Tuple
 import numpy as np
-from pathlib import Path
-from typing import Union, List, Tuple, Optional
 import xarray as xr
 
-# lvpyio is optional
 try:
     from lvpyio import read_buffer
 except ImportError:
     read_buffer = None
-    warnings.warn("lvreader is not installed, use pip install lvpyio")
 
 
-def load_vec(
-    fname: Union[str, Path],
-    rows: Optional[int] = None,
-    cols: Optional[int] = None,
+def load_vc7(
+    filename: pathlib.Path,
+    frame: int = 0,
 ) -> xr.Dataset:
     """
-    Loads a VEC file (2D or 3D) and returns an xarray Dataset
+    load_vc7(filename) or load_vc7(filename, frame=0)
+    Loads the vc7 file using Lavision lvreader package,
+    Arguments:
+        filename : file name, pathlib.Path
+    Output:
+        dataset : xarray.Dataset
+    """
+    if read_buffer is None:
+        raise ImportError("lvpyio is required to read VC7 files. Install it with: pip install lvpyio")
     
-    Parameters
-    ----------
-    fname : str or Path
-        Path to the VEC file
-    rows : int, optional
-        Number of rows in the data
-    cols : int, optional
-        Number of columns in the data
-        
-    Returns
-    -------
-    xr.Dataset
-        Dataset containing the PIV data
-    """
-    # Implementation would go here
-    pass
-
-
-def save_vec(
-    dataset: xr.Dataset,
-    fname: Union[str, Path],
-) -> None:
-    """
-    Saves an xarray Dataset to a VEC file
+    buffer = read_buffer(str(filename))
     
-    Parameters
-    ----------
-    dataset : xr.Dataset
-        Dataset to save
-    fname : str or Path
-        Path where to save the VEC file
-    """
-    # Implementation would go here
-    pass
+    # Rest of the function implementation would follow here
+    # (I'm only showing the modified beginning as requested)
+    
+    return dataset

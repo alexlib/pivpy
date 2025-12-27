@@ -42,6 +42,24 @@ Typical dataset structure:
 - Dims: ``('y', 'x', 't')``
 - Variables: ``u``, ``v``, and (often) ``chc``
 
+Create a scalar dataset from an image (PIVMAT-style ``im2pivmat``)
+===============================================================
+
+If you have a 2D image array (shape ``(y, x)``), you can wrap it into a PIVPy
+scalar Dataset using :func:`pivpy.io.im2pivmat`:
+
+.. code-block:: python
+
+   import numpy as np
+   from pivpy import io
+   import pivpy.pivpy  # registers the .piv accessor
+
+   im = np.random.rand(128, 256)
+   ds_im = io.im2pivmat(im, namew='I', unit='au')
+
+   # Plot the scalar field
+   ds_im.piv.showscal(property='w')
+
 Gradient of a scalar field (PIVMAT-style ``gradientf``)
 =======================================================
 
@@ -91,6 +109,26 @@ the velocity field:
 
    hv = ds.piv.histf()
    # hv contains hv['hx'] for u (or vx) and hv['hy'] for v (or vy)
+
+Graphical histogram display (PIVMAT-style)
+==========================================
+
+PIVPy also includes plotting helpers inspired by PIVMAT's ``histscal_disp`` and
+``histvec_disp``.
+
+Scalar histogram display (with optional PDF normalization):
+
+.. code-block:: python
+
+   from pivpy import graphics
+
+   fig, ax = graphics.histscal_disp(ds, variable='w', opt='n')
+
+Vector histogram display:
+
+.. code-block:: python
+
+   fig, ax = graphics.histvec_disp(ds, opt='n')
 
 Extract a rectangular region (PIVMAT-style ``extractf``)
 ================================================================

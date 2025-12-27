@@ -21,6 +21,8 @@ from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
 from pivpy.graphics import streamplot as gstreamplot
 from pivpy.graphics import autocorrelation_plot as gautocorrelation_plot
+from pivpy.graphics import histscal_disp as ghistscal_disp
+from pivpy.graphics import histvec_disp as ghistvec_disp
 from pivpy.compute_funcs import (
     Γ1_moving_window_function,
     Γ2_moving_window_function,
@@ -2266,6 +2268,14 @@ class PIVAccessor(object):
     def showscal(self, **kwargs):
         """method for graphics.showscal"""
         gshowscal(self._obj, **kwargs)
+
+    def histscal_disp(self, *args, **kwargs):
+        """method for graphics.histscal_disp"""
+        return ghistscal_disp(self._obj, *args, **kwargs)
+
+    def histvec_disp(self, *args, **kwargs):
+        """method for graphics.histvec_disp"""
+        return ghistvec_disp(self._obj, *args, **kwargs)
 
     def autocorrelation_plot(self, variable: str = "u", spatial_average: bool = True, **kwargs):
         """Creates autocorrelation plot of a specified variable

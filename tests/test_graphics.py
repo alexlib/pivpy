@@ -94,3 +94,35 @@ def test_autocorrelation_plot():
     # Test with accessor
     _d.piv.autocorrelation_plot(variable='u')
     _d.piv.autocorrelation_plot(variable='v', spatial_average=False)
+
+
+def test_histscal_disp():
+    """tests histscal_disp"""
+    d = io.create_sample_Dataset(n_frames=3, rows=8, cols=8)
+    fig, ax = graphics.histscal_disp(d, variable='u', smooth=0, opt='n')
+    assert fig is not None
+    assert ax is not None
+
+    # log-y option
+    fig2, ax2 = graphics.histscal_disp(d, variable='u', smooth=0, opt='nl')
+    assert ax2.get_yscale() == 'log'
+
+    # accessor wrapper
+    fig3, ax3 = d.piv.histscal_disp(variable='u', smooth=0, opt='n')
+    assert fig3 is not None
+    assert ax3 is not None
+
+
+def test_histvec_disp():
+    """tests histvec_disp"""
+    d = io.create_sample_Dataset(n_frames=3, rows=8, cols=8)
+    fig, ax = graphics.histvec_disp(d, smooth=0, opt='n')
+    assert fig is not None
+    assert ax is not None
+
+    fig2, ax2 = graphics.histvec_disp(d, smooth=0, opt='nl')
+    assert ax2.get_yscale() == 'log'
+
+    fig3, ax3 = d.piv.histvec_disp(smooth=0, opt='n')
+    assert fig3 is not None
+    assert ax3 is not None

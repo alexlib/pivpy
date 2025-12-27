@@ -432,6 +432,261 @@ def histogram(data: xr.Dataset, bins: int = 50, ax: plt.Axes | None = None, **kw
     return fig, ax
 
 
+def histscal_disp(
+    data: xr.Dataset,
+    smooth: int = 0,
+    bin: np.ndarray | None = None,
+    opt: str = "ngl",
+    *,
+    variable: str = "w",
+    ax: plt.Axes | None = None,
+) -> tuple[plt.Figure, plt.Axes] | list[tuple[plt.Figure, plt.Axes]]:
+    """Display histogram(s) for a scalar field (PIVMAT-inspired).
+
+    Parameters
+    ----------
+    data:
+        Dataset containing the scalar variable.
+    smooth:
+        Number of consecutive frames to average. Use ``0`` to average over all
+        frames (default). If ``smooth>1``, returns a list of figures (one per
+        chunk).
+    bin:
+        Optional bin centers.
+    opt:
+        Option string. Supported letters:
+        ``n`` (normalize to PDF), ``g`` (Gaussian fit), ``l`` (log y-axis).
+        To include zeros in the underlying histogram computation, include
+        ``'0'`` in ``opt``.
+    variable:
+        Scalar variable name (default: ``'w'``). If missing and ``'u'`` exists,
+        falls back to ``'u'`` for convenience.
+    ax:
+        Optional axes to plot into (only used when producing a single plot).
+
+    Returns
+    -------
+    tuple or list of tuple
+        ``(fig, ax)`` or a list of ``(fig, ax)`` when multiple chunks are plotted.
+    """
+
+    ds = data
+    if variable not in ds and "u" in ds and variable == "w":
+        variable = "u"
+    if variable not in ds:
+        raise KeyError(f"Variable {variable} not found in dataset")
+
+    opt_l = str(opt).lower() if opt is not None else ""
+    normalize = "n" in opt_l
+    gaussian = "g" in opt_l
+    logy = "l" in opt_l
+    include_zeros = "0" in opt_l
+
+    if "t" in ds.dims:
+        nframe = int(ds.sizes.get("t", 1))
+    else:
+        nframe = 1
+
+    if smooth is None:
+        smooth = 0
+    smooth_i = int(smooth)
+    if smooth_i <= 0:
+        smooth_i = nframe
+
+    results: list[tuple[plt.Figure, plt.Axes]] = []
+    n_chunks = max(1, nframe // smooth_i)
+
+    for chunk in range(n_chunks):
+        t0 = chunk * smooth_i
+        t1 = (chunk + 1) * smooth_i
+        sub = ds.isel(t=slice(t0, t1)) if "t" in ds.dims else ds
+
+        hds = sub.piv.histf(variable=variable, bin=bin, opt="0" if include_zeros else "")
+        centers = np.asarray(hds["bin"].values, dtype=float)
+        counts = np.asarray(hds["h"].values, dtype=float)
+
+        delta = float(centers[1] - centers[0]) if centers.size >= 2 else 1.0
+        y = counts.copy()
+        if normalize:
+            denom = float(np.sum(y)) * delta
+            if denom != 0:
+                y = y / denom
+
+        # Stats for axis limits and Gaussian overlay.
+        vals = np.asarray(sub[variable].values, dtype=float).ravel()
+        vals = vals[np.isfinite(vals)]
+        if not include_zeros:
+            vals = vals[vals != 0]
+        mean = float(np.mean(vals)) if vals.size else 0.0
+        std = float(np.std(vals)) if vals.size else 1.0
+        if not np.isfinite(std) or std == 0.0:
+            std = 1.0
+
+        if ax is not None and n_chunks == 1:
+            fig = ax.figure
+            use_ax = ax
+        else:
+            fig, use_ax = plt.subplots()
+
+        use_ax.plot(centers, y, "ro", label="hist")
+        use_ax.axvline(0.0, color="k", linewidth=1.0)
+        use_ax.set_xlabel(variable)
+        use_ax.set_ylabel("pdf" if normalize else "Histogram")
+
+        if logy:
+            # Matplotlib warns if attempting log scale with no positive values.
+            if np.any(y > 0):
+                use_ax.set_yscale("log")
+
+        # x-limits like PIVMAT: +/- 15*std around 0 or around mean.
+        if mean < std:
+            use_ax.set_xlim(-15.0 * std, 15.0 * std)
+        else:
+            use_ax.set_xlim(mean - 15.0 * std, mean + 15.0 * std)
+
+        if gaussian:
+            xg = np.linspace(float(centers[0]), float(centers[-1]), 2000)
+            gauss = 1.0 / (np.sqrt(2.0 * np.pi) * std) * np.exp(-0.5 * (xg**2) / (std**2))
+            use_ax.plot(xg, gauss, "b-", label="gauss")
+
+        if "t" in ds.dims:
+            use_ax.set_title(f"{variable}: frames {t0}..{t1-1}")
+        else:
+            use_ax.set_title(f"{variable} histogram")
+
+        if gaussian:
+            use_ax.legend()
+
+        results.append((fig, use_ax))
+
+    return results[0] if len(results) == 1 else results
+
+
+def histvec_disp(
+    data: xr.Dataset,
+    smooth: int = 0,
+    bin: np.ndarray | None = None,
+    opt: str = "ngl",
+    *,
+    ax: plt.Axes | None = None,
+) -> tuple[plt.Figure, plt.Axes] | list[tuple[plt.Figure, plt.Axes]]:
+    """Display histogram(s) for a 2D vector field (PIVMAT-inspired).
+
+    Vector components are taken from ``('u','v')`` if present, otherwise
+    ``('vx','vy')``.
+
+    Parameters
+    ----------
+    data:
+        Dataset containing vector components.
+    smooth, bin, opt, ax:
+        Same semantics as :func:`histscal_disp`.
+
+    Returns
+    -------
+    tuple or list of tuple
+        ``(fig, ax)`` or a list of ``(fig, ax)`` when multiple chunks are plotted.
+    """
+
+    ds = data
+    if "u" in ds and "v" in ds:
+        xname, yname = "u", "v"
+    elif "vx" in ds and "vy" in ds:
+        xname, yname = "vx", "vy"
+    else:
+        raise KeyError("histvec_disp requires ('u','v') or ('vx','vy')")
+
+    opt_l = str(opt).lower() if opt is not None else ""
+    normalize = "n" in opt_l
+    gaussian = "g" in opt_l
+    logy = "l" in opt_l
+    include_zeros = "0" in opt_l
+
+    if "t" in ds.dims:
+        nframe = int(ds.sizes.get("t", 1))
+    else:
+        nframe = 1
+
+    if smooth is None:
+        smooth = 0
+    smooth_i = int(smooth)
+    if smooth_i <= 0:
+        smooth_i = nframe
+
+    results: list[tuple[plt.Figure, plt.Axes]] = []
+    n_chunks = max(1, nframe // smooth_i)
+
+    for chunk in range(n_chunks):
+        t0 = chunk * smooth_i
+        t1 = (chunk + 1) * smooth_i
+        sub = ds.isel(t=slice(t0, t1)) if "t" in ds.dims else ds
+
+        hds = sub.piv.histf(variable=None, bin=bin, opt="0" if include_zeros else "")
+        centers = np.asarray(hds["bin"].values, dtype=float)
+        hx = np.asarray(hds["hx"].values, dtype=float)
+        hy = np.asarray(hds["hy"].values, dtype=float)
+
+        delta = float(centers[1] - centers[0]) if centers.size >= 2 else 1.0
+        if normalize:
+            sx = float(np.sum(hx)) * delta
+            sy = float(np.sum(hy)) * delta
+            if sx != 0:
+                hx = hx / sx
+            if sy != 0:
+                hy = hy / sy
+
+        # Stats for Gaussian overlay.
+        def _stats(arr: xr.DataArray) -> tuple[float, float]:
+            v = np.asarray(arr.values, dtype=float).ravel()
+            v = v[np.isfinite(v)]
+            if not include_zeros:
+                v = v[v != 0]
+            if v.size == 0:
+                return 0.0, 1.0
+            m = float(np.mean(v))
+            s = float(np.std(v))
+            if not np.isfinite(s) or s == 0.0:
+                s = 1.0
+            return m, s
+
+        mx, sx = _stats(sub[xname])
+        my, sy = _stats(sub[yname])
+
+        if ax is not None and n_chunks == 1:
+            fig = ax.figure
+            use_ax = ax
+        else:
+            fig, use_ax = plt.subplots()
+
+        use_ax.plot(centers, hx, "ro", label=xname)
+        use_ax.plot(centers, hy, "bs", label=yname)
+        use_ax.axvline(0.0, color="k", linewidth=1.0)
+        use_ax.set_xlabel("value")
+        use_ax.set_ylabel("pdf" if normalize else "Histogram")
+        use_ax.legend()
+
+        if logy:
+            # Matplotlib warns if attempting log scale with no positive values.
+            if np.any(hx > 0) or np.any(hy > 0):
+                use_ax.set_yscale("log")
+
+        if gaussian:
+            xg = np.linspace(float(centers[0]), float(centers[-1]), 2000)
+            gx = float(np.max(hx)) * np.exp(-0.5 * ((xg - mx) ** 2) / (sx**2))
+            gy = float(np.max(hy)) * np.exp(-0.5 * ((xg - my) ** 2) / (sy**2))
+            use_ax.plot(xg, gx, "r-", linewidth=1.0)
+            use_ax.plot(xg, gy, "b-", linewidth=1.0)
+
+        if "t" in ds.dims:
+            use_ax.set_title(f"vector hist: frames {t0}..{t1-1}")
+        else:
+            use_ax.set_title("vector histogram")
+
+        results.append((fig, use_ax))
+
+    return results[0] if len(results) == 1 else results
+
+
 def autocorrelation_plot(
     data: xr.Dataset,
     variable: str = "u",

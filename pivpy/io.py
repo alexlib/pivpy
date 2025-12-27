@@ -126,6 +126,82 @@ def from_arrays(
     return set_default_attrs(ds)
 
 
+def im2pivmat(
+    im: ArrayLike,
+    *,
+    x: ArrayLike | None = None,
+    y: ArrayLike | None = None,
+    namew: str = "I",
+    unit: str = "au",
+    dtype: Any = np.float32,
+) -> xr.Dataset:
+    """Convert an image into a PIVPy scalar Dataset (PIVMAT-inspired).
+
+    This is the xarray equivalent of PIVMAT's ``im2pivmat.m``.
+
+    The result is a single-frame Dataset with dims ``('y','x','t')`` and a
+    scalar variable ``w``.
+
+    Parameters
+    ----------
+    im:
+        2D image array (interpreted as ``(y, x)``).
+    x, y:
+        Optional 1D coordinate vectors. Defaults are 1..N (MATLAB-like).
+    namew:
+        Display name for the scalar (stored in ``w.attrs['long_name']``).
+    unit:
+        Unit string for coordinates and intensity (default: ``'au'``).
+    dtype:
+        Output dtype for ``w`` (default: ``numpy.float32``).
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with variable ``w`` and coordinates ``x``, ``y``, ``t``.
+    """
+
+    arr = np.asarray(im)
+    if arr.ndim != 2:
+        raise ValueError("im2pivmat expects a 2D image array")
+
+    ny, nx = int(arr.shape[0]), int(arr.shape[1])
+
+    if x is None:
+        x1 = np.arange(1, nx + 1, dtype=float)
+    else:
+        x1 = np.asarray(x, dtype=float)
+        if x1.ndim != 1 or x1.size != nx:
+            raise ValueError("x must be a 1D array with length equal to image width")
+
+    if y is None:
+        y1 = np.arange(1, ny + 1, dtype=float)
+    else:
+        y1 = np.asarray(y, dtype=float)
+        if y1.ndim != 1 or y1.size != ny:
+            raise ValueError("y must be a 1D array with length equal to image height")
+
+    w = np.asarray(arr, dtype=dtype)
+    ds = xr.Dataset(
+        data_vars={"w": (("y", "x", "t"), w[:, :, None])},
+        coords={
+            "x": ("x", x1),
+            "y": ("y", y1),
+            "t": ("t", np.asarray([0.0], dtype=float)),
+        },
+    )
+
+    ds["x"].attrs.setdefault("units", unit)
+    ds["y"].attrs.setdefault("units", unit)
+    ds["t"].attrs.setdefault("units", TIME_UNITS)
+    ds["w"].attrs.setdefault("units", unit)
+    ds["w"].attrs.setdefault("long_name", str(namew))
+    ds.attrs.setdefault("source", "image")
+    ds.attrs.setdefault("delta_t", float(DELTA_T))
+    ds.attrs.setdefault("files", [])
+    return ds
+
+
 def create_sample_field(
     rows: int = 10,
     cols: int = 11,

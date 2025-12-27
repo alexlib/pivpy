@@ -136,6 +136,44 @@ scalar variables and display it with filled contours:
    jpdf = ds.piv.jpdfscal('w', 'div', nbin=101)
    fig, ax = ds.piv.jpdfscal_disp('w', 'div', nbin=101)
 
+Probe time series (PIVMAT-style ``probef`` and ``probeaverf``)
+==============================================================
+
+Sample the time evolution at a point (with bilinear interpolation):
+
+.. code-block:: python
+
+   p = ds.piv.probef(20.0, 30.0, variables=['u', 'v'])
+   # p['u'] and p['v'] are 1D time series over the dataset's t dimension
+
+Average over a rectangular probe area ``[x1, y1, x2, y2]``:
+
+.. code-block:: python
+
+   pavg = ds.piv.probeaverf([10.0, 10.0, 30.0, 40.0], variables=['u', 'v'])
+
+Spatio-temporal diagram (PIVMAT-style ``spatiotempf``)
+======================================================
+
+Sample a scalar field along a line segment for each time frame:
+
+.. code-block:: python
+
+   ds = ds.piv.vec2scal('vorticity', name='w')
+   st = ds.piv.spatiotempf([0.0, 50.0], [10.0, 10.0], var='w', n=200)
+   # st['st'] has dims (t, s) and can be plotted with imshow/pcolormesh.
+
+Temporal correlation (PIVMAT-style ``tempcorrf``)
+=================================================
+
+Compute the temporal correlation function $f(T)$ of a scalar (or vector) time series
+averaged over space:
+
+.. code-block:: python
+
+   cor = ds.piv.tempcorrf(variables=['w'], normalize=True)
+   # cor['f'] is the correlation vs lag cor['t']
+
 Gradient of a scalar field (PIVMAT-style ``gradientf``)
 =======================================================
 

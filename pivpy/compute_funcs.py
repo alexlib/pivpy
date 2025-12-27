@@ -274,6 +274,400 @@ def corrx(
     return c
 
 
+def _sel_coord_range(ds: xr.Dataset, coord: str, lo: float, hi: float) -> xr.Dataset:
+    if coord not in ds.coords:
+        raise ValueError(f"Dataset is missing coordinate '{coord}'")
+
+    vals = np.asarray(ds[coord].values, dtype=float)
+    if vals.size == 0:
+        return ds
+    if vals.size == 1:
+        return ds
+
+    increasing = bool(vals[1] >= vals[0])
+    a = float(lo)
+    b = float(hi)
+    if increasing:
+        return ds.sel({coord: slice(min(a, b), max(a, b))})
+    return ds.sel({coord: slice(max(a, b), min(a, b))})
+
+
+def probef(
+    ds: xr.Dataset,
+    x0,
+    y0,
+    *,
+    variables: list[str] | None = None,
+    method: str = "linear",
+) -> xr.Dataset:
+    """Record the time evolution of probe point(s) in a dataset (PIVMAT-inspired).
+
+    This samples one or more variables at one or more probe points (x0, y0)
+    using xarray's interpolation along the spatial coordinates.
+
+    Parameters
+    ----------
+    ds:
+        Input dataset with spatial coordinates ``x`` and ``y``.
+    x0, y0:
+        Probe coordinates in physical units. Scalars or 1D arrays of equal length.
+    variables:
+        Variables to sample. If None, defaults to ``['u','v']`` when present,
+        otherwise tries ``['w']``.
+    method:
+        Interpolation method, passed to ``DataArray.interp`` (e.g. 'linear', 'nearest').
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset of sampled time series. If multiple probe points are given,
+        the result has a ``probe`` dimension.
+    """
+
+    if "x" not in ds.coords or "y" not in ds.coords:
+        raise ValueError("probef requires coordinates 'x' and 'y'")
+
+    if variables is None:
+        if "u" in ds and "v" in ds:
+            variables = ["u", "v"]
+        elif "w" in ds:
+            variables = ["w"]
+        else:
+            # Fall back to first data_var if any.
+            if not ds.data_vars:
+                raise ValueError("probef: dataset has no data variables")
+            variables = [next(iter(ds.data_vars))]
+
+    variables = list(variables)
+    for name in variables:
+        if name not in ds:
+            raise KeyError(f"Variable '{name}' not found in dataset")
+
+    x_arr = np.asarray(x0, dtype=float)
+    y_arr = np.asarray(y0, dtype=float)
+    if x_arr.ndim == 0 and y_arr.ndim == 0:
+        # Single probe point
+        x_da: xr.DataArray | float = float(x_arr)
+        y_da: xr.DataArray | float = float(y_arr)
+        probe_coord = None
+    else:
+        x_arr = np.atleast_1d(x_arr).astype(float)
+        y_arr = np.atleast_1d(y_arr).astype(float)
+        if x_arr.shape != y_arr.shape:
+            raise ValueError("x0 and y0 must have the same shape")
+        probe = np.arange(int(x_arr.size), dtype=int)
+        x_da = xr.DataArray(x_arr.reshape(-1), dims=("probe",), coords={"probe": probe})
+        y_da = xr.DataArray(y_arr.reshape(-1), dims=("probe",), coords={"probe": probe})
+        probe_coord = probe
+
+    out_vars: dict[str, xr.DataArray] = {}
+    for name in variables:
+        da = ds[name]
+        if "x" not in da.dims or "y" not in da.dims:
+            raise ValueError(f"Variable '{name}' must have dims including 'x' and 'y'")
+        sampled = da.interp(x=x_da, y=y_da, method=method)
+        out_vars[name] = sampled
+
+    out = xr.Dataset(out_vars)
+    if probe_coord is not None:
+        out = out.assign_coords(
+            x_probe=("probe", np.asarray(x_arr.reshape(-1), dtype=float)),
+            y_probe=("probe", np.asarray(y_arr.reshape(-1), dtype=float)),
+        )
+    out.attrs = dict(ds.attrs)
+    return out
+
+
+def probeaverf(
+    ds: xr.Dataset,
+    rect,
+    *,
+    variables: list[str] | None = None,
+    skipna: bool = True,
+) -> xr.Dataset:
+    """Time series averaged over a rectangular area (PIVMAT-inspired).
+
+    Parameters
+    ----------
+    ds:
+        Input dataset with spatial coordinates ``x`` and ``y``.
+    rect:
+        Rectangle as ``[x1, y1, x2, y2]`` in physical units.
+    variables:
+        Variables to average. If None, defaults to ``['u','v']`` when present,
+        otherwise tries ``['w']``.
+    skipna:
+        If True (default), NaNs are ignored in the mean.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset containing the spatially averaged time series.
+    """
+
+    if rect is None or not hasattr(rect, "__len__") or len(rect) != 4:
+        raise ValueError("rect must be [x1, y1, x2, y2]")
+
+    if variables is None:
+        if "u" in ds and "v" in ds:
+            variables = ["u", "v"]
+        elif "w" in ds:
+            variables = ["w"]
+        else:
+            if not ds.data_vars:
+                raise ValueError("probeaverf: dataset has no data variables")
+            variables = [next(iter(ds.data_vars))]
+
+    variables = list(variables)
+    for name in variables:
+        if name not in ds:
+            raise KeyError(f"Variable '{name}' not found in dataset")
+
+    x1, y1, x2, y2 = [float(v) for v in rect]
+    sub = _sel_coord_range(ds, "x", x1, x2)
+    sub = _sel_coord_range(sub, "y", y1, y2)
+
+    out_vars: dict[str, xr.DataArray] = {}
+    for name in variables:
+        da = sub[name]
+        if "x" not in da.dims or "y" not in da.dims:
+            raise ValueError(f"Variable '{name}' must have dims including 'x' and 'y'")
+        out_vars[name] = da.mean(dim=("y", "x"), skipna=bool(skipna))
+
+    out = xr.Dataset(out_vars)
+    out.attrs = dict(ds.attrs)
+    return out
+
+
+def spatiotempf(
+    ds: xr.Dataset,
+    X,
+    Y,
+    *,
+    var: str = "w",
+    n: int | None = None,
+    method: str = "linear",
+) -> xr.Dataset:
+    """Spatio-temporal diagram along one (or more) line segments (PIVMAT-inspired).
+
+    This samples a scalar field along line segment(s) defined by endpoints
+    ``(X[i,0], Y[i,0]) -> (X[i,1], Y[i,1])`` and returns the sampled values
+    as a function of time and curvilinear coordinate.
+
+    Parameters
+    ----------
+    ds:
+        Input dataset with coordinates ``x`` and ``y``.
+    X, Y:
+        Endpoints in physical units.
+
+        - Single line: ``X=[x0,x1]``, ``Y=[y0,y1]``.
+        - Multiple lines: ``X=[[x0,x1],[...]]``, ``Y=[[y0,y1],[...]]``.
+    var:
+        Scalar variable name to sample.
+    n:
+        Number of sample points along each line. If None, a heuristic based on
+        grid spacing is used.
+    method:
+        Interpolation method for ``DataArray.interp``.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with variable ``st``.
+
+        - dims: ``('t','s')`` for a single line, or ``('line','t','s')`` for multiple.
+        - coords: ``s`` is the distance along the line (same units as x/y).
+          ``x_line`` and ``y_line`` give the sampled coordinates along the line.
+    """
+
+    if "x" not in ds.coords or "y" not in ds.coords:
+        raise ValueError("spatiotempf requires coordinates 'x' and 'y'")
+    if var not in ds:
+        raise KeyError(f"Variable '{var}' not found in dataset")
+
+    da = ds[var]
+    if "x" not in da.dims or "y" not in da.dims:
+        raise ValueError(f"Variable '{var}' must have dims including 'x' and 'y'")
+    if "t" not in da.dims:
+        raise ValueError("spatiotempf requires a time dimension 't'")
+
+    X_arr = np.asarray(X, dtype=float)
+    Y_arr = np.asarray(Y, dtype=float)
+
+    # Normalize to (nlines, 2)
+    if X_arr.ndim == 1:
+        if X_arr.size != 2 or Y_arr.ndim != 1 or Y_arr.size != 2:
+            raise ValueError("For a single line, X and Y must be length-2 sequences")
+        X_arr = X_arr.reshape(1, 2)
+        Y_arr = Y_arr.reshape(1, 2)
+        single_line = True
+    else:
+        if X_arr.ndim != 2 or Y_arr.ndim != 2 or X_arr.shape != Y_arr.shape or X_arr.shape[1] != 2:
+            raise ValueError("For multiple lines, X and Y must be shaped (nlines, 2)")
+        single_line = X_arr.shape[0] == 1
+
+    # Heuristic for n based on average grid spacing
+    if n is None:
+        xvals = np.asarray(ds["x"].values, dtype=float)
+        yvals = np.asarray(ds["y"].values, dtype=float)
+        dx = float(np.nanmedian(np.abs(np.diff(xvals)))) if xvals.size >= 2 else 1.0
+        dy = float(np.nanmedian(np.abs(np.diff(yvals)))) if yvals.size >= 2 else 1.0
+        d = float(np.nanmin([dx, dy])) if np.isfinite(dx) and np.isfinite(dy) else 1.0
+        if not np.isfinite(d) or d <= 0:
+            d = 1.0
+        lengths = np.sqrt((X_arr[:, 1] - X_arr[:, 0]) ** 2 + (Y_arr[:, 1] - Y_arr[:, 0]) ** 2)
+        maxlen = float(np.nanmax(lengths)) if lengths.size else 0.0
+        n = int(max(2, min(4096, np.ceil(maxlen / d) + 1)))
+    else:
+        n = int(n)
+        if n < 2:
+            raise ValueError("n must be >= 2")
+
+    s = np.linspace(0.0, 1.0, n, dtype=float)
+
+    # We keep a normalized s in [0,1] as the dimension for robust concatenation.
+    # Physical distance along the line is provided as coordinate ``s_phys``.
+    line_lengths = np.sqrt((X_arr[:, 1] - X_arr[:, 0]) ** 2 + (Y_arr[:, 1] - Y_arr[:, 0]) ** 2)
+    line_lengths = np.asarray(line_lengths, dtype=float)
+
+    out_list: list[xr.DataArray] = []
+    for i in range(int(X_arr.shape[0])):
+        x_line = X_arr[i, 0] + s * (X_arr[i, 1] - X_arr[i, 0])
+        y_line = Y_arr[i, 0] + s * (Y_arr[i, 1] - Y_arr[i, 0])
+
+        x_da = xr.DataArray(x_line, dims=("s",), coords={"s": s})
+        y_da = xr.DataArray(y_line, dims=("s",), coords={"s": s})
+        sampled = da.interp(x=x_da, y=y_da, method=method)
+        # sampled dims: (t, s) plus any others (but var should be scalar).
+        sampled = sampled.transpose("t", "s", ...)
+        sampled = sampled.assign_coords(
+            x_line=("s", np.asarray(x_line, dtype=float)),
+            y_line=("s", np.asarray(y_line, dtype=float)),
+            s_phys=("s", np.asarray(s * float(line_lengths[i]), dtype=float)),
+        )
+        out_list.append(sampled)
+
+    if len(out_list) == 1:
+        st = out_list[0]
+        # For single-line case, promote s_phys to be the primary coordinate values
+        # while keeping the dimension name 's'.
+        st = st.assign_coords(s=np.asarray(st["s_phys"].values, dtype=float))
+        st.name = "st"
+        out = xr.Dataset({"st": st})
+        out.attrs = dict(ds.attrs)
+        return out
+
+    st_all = xr.concat(out_list, dim="line")
+    st_all = st_all.assign_coords(line=np.arange(st_all.sizes["line"], dtype=int))
+    st_all.name = "st"
+    out = xr.Dataset({"st": st_all})
+    out.attrs = dict(ds.attrs)
+    return out
+
+
+def tempcorrf(
+    ds: xr.Dataset,
+    *,
+    variables: list[str] | None = None,
+    opt: str = "",
+    normalize: bool = False,
+) -> xr.Dataset:
+    """Temporal correlation function of vector or scalar fields (PIVMAT-inspired).
+
+    For a scalar field ``w(t)``, computes a time-lag correlation
+    ``C(T) = < w(t) w(t+T) >`` where the average is taken over space and
+    over time pairs.
+
+    For a vector field, returns the sum of the correlations of each component.
+
+    Parameters
+    ----------
+    ds:
+        Input dataset with time dimension ``t``.
+    variables:
+        Variables to include. If None, defaults to ``['u','v']`` when both
+        present, otherwise ``['w']`` if present.
+    opt:
+        If opt contains ``'0'``, zeros are included as valid values.
+        Otherwise (default), zeros are treated as missing and ignored.
+    normalize:
+        If True, normalizes by the zero-lag value so that ``C(0)=1``.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with coords ``t`` (lag, integer) and variable ``f``.
+    """
+
+    if "t" not in ds.dims:
+        raise ValueError("tempcorrf requires a time dimension 't'")
+
+    if variables is None:
+        if "u" in ds and "v" in ds:
+            variables = ["u", "v"]
+        elif "w" in ds:
+            variables = ["w"]
+        else:
+            if not ds.data_vars:
+                raise ValueError("tempcorrf: dataset has no data variables")
+            variables = [next(iter(ds.data_vars))]
+
+    variables = list(variables)
+    for name in variables:
+        if name not in ds:
+            raise KeyError(f"Variable '{name}' not found in dataset")
+
+    include_zeros = "0" in str(opt).lower()
+
+    n = int(ds.sizes.get("t", 0) or 0)
+    if n <= 0:
+        raise ValueError("Empty time dimension")
+
+    lags = np.arange(n, dtype=int)
+    cor = np.zeros(n, dtype=float)
+
+    # Compute correlation per lag, summing over variables.
+    # IMPORTANT: use NumPy arrays to avoid xarray coordinate alignment when
+    # multiplying time-shifted views (isel preserves time coordinates).
+    for k in range(n):
+        num_total = 0.0
+        den_total = 0.0
+        for name in variables:
+            da = ds[name]
+            a0 = np.asarray(da.isel(t=slice(0, n - k)).data, dtype=float)
+            a1 = np.asarray(da.isel(t=slice(k, n)).data, dtype=float)
+
+            finite = np.isfinite(a0) & np.isfinite(a1)
+            if not include_zeros:
+                finite &= (a0 != 0.0) & (a1 != 0.0)
+
+            prod = a0 * a1
+            num = float(np.nansum(np.where(finite, prod, np.nan)))
+            den = float(np.sum(finite))
+            num_total += num
+            den_total += den
+
+        cor[k] = (num_total / den_total) if den_total > 0 else np.nan
+
+    if normalize:
+        c0 = cor[0]
+        if np.isfinite(c0) and c0 != 0.0:
+            cor = cor / c0
+        else:
+            cor = cor * np.nan
+
+    out = xr.Dataset(
+        {
+            "f": ("t", cor),
+        },
+        coords={"t": lags.astype(float)},
+    )
+    out["t"].attrs["long_name"] = "time lag"
+    out.attrs = dict(ds.attrs)
+    return out
+
+
 def corrm(
     x: xr.DataArray | np.ndarray,
     dim: int | str = 1,

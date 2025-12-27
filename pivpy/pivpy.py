@@ -38,6 +38,10 @@ from pivpy.compute_funcs import (
     interpolat_zeros_2d,
     interpf as cinterpf,
     jpdfscal as cjpdfscal,
+    probef as cprobef,
+    probeaverf as cprobeaverf,
+    spatiotempf as cspatiotempf,
+    tempcorrf as ctempcorrf,
 )
 
 # """ learn from this example
@@ -1419,6 +1423,117 @@ class PIVAccessor(object):
         out = out.assign_coords(t=np.arange(out.sizes["t"], dtype=float))
         out.attrs = dict(ds.attrs)
         return out
+
+    def probef(
+        self,
+        x0,
+        y0,
+        *,
+        variables: Optional[list[str]] = None,
+        method: str = "linear",
+    ) -> xr.Dataset:
+        """Record the time evolution of probe point(s) (PIVMAT-inspired).
+
+        This samples variable(s) at point(s) ``(x0, y0)`` using spatial
+        interpolation.
+
+        Parameters
+        ----------
+        x0, y0:
+            Probe location(s) in physical units. Scalars or 1D arrays.
+        variables:
+            Variables to sample. If None, defaults to ``['u','v']`` when present,
+            otherwise ``['w']``.
+        method:
+            Interpolation method ('linear' or 'nearest' are typical).
+
+        Returns
+        -------
+        xarray.Dataset
+            Sampled time series. For multiple probe points, includes a ``probe`` dim
+            and coordinates ``x_probe``/``y_probe``.
+        """
+
+        return cprobef(self._obj, x0, y0, variables=variables, method=method)
+
+    def probeaverf(
+        self,
+        rect,
+        *,
+        variables: Optional[list[str]] = None,
+        skipna: bool = True,
+    ) -> xr.Dataset:
+        """Time series averaged over a rectangular area (PIVMAT-inspired).
+
+        Parameters
+        ----------
+        rect:
+            Rectangle ``[x1, y1, x2, y2]`` in physical units.
+        variables:
+            Variables to average. If None, defaults to ``['u','v']`` when present,
+            otherwise ``['w']``.
+        skipna:
+            If True (default), NaNs are ignored.
+
+        Returns
+        -------
+        xarray.Dataset
+            Spatially averaged time series.
+        """
+
+        return cprobeaverf(self._obj, rect, variables=variables, skipna=skipna)
+
+    def spatiotempf(
+        self,
+        X,
+        Y,
+        *,
+        var: str = "w",
+        n: Optional[int] = None,
+        method: str = "linear",
+    ) -> xr.Dataset:
+        """Spatio-temporal diagram along line segment(s) (PIVMAT-inspired).
+
+        Parameters
+        ----------
+        X, Y:
+            Endpoints in physical units. Single line: ``X=[x0,x1]``, ``Y=[y0,y1]``.
+            Multiple lines: ``X=[[x0,x1],[...]]``, same for ``Y``.
+        var:
+            Scalar variable name to sample.
+        n:
+            Number of sample points along each line (None -> heuristic).
+        method:
+            Interpolation method ('linear' or 'nearest' are typical).
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset containing variable ``st``.
+        """
+
+        return cspatiotempf(self._obj, X, Y, var=var, n=n, method=method)
+
+    def tempcorrf(
+        self,
+        *,
+        variables: Optional[list[str]] = None,
+        opt: str = "",
+        normalize: bool = False,
+    ) -> xr.Dataset:
+        """Temporal correlation function (PIVMAT-inspired).
+
+        Parameters
+        ----------
+        variables:
+            Variables to include. Default is ``['u','v']`` if present, otherwise ``['w']``.
+        opt:
+            Include zeros if opt contains ``'0'`` (default excludes zeros).
+        normalize:
+            If True, normalizes so that ``f(t=0)=1``.
+        """
+
+        return ctempcorrf(self._obj, variables=variables, opt=opt, normalize=normalize)
 
     def resamplef(
         self,

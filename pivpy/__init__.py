@@ -11,3 +11,5 @@ try:
 	__version__ = version("pivpy")
 except PackageNotFoundError:
 	__version__ = "0.1.0"
+
+from .update import check_update, UpdateCheckResult  # noqa: E402,F401

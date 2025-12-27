@@ -51,6 +51,12 @@ Legacy loaders (still supported):
     ds = io.load_vec('your_file.vec')
     ds = io.load_openpiv_txt('your_file.txt')
 
+Check whether a newer version is available on PyPI:
+
+    import pivpy
+    res = pivpy.check_update(verbose=True)
+    # res.status: 0=unavailable, 1=up-to-date, 2=update available, 3=installed newer
+
 ## PIVMat-inspired methods
 
 PIVPy exposes many post-processing operations via the xarray accessor `Dataset.piv`.
@@ -82,6 +88,32 @@ Several common PIVMat toolbox methods are available with similar names/behavior:
     # Temporal resampling and phase average (similar to PIVMat resamplef/phaseaverf)
     ds_r = ds.piv.resamplef(tini=range(ds.sizes['t']), tfin=[0.5, 1.5, 2.5])
     phased = ds.piv.phaseaverf(12)
+
+Additional PIVMat-inspired utilities:
+
+    # Correlation along a dimension (similar to PIVMat corrm/corrx)
+    cu = ds.piv.corrm(variable='u', dim='x')        # returns DataArray with a 'lag' dimension
+    cv = ds.piv.corrm(variable='v', dim='y', half=True)
+
+    # Spatial correlation function + integral scales (similar to PIVMat corrf)
+    cor = ds.piv.corrf(variable='u', dim='x', normalize=True)
+    # correlation curve: cor['f'] over cor['r']
+    # integral scales: cor['isinf'], cor['is5'], cor['is2'], cor['is1'], cor['is0']
+
+    # Fill holes encoded as zeros (similar to PIVMat interpolat.m behavior)
+    ds_filled = ds.piv.fill_zeros(max_iter=10)
+
+    # 2D Butterworth filter (similar to PIVMat bwfilterf)
+    ds_low = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='low', trunc=True)
+    ds_high = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='high')
+
+    # PIVMat-style option wrapper: opts can include 'high'/'low'/'trunc'
+    ds_high2 = ds.piv.bwfilterf_pm(3.0, 8.0, 'high', 'trunc')
+
+    # Batch processing over filename series (similar to PIVMat batchf)
+    # fun can be a callable (fun(ds, ...)) or an accessor method name (e.g. 'averf', 'bwfilterf')
+    from pivpy.io import batchf
+    results = batchf('pivpy/data/day2/day2a00500[0:5].T000.D000.P003.H001.L.vec', 'averf')
 
 ### For developers, local use:
 

@@ -10,6 +10,21 @@ The ``pivpy.io`` module
 .. automodule:: pivpy.io
     :members:
 
+The ``pivpy.compute_funcs`` module
+----------------------------------
+.. automodule:: pivpy.compute_funcs
+    :members:
+
+The ``pivpy.pivmat_compat`` module
+----------------------------------
+.. automodule:: pivpy.pivmat_compat
+    :members:
+
+The ``pivpy.update`` module
+---------------------------
+.. automodule:: pivpy.update
+    :members:
+
 The ``pivpy.graphics`` module
 -----------------------------
 .. automodule:: pivpy.graphics

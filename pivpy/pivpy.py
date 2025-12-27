@@ -21,8 +21,14 @@ from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
 from pivpy.graphics import streamplot as gstreamplot
 from pivpy.graphics import autocorrelation_plot as gautocorrelation_plot
-from pivpy.compute_funcs import Γ1_moving_window_function, Γ2_moving_window_function, corrm
-from pivpy.compute_funcs import Γ1_moving_window_function, Γ2_moving_window_function, corrm, interpolat_zeros_2d
+from pivpy.compute_funcs import (
+    Γ1_moving_window_function,
+    Γ2_moving_window_function,
+    bwfilter2d,
+    corrf,
+    corrm,
+    interpolat_zeros_2d,
+)
 
 # """ learn from this example
 # import xarray as xr
@@ -292,6 +298,151 @@ class PIVAccessor(object):
         )
 
         return self._obj
+
+    def bwfilterf(
+        self,
+        filtsize: float = 3.0,
+        order: float = 8.0,
+        *,
+        mode: Literal["low", "high"] = "low",
+        trunc: bool = False,
+        var: Optional[str] = None,
+        variables: Optional[List[str]] = None,
+    ) -> xr.Dataset:
+        """Butterworth spatial filter for vector/scalar fields (PIVMAT-inspired).
+
+        Applies a low-pass (default) or high-pass Butterworth filter in Fourier space
+        along the spatial dimensions (y, x). Implemented via fast NumPy FFT inside
+        `xarray.apply_ufunc`, vectorized over any remaining dimensions (e.g. t).
+
+        Parameters
+        ----------
+        filtsize:
+            Cutoff size in grid units. If 0, returns the dataset unchanged.
+        order:
+            Filter order (typical range 2..10). Larger means sharper cutoff.
+        mode:
+            'low' or 'high'. High-pass is implemented by flipping the sign of order.
+        trunc:
+            If True, truncates borders of width floor(filtsize) after filtering.
+        var:
+            Scalar variable name to filter. If None, defaults to vector mode (u, v)
+            unless `variables` is provided.
+        variables:
+            Explicit list of variables to filter.
+        """
+
+        fs = float(filtsize)
+        if fs == 0.0:
+            return self._obj
+
+        ds = self._obj
+        if "x" not in ds.dims or "y" not in ds.dims:
+            raise ValueError("bwfilterf requires spatial dims 'y' and 'x'")
+
+        ord_eff = float(order)
+        if str(mode).lower().startswith("high"):
+            ord_eff = -abs(ord_eff)
+        else:
+            ord_eff = abs(ord_eff)
+
+        # PIVMAT behavior: enforce even spatial sizes by dropping last row/col.
+        out = ds
+        if int(out.sizes["x"]) % 2 == 1:
+            out = out.isel(x=slice(0, -1))
+        if int(out.sizes["y"]) % 2 == 1:
+            out = out.isel(y=slice(0, -1))
+
+        if variables is None:
+            if var is not None:
+                variables = [var]
+            else:
+                variables = [v for v in ("u", "v") if v in out.data_vars]
+                if not variables:
+                    raise ValueError("bwfilterf: no variables to filter (expected 'u'/'v' or var=...)")
+        else:
+            variables = list(variables)
+            for v in variables:
+                if v not in out.data_vars:
+                    raise ValueError(f"Variable '{v}' not found in dataset")
+
+        def _bw_core(a2: np.ndarray) -> np.ndarray:
+            return bwfilter2d(a2, fs, ord_eff)
+
+        out2 = out.copy(deep=True)
+        for name in variables:
+            da = out2[name]
+            if "y" not in da.dims or "x" not in da.dims:
+                continue
+            out2[name] = xr.apply_ufunc(
+                _bw_core,
+                da,
+                input_core_dims=[["y", "x"]],
+                output_core_dims=[["y", "x"]],
+                vectorize=True,
+                dask="parallelized",
+                output_dtypes=[float],
+            )
+            out2[name].attrs = dict(out[name].attrs)
+
+        if trunc:
+            ntr = int(np.floor(fs))
+            if ntr > 0:
+                ny = int(out2.sizes["y"])
+                nx = int(out2.sizes["x"])
+                if 2 * ntr >= ny or 2 * ntr >= nx:
+                    raise ValueError("truncation too large for field size")
+                out2 = out2.isel(y=slice(ntr, -ntr), x=slice(ntr, -ntr))
+
+        out2.attrs = dict(out.attrs)
+        self._obj = out2
+        return out2
+
+    def bwfilterf_pm(
+        self,
+        filtsize: float,
+        order: float,
+        *opts: str,
+        var: Optional[str] = None,
+        variables: Optional[List[str]] = None,
+    ) -> xr.Dataset:
+        """PIVMAT-compatible wrapper for :meth:`bwfilterf`.
+
+        Accepts option strings like PIVMAT:
+        - 'low' (default)
+        - 'high'
+        - 'trunc'
+
+        Examples
+        --------
+        - ``ds.piv.bwfilterf_pm(3, 8)``
+        - ``ds.piv.bwfilterf_pm(3, 8, 'high')``
+        - ``ds.piv.bwfilterf_pm(3, 8, 'high', 'trunc')``
+        """
+
+        mode: Literal["low", "high"] = "low"
+        trunc = False
+        for opt in opts:
+            o = str(opt).lower()
+            if o.startswith("high"):
+                mode = "high"
+            elif o.startswith("low"):
+                mode = "low"
+            elif o.startswith("trunc"):
+                trunc = True
+            elif o == "":
+                continue
+            else:
+                raise ValueError(f"Unknown bwfilterf option: {opt!r}")
+
+        return self.bwfilterf(
+            filtsize=float(filtsize),
+            order=float(order),
+            mode=mode,
+            trunc=trunc,
+            var=var,
+            variables=variables,
+        )
 
     def addnoisef(
         self,
@@ -802,6 +953,104 @@ class PIVAccessor(object):
             out["v"].values[...] = v_new
 
         return out
+
+    def azprofile(
+        self,
+        x0: float = 0.0,
+        y0: float = 0.0,
+        r: float = 1.0,
+        na: int | None = None,
+        *,
+        var: str | None = None,
+        frame: int | None = None,
+        angle_dim: str = "angle",
+    ):
+        """Azimuthal profile sampled along a circle (PIVMAT-style).
+
+        This is a port of PIVMAT's ``azprofile``:
+        samples a scalar or vector field along the circle
+        ``(x, y) = (x0 + r*cos(a), y0 + r*sin(a))``.
+
+        Parameters
+        ----------
+        x0, y0:
+            Circle center in the same units as coordinates ``x`` and ``y``.
+        r:
+            Circle radius.
+        na:
+            Number of angular samples. If None, uses PIVMAT's default heuristic
+            ``round(4*r/abs(dx))`` where ``dx`` is the x-grid spacing.
+        var:
+            Scalar variable to sample. If None, samples vector components ``u`` and ``v``
+            and returns (angle, ur, ut).
+        frame:
+            Optional time index. If provided, samples only that frame.
+        angle_dim:
+            Name of the angular dimension.
+
+        Returns
+        -------
+        Scalar mode:
+            (angle, p)
+        Vector mode:
+            (angle, ur, ut)
+        where returned arrays are NumPy arrays. If the dataset has a time dimension
+        and ``frame`` is None, the profiles have shape (na, nt).
+        """
+
+        ds = self._obj
+        if "x" not in ds.coords or "y" not in ds.coords:
+            raise ValueError("azprofile requires 'x' and 'y' coordinates")
+
+        x = np.asarray(ds.coords["x"].values, dtype=float)
+        if x.size < 2:
+            raise ValueError("azprofile requires at least 2 x points")
+        dx = float(np.nanmedian(np.diff(x)))
+        dx_abs = abs(dx) if np.isfinite(dx) and dx != 0 else 1.0
+        if na is None:
+            na = int(round(4.0 * float(r) / dx_abs))
+        na = int(na)
+        if na <= 0:
+            raise ValueError("na must be positive")
+
+        angle = np.linspace(0.0, 2.0 * np.pi, na, endpoint=False)
+        x_s = x0 + float(r) * np.cos(angle)
+        y_s = y0 + float(r) * np.sin(angle)
+
+        a_da = xr.DataArray(angle, dims=(angle_dim,), coords={angle_dim: angle})
+        x_da = xr.DataArray(x_s, dims=(angle_dim,), coords={angle_dim: angle})
+        y_da = xr.DataArray(y_s, dims=(angle_dim,), coords={angle_dim: angle})
+        cos_da = xr.DataArray(np.cos(angle), dims=(angle_dim,), coords={angle_dim: angle})
+        sin_da = xr.DataArray(np.sin(angle), dims=(angle_dim,), coords={angle_dim: angle})
+
+        # Optional frame selection.
+        if frame is not None:
+            if "t" not in ds.dims:
+                raise ValueError("frame was provided but dataset has no 't' dimension")
+            ds = ds.isel(t=int(frame))
+
+        scalar_mode = var is not None
+        if scalar_mode:
+            if var not in ds:
+                raise ValueError(f"Scalar variable '{var}' not found in dataset")
+            p = ds[var].interp(x=x_da, y=y_da)
+            # Ensure angle-first for numpy return.
+            if angle_dim in p.dims:
+                p = p.transpose(angle_dim, ...)
+            return angle, np.asarray(p.values)
+
+        # Vector mode
+        if "u" not in ds or "v" not in ds:
+            raise ValueError("Vector mode azprofile requires 'u' and 'v'")
+
+        u_samp = ds["u"].interp(x=x_da, y=y_da)
+        v_samp = ds["v"].interp(x=x_da, y=y_da)
+        ur = u_samp * cos_da + v_samp * sin_da
+        ut = -u_samp * sin_da + v_samp * cos_da
+
+        ur = ur.transpose(angle_dim, ...)
+        ut = ut.transpose(angle_dim, ...)
+        return angle, np.asarray(ur.values), np.asarray(ut.values)
 
     def phaseaverf(
         self,
@@ -1801,6 +2050,32 @@ class PIVAccessor(object):
             half=half,
             nan_as_zero=nan_as_zero,
             lag_dim=lag_dim,
+        )
+
+    def corrf(
+        self,
+        variable: str = "u",
+        dim: int | str = "x",
+        *,
+        normalize: bool = False,
+        nan_as_zero: bool = True,
+        nowarning: bool = False,
+    ) -> xr.Dataset:
+        """PIVMAT-style spatial correlation and integral scales for a scalar variable.
+
+        This wraps :func:`pivpy.compute_funcs.corrf` and returns a Dataset with
+        coordinate ``r`` and variable ``f`` plus scalar outputs (``isinf``, ``r5``, ...).
+        """
+
+        if variable not in self._obj:
+            raise KeyError(f"Variable {variable} not in dataset")
+
+        return corrf(
+            self._obj[variable],
+            dim=dim,
+            normalize=normalize,
+            nan_as_zero=nan_as_zero,
+            nowarning=nowarning,
         )
 
     # @property

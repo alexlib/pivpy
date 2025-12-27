@@ -21,6 +21,8 @@ import pathlib
 import re
 import warnings
 from typing import Any, Optional
+import glob
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -812,3 +814,94 @@ def load_directory(path: Any, basename: str = "*", ext: str = ".vec") -> xr.Data
 def load_pivlab(filepath: Any, frame: Optional[int] = None) -> xr.Dataset:
     reader = PIVLabReader()
     return reader.read(filepath, frame=frame) if frame is not None else reader.read(filepath)
+
+
+def batchf(
+    filename: Any,
+    fun: str | Callable[..., Any],
+    *args: Any,
+    nodisp: bool = True,
+    **kwargs: Any,
+) -> list[Any]:
+    """Execute a function over a series of files (PIVMAT-style).
+
+    This is inspired by PIVMAT's ``batchf``: it processes fields from disk
+    one-by-one (no big in-memory list of Datasets), applying ``fun`` to each.
+
+    Parameters
+    ----------
+    filename:
+        File pattern or path. Supports:
+        - glob wildcards like ``*``
+        - PIVMAT-style bracket expansion via :func:`pivpy.pivmat_compat.expandstr`,
+          e.g. ``'Run[1:10,6].vec'``.
+    fun:
+        Either a callable ``fun(ds, *args, **kwargs)`` or a string naming a
+        PIV accessor method (e.g. ``'azprofile'`` will call ``ds.piv.azprofile``).
+    nodisp:
+        If False, prints each call.
+    *args, **kwargs:
+        Passed through to ``fun``.
+
+    Returns
+    -------
+    list
+        List of per-file results.
+    """
+
+    # Expand bracket patterns (safe subset) if present.
+    patterns: list[str]
+    if isinstance(filename, (list, tuple)):
+        patterns = [str(f) for f in filename]
+    else:
+        patterns = [str(filename)]
+
+    expanded: list[str] = []
+    for pat in patterns:
+        if "[" in pat and "]" in pat:
+            try:
+                from pivpy.pivmat_compat import expandstr
+
+                expanded.extend(expandstr(pat))
+            except Exception:
+                # If parsing fails, fall back to raw glob pattern.
+                expanded.append(pat)
+        else:
+            expanded.append(pat)
+
+    # Resolve files.
+    files: list[str] = []
+    for pat in expanded:
+        files.extend(glob.glob(pat, recursive=True))
+    files = sorted(set(files))
+    if not files:
+        raise FileNotFoundError("No file match")
+
+    def _apply(ds: xr.Dataset) -> Any:
+        if callable(fun):
+            return fun(ds, *args, **kwargs)
+
+        name = str(fun)
+        # Prefer xarray accessor methods (PIVPy idiom).
+        if hasattr(ds, "piv") and hasattr(ds.piv, name):
+            return getattr(ds.piv, name)(*args, **kwargs)
+
+        # Fallback: module-level functions that accept (ds, ...)
+        # Keep scope limited to pivpy modules.
+        import pivpy
+
+        for mod_name in ("graphics", "compute_funcs", "io"):
+            mod = getattr(pivpy, mod_name, None)
+            if mod is not None and hasattr(mod, name):
+                return getattr(mod, name)(ds, *args, **kwargs)
+
+        raise ValueError(f"Unknown function '{name}'. Pass a callable or a ds.piv method name.")
+
+    results: list[Any] = []
+    for fp in files:
+        if not nodisp:
+            arg_s = ", ".join([repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()])
+            print(f"{fun}({fp!r}{', ' if arg_s else ''}{arg_s})")
+        ds = read_piv(fp)
+        results.append(_apply(ds))
+    return results

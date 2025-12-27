@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import xarray as xr
 
@@ -5,6 +7,70 @@ try:
     from scipy.ndimage import convolve as _nd_convolve
 except Exception:  # pragma: no cover
     _nd_convolve = None
+
+
+def bwfilter2d(arr2: np.ndarray, filtsize: float, order: float) -> np.ndarray:
+    """2D Butterworth filter in Fourier space (PIVMAT-inspired).
+
+    Parameters
+    ----------
+    arr2:
+        2D array.
+    filtsize:
+        Cutoff size in grid units. If 0, returns input.
+    order:
+        Butterworth order. Positive -> low-pass. Negative -> high-pass.
+
+    Notes
+    -----
+    This follows the PIVMAT convention:
+    - k is measured in index space on the FFT-shifted grid.
+    - kc = n / filtsize, where n = min(nx, ny).
+    - Transfer: T(k)=1/(1+(k/kc)^(order/2)).
+    """
+
+    a = np.asarray(arr2, dtype=float)
+    if a.ndim != 2:
+        raise ValueError("bwfilter2d expects a 2D array")
+
+    fs = float(filtsize)
+    if fs == 0.0:
+        return a
+
+    ny, nx = a.shape
+    # PIVMAT behavior: if odd, discard last row/col.
+    if nx % 2 == 1:
+        a = a[:, :-1]
+        nx -= 1
+    if ny % 2 == 1:
+        a = a[:-1, :]
+        ny -= 1
+
+    n = float(min(nx, ny))
+    kc = n / fs
+    if not np.isfinite(kc) or kc == 0.0:
+        return a
+
+    # Integer-like wavenumbers on the shifted FFT grid: [-N/2 .. N/2-1]
+    kx = np.fft.fftshift(np.fft.fftfreq(nx) * nx)
+    ky = np.fft.fftshift(np.fft.fftfreq(ny) * ny)
+    KX, KY = np.meshgrid(kx, ky)
+    k = np.sqrt(KX * KX + KY * KY)
+
+    p = float(order) / 2.0
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        powterm = np.power(k / kc, p)
+        T = 1.0 / (1.0 + powterm)
+
+    # Fix the zero-mode explicitly for numerical stability.
+    if order < 0:
+        T[k == 0] = 0.0
+    else:
+        T[k == 0] = 1.0
+
+    sp = np.fft.fftshift(np.fft.fft2(a))
+    out = np.fft.ifft2(np.fft.ifftshift(sp * T)).real
+    return out
 
 
 def corrx(
@@ -162,6 +228,221 @@ def corrm(
         return c
 
     raise ValueError("dim must be 1 or 2 (NumPy inputs) or a valid xarray dim name.")
+
+
+def _corrf_scales(
+    r: np.ndarray,
+    f: np.ndarray,
+    *,
+    nowarning: bool = False,
+) -> dict[str, float]:
+    """Compute integral scales and crossover radii for a 1D correlation curve.
+
+    This follows the PIVMAT `corrf.m` convention:
+    - isinf integrates from r=0 to r=r_max using a simple Riemann sum.
+    - r0/r1/r2/r5 are the first crossover radii for thresholds 0, 0.1, 0.2, 0.5
+      (linearly interpolated between samples).
+    - is0/is1/is2/is5 integrate from r=0 up to the first index where the
+      threshold is crossed (inclusive), normalized by f(0).
+    """
+
+    r = np.asarray(r, dtype=float)
+    f = np.asarray(f, dtype=float)
+    if r.ndim != 1 or f.ndim != 1 or r.shape[0] != f.shape[0]:
+        raise ValueError("r and f must be 1D arrays of equal length")
+    if r.shape[0] == 0:
+        nan = float("nan")
+        return {
+            "isinf": nan,
+            "r0": nan,
+            "is0": nan,
+            "r1": nan,
+            "is1": nan,
+            "r2": nan,
+            "is2": nan,
+            "r5": nan,
+            "is5": nan,
+        }
+
+    f0 = float(f[0])
+    if not np.isfinite(f0) or f0 == 0.0:
+        nan = float("nan")
+        return {
+            "isinf": nan,
+            "r0": nan,
+            "is0": nan,
+            "r1": nan,
+            "is1": nan,
+            "r2": nan,
+            "is2": nan,
+            "r5": nan,
+            "is5": nan,
+        }
+
+    if r.shape[0] >= 2:
+        dr = float(r[1] - r[0])
+    else:
+        dr = 1.0
+
+    def _first_crossing(target: float, *, use_normalized: bool) -> tuple[float, float]:
+        if use_normalized:
+            series = f / f0
+            thr = target
+        else:
+            series = f
+            thr = target
+
+        idx = np.where(series <= thr)[0]
+        if idx.size == 0:
+            if not nowarning:
+                warnings.warn(
+                    f"Correlation function does not cross threshold {target}.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            return float("nan"), float("nan")
+
+        k = int(idx[0])
+        if k == 0:
+            return float(r[0]), 0.0
+
+        # Linear interpolation (PIVMAT-style): use samples k-1 and k.
+        r0_ = float(r[k])
+        r1_ = float(r[k - 1])
+        f0_ = float(series[k])
+        f1_ = float(series[k - 1])
+
+        denom = (f0_ - f1_)
+        if denom == 0.0:
+            rt = r0_
+        else:
+            rt = r0_ + (thr - f0_) * ((r0_ - r1_) / denom)
+
+        # Integral scale: sum up to index k (inclusive), normalized.
+        is_t = float(np.sum((f[: (k + 1)] / f0)) * dr)
+        return float(rt), float(is_t)
+
+    isinf = float(np.sum((f / f0)) * dr)
+    r0, is0 = _first_crossing(0.0, use_normalized=False)
+    r1, is1 = _first_crossing(0.1, use_normalized=True)
+    r2, is2 = _first_crossing(0.2, use_normalized=True)
+    r5, is5 = _first_crossing(0.5, use_normalized=True)
+
+    return {
+        "isinf": isinf,
+        "r0": r0,
+        "is0": is0,
+        "r1": r1,
+        "is1": is1,
+        "r2": r2,
+        "is2": is2,
+        "r5": r5,
+        "is5": is5,
+    }
+
+
+def corrf(
+    x: xr.DataArray,
+    dim: int | str = "x",
+    *,
+    normalize: bool = False,
+    nan_as_zero: bool = True,
+    nowarning: bool = False,
+    r_dim: str = "r",
+) -> xr.Dataset:
+    """Spatial correlation function and integral scales (PIVMAT-inspired).
+
+    This is a Python/xarray equivalent of PIVMAT's ``corrf.m`` for a scalar field.
+
+    The correlation along a direction is defined (conceptually) as:
+    f(r) = < F(x,y) F(x+r,y) >
+    where <..> denotes spatial averaging over the orthogonal
+    direction and ensemble averaging over any remaining dimensions (e.g. time).
+
+    Parameters
+    ----------
+    x:
+        Scalar field as an ``xarray.DataArray`` (typically with dims including
+        ``'x'`` and ``'y'``, and optionally ``'t'``).
+    dim:
+        Direction of separation: ``'x'``/``'y'`` (recommended) or MATLAB-like
+        ``1``/``2``.
+    normalize:
+        If True, normalize the correlation so that ``f(0)=1``.
+    nan_as_zero:
+        If True, treat NaNs as missing data and replace by 0 before correlating.
+        (Missing values encoded as 0 are handled by the PIVMAT-style weighting in
+        ``corrx``/``corrm``.)
+    nowarning:
+        If True, suppress warnings when crossover radii are undefined.
+    r_dim:
+        Name of the separation-length coordinate in the returned Dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 1D variable ``f`` over coordinate ``r`` and scalar
+        variables ``isinf, r0, is0, r1, is1, r2, is2, r5, is5``.
+    """
+
+    if not isinstance(x, xr.DataArray):
+        raise TypeError("corrf expects an xarray.DataArray")
+
+    # Resolve the dimension name for coordinate spacing.
+    if isinstance(dim, str):
+        dim_name = dim
+        if dim_name in ("x", "y") and dim_name not in x.dims:
+            # Allow 'x'/'y' mapping only if present; otherwise let corrm raise.
+            pass
+    else:
+        if dim not in (1, 2):
+            raise ValueError("dim must be 'x', 'y', 1 or 2")
+        if x.ndim < dim:
+            raise ValueError(f"Input has only {x.ndim} dims; cannot use dim={dim}.")
+        dim_name = x.dims[dim - 1]
+
+    c = corrm(x, dim=dim, half=True, nan_as_zero=nan_as_zero, lag_dim="lag")
+
+    # Average over all dimensions except lag.
+    mean_dims = [d for d in c.dims if d != "lag"]
+    f_da = c.mean(dim=mean_dims, skipna=True)
+
+    # Separation length: lag index (0..N-1) times grid spacing.
+    if dim_name in x.coords and x.sizes.get(dim_name, 0) >= 2:
+        coord = x[dim_name].values
+        diffs = np.diff(coord.astype(float))
+        dr = float(np.abs(diffs[0])) if diffs.size else 1.0
+        if diffs.size and not np.allclose(diffs, diffs[0]):
+            if not nowarning:
+                warnings.warn(
+                    f"Non-uniform spacing detected along '{dim_name}'; using first step for dr.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+    else:
+        dr = 1.0
+
+    lag = f_da["lag"].values.astype(float)
+    r = lag * dr
+    f = f_da.values.astype(float)
+
+    if normalize and f.size:
+        if f[0] != 0.0:
+            f = f / float(f[0])
+
+    scales = _corrf_scales(r, f, nowarning=nowarning)
+
+    out = xr.Dataset(coords={r_dim: r})
+    out["f"] = (r_dim, f)
+    for k, v in scales.items():
+        out[k] = xr.DataArray(v)
+
+    out.attrs["dim"] = str(dim)
+    out.attrs["dr"] = float(dr)
+    out.attrs["normalized"] = bool(normalize)
+    out.attrs["variable"] = str(x.name) if x.name is not None else ""
+
+    return out
 
 
 def meannz(

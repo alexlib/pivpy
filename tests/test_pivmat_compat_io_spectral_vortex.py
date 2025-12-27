@@ -326,3 +326,43 @@ def test_operf_list_behavior_uses_single_rhs():
     assert len(out) == 2
     assert np.allclose(out[0]["u"].values, a["u"].values + rhs["u"].values)
     assert np.allclose(out[1]["u"].values, b["u"].values + rhs["u"].values)
+
+
+def test_randvec_shapes_determinism_and_near_zero_divergence():
+    ds = io.randvec(32, 3, seed=0)
+    assert isinstance(ds, xr.Dataset)
+    assert set(["u", "v", "chc"]).issubset(ds.data_vars)
+    assert ds["u"].shape == (32, 32, 3)
+    assert ds.sizes["t"] == 3
+
+    # Deterministic by default seed.
+    ds2 = io.randvec(32, 3, seed=0)
+    assert np.allclose(ds["u"].values, ds2["u"].values)
+    assert np.allclose(ds["v"].values, ds2["v"].values)
+
+    # Check that mean flow is ~0 (zero Fourier mode).
+    assert abs(float(ds["u"].isel(t=0).mean())) < 1e-8
+    assert abs(float(ds["v"].isel(t=0).mean())) < 1e-8
+
+    # Divergence-free in Fourier space, excluding Nyquist modes.
+    # (Nyquist lines are special for real fields; PIVMAT handles them separately.)
+    n = 32
+    u = np.asarray(ds["u"].isel(t=0).values, dtype=float)
+    v = np.asarray(ds["v"].isel(t=0).values, dtype=float)
+    U = np.fft.fft2(u) / (n**2)
+    V = np.fft.fft2(v) / (n**2)
+
+    k1d = (np.fft.fftfreq(n) * n).astype(float)
+    kx2d, ky2d = np.meshgrid(k1d, k1d)
+    K = np.hypot(kx2d, ky2d)
+    mask = (K > 0) & (np.abs(kx2d) != n / 2) & (np.abs(ky2d) != n / 2)
+    kdot = kx2d * U + ky2d * V
+
+    num = float(np.sqrt(np.mean(np.abs(kdot[mask]) ** 2)))
+    den = float(np.sqrt(np.mean((K[mask] * np.hypot(np.abs(U[mask]), np.abs(V[mask]))) ** 2)))
+    assert num / (den + 1e-12) < 1e-10
+
+
+def test_randvec_requires_even_n():
+    with pytest.raises(ValueError):
+        io.randvec(31, 1)

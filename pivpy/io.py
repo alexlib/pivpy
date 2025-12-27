@@ -1742,3 +1742,133 @@ def multivortex(
         fields.append(ds)
 
     return xr.concat(fields, dim="t")
+
+
+def randvec(
+    n: int = 256,
+    nf: int = 1,
+    slope: float = 5.0 / 3.0,
+    nc: float = 3.0,
+    nl: float | None = None,
+    *,
+    seed: int = 0,
+) -> xr.Dataset:
+    r"""Generate a synthetic 2D divergence-free random vector field (PIVMAT-compatible).
+
+    Port of PIVMAT's ``randvec.m``.
+
+    The field is constructed in Fourier space with random phase, a prescribed
+    power-law slope, and an incompressibility constraint (2D divergence-free).
+
+    Parameters
+    ----------
+    n:
+        Grid size (produces an ``n x n`` field). PIVMAT assumes even ``n``.
+    nf:
+        Number of independent fields (time frames).
+    slope:
+        Spectral slope $k^{-\mathrm{slope}}$ (default $5/3$).
+    nc:
+        Small-scale cut-off (in units of the vector mesh). For $k > nc$ the
+        spectrum decays Gaussianly.
+    nl:
+        Large-scale cut-off (in units of the vector mesh). For $k < nl$ the
+        spectrum behaves as $k^2$. Defaults to ``n/3``.
+    seed:
+        RNG seed used for deterministic synthesis.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with variables ``u``, ``v`` and ``chc`` and dims ``(y, x, t)``.
+    """
+
+    n = int(n)
+    nf = int(nf)
+    slope = float(slope)
+    nc = float(nc)
+    if nl is None:
+        nl = float(n) / 3.0
+    nl = float(nl)
+
+    if n <= 0 or nf <= 0:
+        raise ValueError("n and nf must be positive")
+    if n % 2 != 0:
+        raise ValueError("randvec currently requires even n (PIVMAT convention)")
+    if nc <= 0.0 or nl <= 0.0:
+        raise ValueError("nc and nl must be positive")
+
+    k0_idx = n // 2  # 0-based index of the zero mode (PIVMAT: k0 = n/2 + 1)
+    rng = np.random.default_rng(int(seed))
+    fields: list[xr.Dataset] = []
+
+    x = np.arange(1, n + 1, dtype=float)
+    y = np.arange(1, n + 1, dtype=float)
+    x2d, y2d = np.meshgrid(x, y)
+
+    small_scale = float(n) / nc
+    large_scale = float(n) / nl
+
+    # Frequencies in numpy's unshifted FFT ordering.
+    kx = (np.fft.fftfreq(n) * n).astype(float)
+    ky = (np.fft.fftfreq(n) * n).astype(float)
+
+    for frame in range(nf):
+        tux = np.zeros((n, n), dtype=np.complex128)
+        tuy = np.zeros((n, n), dtype=np.complex128)
+
+        for iy in range(n):
+            kyv = float(ky[iy])
+            for ix in range(n):
+                kxv = float(kx[ix])
+                ip = (-iy) % n
+                jp = (-ix) % n
+
+                # Only fill one representative per conjugate pair.
+                if (iy > ip) or (iy == ip and ix > jp):
+                    continue
+
+                k = float(np.hypot(kxv, kyv))
+                if k == 0.0:
+                    tux[iy, ix] = 0.0
+                    tuy[iy, ix] = 0.0
+                    continue
+
+                # PIVMAT energy prescription (see randvec.m).
+                e = (
+                    np.exp(-((k / small_scale) ** 2))
+                    * (k**2)
+                    / np.sqrt(1.0 + (k / large_scale) ** (2.0 * slope + 4.0))
+                ) / k
+                amp = float(np.sqrt(float(e)))
+
+                # Self-conjugate modes must be real to keep real-valued fields.
+                if iy == ip and ix == jp:
+                    phase = -1.0 if int(np.round(2.0 * rng.random())) else 1.0
+                else:
+                    phase = np.exp(1j * (rng.random() * 2.0 * np.pi))
+
+                costheta = kxv / k
+                sintheta = kyv / k
+                tux[iy, ix] = -amp * sintheta * phase
+                tuy[iy, ix] = amp * costheta * phase
+
+                if not (iy == ip and ix == jp):
+                    tux[ip, jp] = np.conj(tux[iy, ix])
+                    tuy[ip, jp] = np.conj(tuy[iy, ix])
+
+        vx = np.fft.ifft2(tux).real * (n**2)
+        vy = np.fft.ifft2(tuy).real * (n**2)
+
+        ds = from_arrays(x2d, y2d, vx, vy, mask=np.ones((n, n), dtype=float), frame=frame)
+        ds["x"].attrs["units"] = "au"
+        ds["y"].attrs["units"] = "au"
+        ds["u"].attrs["units"] = "au"
+        ds["v"].attrs["units"] = "au"
+        ds.attrs["ysign"] = "Y axis downward"
+        ds.attrs["name"] = "randvec"
+        ds.attrs["setname"] = ""
+        ds.attrs["history"] = [f"randvec({n},{nf},{slope},{nc},{nl})"]
+        fields.append(ds)
+
+    return xr.concat(fields, dim="t")

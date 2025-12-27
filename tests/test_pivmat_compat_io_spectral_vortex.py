@@ -4,7 +4,7 @@ import pytest
 import xarray as xr
 
 from pivpy import io
-from pivpy.compute_funcs import spec2f, specf, ssf, tempspecf, vsf
+from pivpy.compute_funcs import operf, spec2f, specf, ssf, tempspecf, vsf
 
 
 def _pivpy_data_path() -> pathlib.Path:
@@ -282,3 +282,47 @@ def test_ssf_and_vsf_shapes_and_required_vars():
     assert out_v.sizes["bin"] == 21
     assert out_v.sizes["order"] == 4
     assert set(["lsf", "tsf", "n_long", "n_trans"]).issubset(out_v.data_vars)
+
+
+def test_operf_unary_and_binary_vector():
+    ds = io.create_sample_field(rows=3, cols=4)
+    out_neg = operf("-", ds)
+    assert np.allclose(out_neg["u"].values, -ds["u"].values)
+    assert np.allclose(out_neg["v"].values, -ds["v"].values)
+
+    ds2 = io.create_sample_field(rows=3, cols=4)
+    out_add = operf("+", ds, ds2)
+    assert np.allclose(out_add["u"].values, ds["u"].values + ds2["u"].values)
+    assert np.allclose(out_add["v"].values, ds["v"].values + ds2["v"].values)
+
+
+def test_operf_numeric_vector_add_and_scale():
+    ds = io.create_sample_field(rows=3, cols=4)
+    out_add = operf("+", ds, np.asarray([1.0, 2.0]))
+    assert np.allclose(out_add["u"].values, ds["u"].values + 1.0)
+    assert np.allclose(out_add["v"].values, ds["v"].values + 2.0)
+
+    out_mul = operf("*", ds, 2.0)
+    assert np.allclose(out_mul["u"].values, ds["u"].values * 2.0)
+    assert np.allclose(out_mul["v"].values, ds["v"].values * 2.0)
+
+
+def test_operf_threshold_and_binarize_vector():
+    ds = io.create_sample_field(rows=3, cols=4)
+    out_thr = operf(">", ds, 3.0)
+    assert np.all((out_thr["u"].values == 0.0) | (out_thr["u"].values > 3.0))
+
+    out_bin = operf("b>", ds, 3.0)
+    assert set(np.unique(out_bin["u"].values)).issubset({0.0, 1.0})
+    assert set(np.unique(out_bin["v"].values)).issubset({0.0, 1.0})
+
+
+def test_operf_list_behavior_uses_single_rhs():
+    a = io.create_sample_field(rows=3, cols=4)
+    b = io.create_sample_field(rows=3, cols=4)
+    rhs = io.create_sample_field(rows=3, cols=4)
+    out = operf("+", [a, b], [rhs])
+    assert isinstance(out, list)
+    assert len(out) == 2
+    assert np.allclose(out[0]["u"].values, a["u"].values + rhs["u"].values)
+    assert np.allclose(out[1]["u"].values, b["u"].values + rhs["u"].values)

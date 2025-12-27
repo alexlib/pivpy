@@ -2271,6 +2271,252 @@ def vsf(v: xr.Dataset, *opts: str) -> xr.Dataset:
         },
         attrs={"scaler": scaler, "binwidth": binwidth},
     )
+
+
+def operf(
+    op: str,
+    f1: xr.Dataset | list[xr.Dataset],
+    f2: xr.Dataset | list[xr.Dataset] | float | int | np.ndarray | None = None,
+):
+    """Perform an operation on vector/scalar fields (PIVMAT-inspired).
+
+    This is a pragmatic port of PIVMAT's ``operf.m``.
+
+    Inputs
+    ------
+    - Vector fields: xarray Dataset with variables ``u`` and ``v``
+    - Scalar fields: xarray Dataset with variable ``w``
+    - Lists of fields are supported (PIVMAT struct-array style)
+
+    Operations
+    ----------
+    Unary (``f2 is None``):
+    - ``'+'`` (no-op), ``'-'`` (negate)
+    - ``'log'``, ``'exp'``, ``'abs'``, ``'logabs'``, ``'real'``, ``'imag'``, ``'conj'``,
+      ``'angle'``, ``'sin'``, ``'cos'``, ``'tan'``, ``'asin'``, ``'acos'``, ``'atan'``
+    - Any supported vec2scal mode on a vector field (delegates to ``ds.piv.vec2scal(op)``)
+
+    Binary:
+    - Field-field: ``'+'``, ``'-'``, ``'.*'``, ``'./'`` (also accepts ``'*'`` and ``'/'``)
+    - Field-number: ``'+'``, ``'-'``, ``'*'``, ``'/'``, ``'.^'``
+    - Thresholding: ``'>'``, ``'<'``, ``'>='``, ``'<='``, ``'='``/``'=='`` (keep values else 0)
+    - Binarization: ``'b>'``, ``'b<'``, ``'b>='``, ``'b<='``, ``'b='``/``'b=='`` (0/1 output)
+    """
+
+    def _is_vector(ds: xr.Dataset) -> bool:
+        return "u" in ds.data_vars and "v" in ds.data_vars
+
+    def _is_scalar(ds: xr.Dataset) -> bool:
+        return "w" in ds.data_vars and not _is_vector(ds)
+
+    def _with_history(ds: xr.Dataset, entry: str) -> xr.Dataset:
+        hist = list(ds.attrs.get("history", []))
+        hist.append(entry)
+        ds.attrs["history"] = hist
+        return ds
+
+    def _apply_unary(ds: xr.Dataset) -> xr.Dataset:
+        op_s = str(op)
+        op_l = op_s.lower()
+
+        if op_s in ("+", "-"):
+            out = ds.copy(deep=True)
+            if _is_vector(out):
+                sgn = 1.0 if op_s == "+" else -1.0
+                out["u"] = (out["u"] * sgn).astype(float)
+                out["v"] = (out["v"] * sgn).astype(float)
+            elif _is_scalar(out):
+                sgn = 1.0 if op_s == "+" else -1.0
+                out["w"] = (out["w"] * sgn).astype(float)
+            else:
+                raise ValueError("operf: expected a vector (u,v) or scalar (w) Dataset")
+            return _with_history(out, f"operf('{op_s}', ans)")
+
+        unary_map: dict[str, object] = {
+            "log": np.log,
+            "exp": np.exp,
+            "abs": np.abs,
+            "real": np.real,
+            "imag": np.imag,
+            "conj": np.conj,
+            "angle": np.angle,
+            "sin": np.sin,
+            "cos": np.cos,
+            "tan": np.tan,
+            "asin": np.arcsin,
+            "acos": np.arccos,
+            "atan": np.arctan,
+        }
+
+        if op_l == "logabs":
+            func = lambda a: np.log(np.abs(a))  # noqa: E731
+        elif op_l in unary_map:
+            func = unary_map[op_l]
+        else:
+            if not _is_vector(ds):
+                raise ValueError("operf: invalid unary operation for scalar field")
+            if not hasattr(ds, "piv"):
+                raise ValueError("operf: xarray accessor 'piv' not available")
+            out = ds.piv.vec2scal(op)  # type: ignore[attr-defined]
+            if not isinstance(out, xr.Dataset):
+                raise ValueError("operf: vec2scal returned unexpected type")
+            return _with_history(out, f"operf('{op}', ans)")
+
+        out = ds.copy(deep=True)
+        if _is_vector(out):
+            out["u"] = xr.apply_ufunc(func, out["u"])  # type: ignore[arg-type]
+            out["v"] = xr.apply_ufunc(func, out["v"])  # type: ignore[arg-type]
+        elif _is_scalar(out):
+            out["w"] = xr.apply_ufunc(func, out["w"])  # type: ignore[arg-type]
+        else:
+            raise ValueError("operf: expected a vector (u,v) or scalar (w) Dataset")
+        return _with_history(out, f"operf('{op}', ans)")
+
+    def _apply_binary(ds: xr.Dataset, rhs: xr.Dataset | float | int | np.ndarray) -> xr.Dataset:
+        op_s = str(op)
+        op_l = op_s.lower()
+
+        # Normalize operator aliases
+        if op_s in (".*",):
+            op_s = "*"
+        if op_s in ("./",):
+            op_s = "/"
+        if op_s == "=":
+            op_s = "=="
+
+        # Field-field
+        if isinstance(rhs, xr.Dataset):
+            if _is_vector(ds) != _is_vector(rhs) or _is_scalar(ds) != _is_scalar(rhs):
+                raise ValueError("operf: f1 and f2 must be of the same type")
+            if op_s not in ("+", "-", "*", "/"):
+                raise ValueError("operf: invalid binary operation for fields")
+            a, b = xr.align(ds, rhs, join="exact")
+            out = a.copy(deep=True)
+            if _is_vector(out):
+                if op_s == "+":
+                    out["u"] = out["u"] + b["u"]
+                    out["v"] = out["v"] + b["v"]
+                elif op_s == "-":
+                    out["u"] = out["u"] - b["u"]
+                    out["v"] = out["v"] - b["v"]
+                elif op_s == "*":
+                    out["u"] = out["u"] * b["u"]
+                    out["v"] = out["v"] * b["v"]
+                else:
+                    out["u"] = out["u"] / b["u"]
+                    out["v"] = out["v"] / b["v"]
+            else:
+                if op_s == "+":
+                    out["w"] = out["w"] + b["w"]
+                elif op_s == "-":
+                    out["w"] = out["w"] - b["w"]
+                elif op_s == "*":
+                    out["w"] = out["w"] * b["w"]
+                else:
+                    out["w"] = out["w"] / b["w"]
+            return _with_history(out, f"operf('{op}', ans1, ans2)")
+
+        out = ds.copy(deep=True)
+        rhs_arr = np.asarray(rhs)
+
+        binarize = op_l.startswith("b")
+        cmp_op = op_l[1:] if binarize else op_l
+        if cmp_op == "=":
+            cmp_op = "=="
+
+        def _cmp(a: xr.DataArray, thr: float) -> xr.DataArray:
+            if cmp_op == ">":
+                return a > thr
+            if cmp_op == "<":
+                return a < thr
+            if cmp_op == ">=":
+                return a >= thr
+            if cmp_op == "<=":
+                return a <= thr
+            if cmp_op == "==":
+                return a == thr
+            raise ValueError("operf: invalid operation")
+
+        # Field-number (vector)
+        if _is_vector(out):
+            if op_s in ("+", "-"):
+                if rhs_arr.size == 1:
+                    ru, rv = float(rhs_arr), float(rhs_arr)
+                elif rhs_arr.size >= 2:
+                    ru, rv = float(rhs_arr.flat[0]), float(rhs_arr.flat[1])
+                else:
+                    raise ValueError("operf: invalid numeric operand")
+                if op_s == "+":
+                    out["u"] = out["u"] + ru
+                    out["v"] = out["v"] + rv
+                else:
+                    out["u"] = out["u"] - ru
+                    out["v"] = out["v"] - rv
+                return _with_history(out, f"operf('{op}', ans, {rhs_arr})")
+            if op_s in ("*", "/"):
+                r = float(rhs_arr.flat[0])
+                out["u"] = (out["u"] * r) if op_s == "*" else (out["u"] / r)
+                out["v"] = (out["v"] * r) if op_s == "*" else (out["v"] / r)
+                return _with_history(out, f"operf('{op}', ans, {r})")
+            if op_s in (".^", "^"):
+                r = float(rhs_arr.flat[0])
+                out["u"] = out["u"] ** r
+                out["v"] = out["v"] ** r
+                return _with_history(out, f"operf('{op}', ans, {r})")
+
+            thr = float(rhs_arr.flat[0])
+            m_u = _cmp(out["u"], thr)
+            m_v = _cmp(out["v"], thr)
+            if binarize:
+                out["u"] = m_u.astype(float)
+                out["v"] = m_v.astype(float)
+            else:
+                out["u"] = m_u.astype(float) * out["u"]
+                out["v"] = m_v.astype(float) * out["v"]
+            return _with_history(out, f"operf('{op}', ans, {thr})")
+
+        # Field-number (scalar)
+        if not _is_scalar(out):
+            raise ValueError("operf: expected a vector (u,v) or scalar (w) Dataset")
+
+        if op_s in ("+", "-", "*", "/", ".^", "^"):
+            r = float(rhs_arr.flat[0])
+            if op_s == "+":
+                out["w"] = out["w"] + r
+            elif op_s == "-":
+                out["w"] = out["w"] - r
+            elif op_s == "*":
+                out["w"] = out["w"] * r
+            elif op_s == "/":
+                out["w"] = out["w"] / r
+            else:
+                out["w"] = out["w"] ** r
+            return _with_history(out, f"operf('{op}', ans, {r})")
+
+        thr = float(rhs_arr.flat[0])
+        m = _cmp(out["w"], thr)
+        if binarize:
+            out["w"] = m.astype(float)
+        else:
+            out["w"] = m.astype(float) * out["w"]
+        return _with_history(out, f"operf('{op}', ans, {thr})")
+
+    f1_list = f1 if isinstance(f1, list) else [f1]
+    if f2 is None:
+        out_list = [_apply_unary(ds) for ds in f1_list]
+        return out_list if isinstance(f1, list) else out_list[0]
+
+    if isinstance(f2, list):
+        out_list: list[xr.Dataset] = []
+        for i, ds in enumerate(f1_list):
+            rhs = f2[min(i, len(f2) - 1)]
+            out_list.append(_apply_binary(ds, rhs))
+        return out_list if isinstance(f1, list) else out_list[0]
+
+    out_list = [_apply_binary(ds, f2) for ds in f1_list]
+    return out_list if isinstance(f1, list) else out_list[0]
+
+
 def Γ1_moving_window_function(
         fWin: xr.Dataset,
         n: int,

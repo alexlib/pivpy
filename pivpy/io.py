@@ -27,6 +27,11 @@ from collections.abc import Callable, Sequence
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+try:
+    from scipy.io import savemat as _sp_savemat
+except Exception:  # pragma: no cover
+    _sp_savemat = None
 from numpy.typing import ArrayLike
 
 
@@ -80,6 +85,65 @@ def set_default_attrs(dataset: xr.Dataset) -> xr.Dataset:
     ds.attrs.setdefault("delta_t", float(DELTA_T))
     ds.attrs.setdefault("files", [])
     return ds
+
+
+def vec2mat(
+    f: xr.Dataset,
+    filename: str,
+    key: str = "v",
+    squeeze: bool = True,
+) -> str:
+    """Export a vector/scalar dataset to a MATLAB ``.mat`` file (PIVMAT-compatible helper).
+
+    This is a pragmatic Python equivalent of PIVMAT's ``vec2mat``.
+
+    Parameters
+    ----------
+    f:
+        Dataset containing coords ``x``, ``y`` and variables ``u,v`` or ``w``.
+    filename:
+        Output path. If it does not end with ``.mat`` it will be appended.
+    key:
+        Top-level MATLAB variable name.
+    squeeze:
+        If True, singleton dimensions are removed in the saved arrays.
+
+    Returns
+    -------
+    str
+        The written filename.
+    """
+
+    if _sp_savemat is None:
+        raise ImportError("vec2mat requires SciPy (scipy.io.savemat)")
+
+    outname = filename if filename.lower().endswith(".mat") else f"{filename}.mat"
+
+    mdict: dict[str, object] = {
+        "x": np.asarray(f["x"].values),
+        "y": np.asarray(f["y"].values),
+    }
+    if "t" in f.coords:
+        mdict["t"] = np.asarray(f["t"].values)
+
+    if "u" in f.data_vars and "v" in f.data_vars:
+        mdict["u"] = np.asarray(f["u"].values)
+        mdict["v"] = np.asarray(f["v"].values)
+    elif "w" in f.data_vars:
+        mdict["w"] = np.asarray(f["w"].values)
+    else:
+        raise ValueError("vec2mat expects variables (u,v) for vector fields or (w) for scalar fields")
+
+    if "chc" in f.data_vars:
+        mdict["chc"] = np.asarray(f["chc"].values)
+
+    if squeeze:
+        for k, v in list(mdict.items()):
+            if isinstance(v, np.ndarray):
+                mdict[k] = np.squeeze(v)
+
+    _sp_savemat(outname, {key: mdict}, do_compression=True)
+    return outname
 
 
 def _coords_from_mesh(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

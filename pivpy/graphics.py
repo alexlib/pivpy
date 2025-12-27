@@ -173,6 +173,60 @@ def quiver(
 
     return fig, ax
 
+def statvec_disp(stat_u: dict, stat_v: dict, ax=None, title: str | None = None):
+    """Display vector statistics returned by ``statf`` (PIVMAT-style helper)."""
+
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    else:
+        fig = ax.figure
+
+    labels = ["mean", "std", "rms", "min", "max"]
+    uvals = [float(stat_u.get(k, np.nan)) for k in labels]
+    vvals = [float(stat_v.get(k, np.nan)) for k in labels]
+
+    x = np.arange(len(labels))
+    ax.plot(x, uvals, "o-", label="u")
+    ax.plot(x, vvals, "o-", label="v")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=30, ha="right")
+    ax.set_ylabel("value")
+    if title is not None:
+        ax.set_title(title)
+    ax.legend()
+    fig.tight_layout()
+    return fig, ax
+
+
+def vsf_disp(vsf: xr.Dataset, ax=None, title: str | None = None):
+    """Display vector structure function results (PIVMAT-style helper)."""
+
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    else:
+        fig = ax.figure
+
+    if "r" in vsf.coords:
+        r = np.asarray(vsf["r"].values)
+    else:
+        raise ValueError("vsf_disp expects a Dataset with coordinate 'r'")
+
+    for name in ["SLL", "SNN", "STT", "S2", "S3"]:
+        if name in vsf.data_vars:
+            ax.loglog(r, np.asarray(vsf[name].values), label=name)
+
+    ax.set_xlabel("r")
+    ax.set_ylabel("VSF")
+    if title is not None:
+        ax.set_title(title)
+    ax.legend()
+    fig.tight_layout()
+    return fig, ax
+
 
 def vectorplot(
     data: xr.Dataset,

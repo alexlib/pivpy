@@ -5,6 +5,16 @@ import xarray as xr
 from numpy.typing import ArrayLike
 
 try:
+    from scipy.ndimage import map_coordinates as _nd_map_coordinates
+except Exception:  # pragma: no cover
+    _nd_map_coordinates = None
+
+try:
+    from scipy.interpolate import griddata as _sp_griddata
+except Exception:  # pragma: no cover
+    _sp_griddata = None
+
+try:
     from scipy.ndimage import convolve as _nd_convolve
 except Exception:  # pragma: no cover
     _nd_convolve = None
@@ -2515,6 +2525,828 @@ def operf(
 
     out_list = [_apply_binary(ds, f2) for ds in f1_list]
     return out_list if isinstance(f1, list) else out_list[0]
+
+
+def _as_field_list(f: xr.Dataset | list[xr.Dataset]) -> list[xr.Dataset]:
+    return f if isinstance(f, list) else [f]
+
+
+def _with_history(ds: xr.Dataset, entry: str) -> xr.Dataset:
+    out = ds.copy(deep=True)
+    hist = list(out.attrs.get("history", []))
+    hist.append(entry)
+    out.attrs["history"] = hist
+    return out
+
+
+def _is_vector(ds: xr.Dataset) -> bool:
+    return "u" in ds.data_vars and "v" in ds.data_vars
+
+
+def _is_scalar(ds: xr.Dataset) -> bool:
+    return "w" in ds.data_vars and not _is_vector(ds)
+
+
+def setoriginf(f: xr.Dataset | list[xr.Dataset], P0: ArrayLike) -> xr.Dataset | list[xr.Dataset]:
+    """Set the origin (0,0) of a vector/scalar field (PIVMAT-compatible).
+
+    Port of PIVMAT's ``setoriginf.m``.
+
+    Parameters
+    ----------
+    f:
+        Vector/scalar dataset (or list of datasets).
+    P0:
+        New origin as ``[x0, y0]`` in the same units as the coords.
+    """
+
+    p = np.asarray(P0, dtype=float).ravel()
+    if p.size < 2:
+        raise ValueError("P0 must be a 2-element sequence [x0, y0]")
+    x0, y0 = float(p[0]), float(p[1])
+
+    out_list: list[xr.Dataset] = []
+    for ds in _as_field_list(f):
+        out = ds.assign_coords(x=ds["x"] - x0, y=ds["y"] - y0)
+        out_list.append(_with_history(out, f"setoriginf(ans, [{x0}, {y0}])"))
+    return out_list if isinstance(f, list) else out_list[0]
+
+
+def shiftf(f: xr.Dataset | list[xr.Dataset], opt: str = "bottomleft") -> xr.Dataset | list[xr.Dataset]:
+    """Shift the axis of a vector/scalar field (PIVMAT-compatible).
+
+    Port of PIVMAT's ``shiftf.m``.
+
+    Parameters
+    ----------
+    opt:
+        One of: 'bottomleft'/'bl' (default), 'bottomright'/'br',
+        'topleft'/'tl', 'topright'/'tr', 'center'/'c'/'middle'.
+    """
+
+    opt_l = str(opt).lower()
+    out_list: list[xr.Dataset] = []
+    for ds in _as_field_list(f):
+        x = np.asarray(ds["x"].values, dtype=float)
+        y = np.asarray(ds["y"].values, dtype=float)
+        if x.size == 0 or y.size == 0:
+            out_list.append(ds)
+            continue
+
+        if opt_l in {"center", "c", "middle"}:
+            sx = 0.5 * (float(x[0]) + float(x[-1]))
+            sy = 0.5 * (float(y[0]) + float(y[-1]))
+        elif opt_l in {"bottomleft", "bl"}:
+            sx = float(x[0])
+            sy = float(y[0])
+        elif opt_l in {"bottomright", "br"}:
+            sx = float(x[-1])
+            sy = float(y[0])
+        elif opt_l in {"topleft", "tl"}:
+            sx = float(x[0])
+            sy = float(y[-1])
+        elif opt_l in {"topright", "tr"}:
+            sx = float(x[-1])
+            sy = float(y[-1])
+        else:
+            raise ValueError("opt must be one of: center/c/middle, bottomleft/bl, bottomright/br, topleft/tl, topright/tr")
+
+        out = ds.assign_coords(x=ds["x"] - sx, y=ds["y"] - sy)
+        out_list.append(_with_history(out, f"shiftf(ans, '{opt}')"))
+    return out_list if isinstance(f, list) else out_list[0]
+
+
+def smoothf(f: xr.Dataset | list[xr.Dataset], n: int = 3, opt: str = "") -> xr.Dataset | list[xr.Dataset]:
+    r"""Temporal running-average smoothing (PIVMAT-compatible).
+
+    Port of PIVMAT's ``smoothf.m``.
+
+    Notes
+    -----
+    For a time series of length $L$ and window length $n$, the output length is
+    $L-2\lfloor n/2 \rfloor$ (PIVMAT behavior).
+    """
+
+    n = int(n)
+    if n <= 0:
+        raise ValueError("n must be positive")
+
+    out_list: list[xr.Dataset] = []
+    for ds in _as_field_list(f):
+        if "t" not in ds.dims:
+            raise ValueError("smoothf requires a time dimension 't'")
+        nt = int(ds.sizes["t"])
+        cn = n // 2
+        if nt < n:
+            raise ValueError("smoothf requires len(t) >= n")
+
+        frames: list[xr.Dataset] = []
+        t_out = np.asarray(ds["t"].values, dtype=float)[cn : nt - cn]
+        # Smoothing should not treat 0 as missing by default.
+        opt_eff = str(opt)
+        if "0" not in opt_eff:
+            opt_eff = opt_eff + "0"
+
+        for i in range(0, nt - n + 1):
+            sub = ds.isel(t=slice(i, i + n))
+            avg = sub.piv.averf(opt_eff)  # type: ignore[attr-defined]
+            # Ensure each window-average has a unique time coordinate so concat stacks,
+            # rather than aligning on identical t=0 values.
+            avg = avg.assign_coords(t=np.asarray([t_out[i]], dtype=float))
+            frames.append(avg)
+
+        out = xr.concat(frames, dim="t")
+        out.attrs = dict(ds.attrs)
+        out_list.append(_with_history(out, f"smoothf(ans, {n}, '{opt}')"))
+    return out_list if isinstance(f, list) else out_list[0]
+
+
+def timederivativef(f: xr.Dataset | list[xr.Dataset], order: int = 2) -> xr.Dataset | list[xr.Dataset]:
+    r"""Time derivative by finite differences (PIVMAT-compatible).
+
+    Port of PIVMAT's ``timederivativef.m``.
+
+    The time unit is not applied here (matches PIVMAT). Divide by $\Delta t$
+    externally if needed.
+    """
+
+    order = int(order)
+    if order not in (1, 2):
+        raise ValueError("order must be 1 or 2")
+
+    def _diff_arr(a: np.ndarray) -> np.ndarray:
+        if a.ndim != 3:
+            raise ValueError("Expected arrays with dims (y,x,t)")
+        if order == 1:
+            return np.diff(a, axis=2)
+        # order 2
+        out = np.empty_like(a)
+        if a.shape[2] == 1:
+            out[...] = 0.0
+            return out
+        out[:, :, 1:-1] = (a[:, :, 2:] - a[:, :, :-2]) / 2.0
+        out[:, :, 0] = a[:, :, 1] - a[:, :, 0]
+        out[:, :, -1] = a[:, :, -1] - a[:, :, -2]
+        return out
+
+    out_list: list[xr.Dataset] = []
+    for ds in _as_field_list(f):
+        if "t" not in ds.dims:
+            raise ValueError("timederivativef requires a time dimension 't'")
+
+        if order == 1:
+            out = ds.isel(t=slice(0, -1)).copy(deep=True)
+            t_out = np.asarray(ds["t"].values, dtype=float)[:-1]
+            out = out.assign_coords(t=("t", t_out))
+        else:
+            out = ds.copy(deep=True)
+
+        if _is_vector(out):
+            out["u"] = xr.DataArray(_diff_arr(np.asarray(ds["u"].values, dtype=float)), dims=("y", "x", "t"), attrs=ds["u"].attrs)
+            out["v"] = xr.DataArray(_diff_arr(np.asarray(ds["v"].values, dtype=float)), dims=("y", "x", "t"), attrs=ds["v"].attrs)
+        elif _is_scalar(out):
+            out["w"] = xr.DataArray(_diff_arr(np.asarray(ds["w"].values, dtype=float)), dims=("y", "x", "t"), attrs=ds["w"].attrs)
+        else:
+            raise ValueError("timederivativef: expected a vector (u,v) or scalar (w) Dataset")
+
+        out_list.append(_with_history(out, f"timederivativef(ans,{order})"))
+    return out_list if isinstance(f, list) else out_list[0]
+
+
+def zerotonanfield(f: xr.Dataset | list[xr.Dataset]) -> xr.Dataset | list[xr.Dataset]:
+    """Convert 0 elements to NaNs in fields (PIVMAT-compatible)."""
+
+    out_list: list[xr.Dataset] = []
+    for ds in _as_field_list(f):
+        out = ds.copy(deep=True)
+        if _is_vector(out):
+            out["u"] = out["u"].where(out["u"] != 0)
+            out["v"] = out["v"].where(out["v"] != 0)
+        elif _is_scalar(out):
+            out["w"] = out["w"].where(out["w"] != 0)
+        else:
+            raise ValueError("zerotonanfield: expected a vector (u,v) or scalar (w) Dataset")
+        out_list.append(_with_history(out, "zerotonanfield(ans)"))
+    return out_list if isinstance(f, list) else out_list[0]
+
+
+def zeropadf(f: xr.Dataset | list[xr.Dataset]) -> xr.Dataset | list[xr.Dataset]:
+    """Zero-pad a rectangular field to a square (PIVMAT-compatible)."""
+
+    def _pad(ds: xr.Dataset) -> xr.Dataset:
+        ny = int(ds.sizes.get("y", 0))
+        nx = int(ds.sizes.get("x", 0))
+        if nx == ny:
+            return ds
+        x = np.asarray(ds["x"].values, dtype=float)
+        y = np.asarray(ds["y"].values, dtype=float)
+        dx = float(x[1] - x[0]) if x.size >= 2 else 1.0
+        dy = float(y[1] - y[0]) if y.size >= 2 else 1.0
+
+        out = ds.copy(deep=True)
+        if nx > ny:
+            pad = nx - ny
+            y_new = y[0] + dy * np.arange(nx, dtype=float)
+            out = out.reindex(y=y_new, fill_value=0.0)
+        else:
+            pad = ny - nx
+            x_new = x[0] + dx * np.arange(ny, dtype=float)
+            out = out.reindex(x=x_new, fill_value=0.0)
+        return out
+
+    out_list: list[xr.Dataset] = []
+    for ds in _as_field_list(f):
+        out_list.append(_with_history(_pad(ds), "zeropadf(ans)"))
+    return out_list if isinstance(f, list) else out_list[0]
+
+
+def truncf(
+    f: xr.Dataset | list[xr.Dataset],
+    cut: float | str = 0.0,
+    *opts: str,
+) -> xr.Dataset | list[xr.Dataset]:
+    """Truncate a field to the largest centered square (PIVMAT-compatible).
+
+    Supports:
+    - ``truncf(f)``: centered square
+    - ``truncf(f, cut, 'phys')``: cut specified in physical units
+    - ``truncf(f, 'nonzero')``: smallest rectangle excluding zeros
+    """
+
+    # PIVMAT allows calling truncf(f,'nonzero') with the option in place of `cut`.
+    if isinstance(cut, str):
+        opts = (cut,) + opts
+        cut = 0.0
+
+    opts_l = {str(o).lower() for o in opts}
+
+    def _to_mesh_cut(ds: xr.Dataset, c: float) -> int:
+        if "phys" not in opts_l:
+            return int(round(float(c)))
+        x = np.asarray(ds["x"].values, dtype=float)
+        dx = abs(float(x[1] - x[0])) if x.size >= 2 else 1.0
+        if dx == 0:
+            dx = 1.0
+        return int(round(float(c) / dx))
+
+    def _nonzero_crop(ds: xr.Dataset) -> xr.Dataset:
+        if _is_vector(ds):
+            a = np.asarray(ds["u"].values, dtype=float)
+            b = np.asarray(ds["v"].values, dtype=float)
+            # any nonzero over time
+            m = (a != 0) | (b != 0)
+        elif _is_scalar(ds):
+            w = np.asarray(ds["w"].values, dtype=float)
+            m = w != 0
+        else:
+            raise ValueError("truncf: expected a vector (u,v) or scalar (w) Dataset")
+        if m.ndim == 3:
+            m2 = np.any(m, axis=2)
+        else:
+            m2 = m
+        rows = np.where(np.any(m2, axis=1))[0]
+        cols = np.where(np.any(m2, axis=0))[0]
+        if rows.size == 0 or cols.size == 0:
+            return ds.isel(y=slice(0, 0), x=slice(0, 0))
+        return ds.isel(y=slice(int(rows[0]), int(rows[-1]) + 1), x=slice(int(cols[0]), int(cols[-1]) + 1))
+
+    out_list: list[xr.Dataset] = []
+    for ds in _as_field_list(f):
+        if "nonzero" in opts_l and float(cut) == 0.0:
+            out = _nonzero_crop(ds)
+            out_list.append(_with_history(out, "truncf(ans, 'nonzero')"))
+            continue
+
+        ny = int(ds.sizes.get("y", 0))
+        nx = int(ds.sizes.get("x", 0))
+        if ny == 0 or nx == 0:
+            out_list.append(ds)
+            continue
+
+        cut_m = _to_mesh_cut(ds, cut)
+        side = min(nx, ny)
+        x0 = (nx - side) // 2
+        y0 = (ny - side) // 2
+        x1 = x0 + side
+        y1 = y0 + side
+
+        x0 += cut_m
+        y0 += cut_m
+        x1 -= cut_m
+        y1 -= cut_m
+        x0 = max(0, x0)
+        y0 = max(0, y0)
+        x1 = min(nx, x1)
+        y1 = min(ny, y1)
+        if x1 < x0:
+            x1 = x0
+        if y1 < y0:
+            y1 = y0
+
+        out = ds.isel(x=slice(x0, x1), y=slice(y0, y1))
+        out_list.append(_with_history(out, f"truncf(ans, {cut}, {opts})"))
+    return out_list if isinstance(f, list) else out_list[0]
+
+
+def spatiotempcorrf(f: xr.Dataset, *opts: str) -> xr.Dataset:
+    """Spatio-temporal correlation function for a scalar time series (PIVMAT-compatible).
+
+    Port of PIVMAT's ``spatiotempcorrf.m``.
+
+    Input must be a scalar dataset with variable ``w`` and dims ``(y,x,t)``.
+
+    Options
+    -------
+    - 'full': use all possible X and T (noisy for large lags)
+    - 'verbose': print progress
+    """
+
+    opt_l = {str(o).lower() for o in opts}
+    verbose = any(o.startswith("verb") for o in opt_l)
+    full = any(o.startswith("full") for o in opt_l)
+
+    if not _is_scalar(f):
+        raise ValueError("spatiotempcorrf requires a scalar dataset with variable 'w'")
+    if "t" not in f.dims:
+        raise ValueError("spatiotempcorrf requires a time dimension 't'")
+
+    w = np.asarray(f["w"].values, dtype=float)
+    ny, nx, nt = w.shape
+    x = np.asarray(f["x"].values, dtype=float)
+    dx = float(x[1] - x[0]) if x.size >= 2 else 1.0
+
+    if full:
+        T = np.arange(nt, dtype=int)
+        X = np.arange(nx, dtype=int)
+    else:
+        T = np.arange(nt // 2 + 1, dtype=int)
+        X = np.arange(nx // 2 + 1, dtype=int)
+
+    corpos = np.zeros((X.size, T.size), dtype=float)
+    corneg = np.zeros((X.size, T.size), dtype=float)
+
+    for it, lagT in enumerate(T):
+        if verbose:
+            print(f"{(it + 1) / max(1, T.size) * 100:.1f}%", end=", ")
+        for ix, lagX in enumerate(X):
+            acc_p = 0.0
+            acc_n = 0.0
+            for j in range(0, nt - lagT):
+                a = w[:, : nx - lagX, j]
+                b = w[:, lagX:, j + lagT]
+                acc_p += float(np.mean(a * b))
+
+                a2 = w[:, lagX:, j]
+                b2 = w[:, : nx - lagX, j + lagT]
+                acc_n += float(np.mean(a2 * b2))
+            corpos[ix, it] = acc_p
+            corneg[ix, it] = acc_n
+    if verbose:
+        print("\n")
+
+    cor = np.vstack([corneg[:0:-1, :], corpos])
+    # Normalize by C(0,0)
+    cor = cor / float(cor[X.size - 1, 0])
+    Xlags = dx * np.concatenate([-X[:0:-1], X]).astype(float)
+
+    return xr.Dataset(
+        data_vars={"cor": (("X", "T"), cor)},
+        coords={"X": ("X", Xlags), "T": ("T", T.astype(float))},
+        attrs={"unitX": f["x"].attrs.get("units", ""), "unitcor": f"({f['w'].attrs.get('units','')})^2"},
+    )
+
+
+def statf(s: xr.Dataset | list[xr.Dataset], maxorder: int = 6):
+    """Statistics of a vector/scalar field (PIVMAT-compatible).
+
+    Port of PIVMAT's ``statf.m``.
+
+    - Zeros are treated as invalid and excluded.
+    - For vector datasets, returns one dict per component (u, v).
+    """
+
+    maxorder = int(maxorder)
+    if maxorder <= 0:
+        raise ValueError("maxorder must be positive")
+
+    fields = _as_field_list(s)
+    if len(fields) == 0:
+        raise ValueError("Empty input")
+
+    ds0 = fields[0]
+    if _is_vector(ds0):
+        su = statf([d[["u"]].rename({"u": "w"}) for d in fields], maxorder)
+        sv = statf([d[["v"]].rename({"v": "w"}) for d in fields], maxorder)
+        return su, sv
+
+    if not _is_scalar(ds0):
+        raise ValueError("statf expects a vector (u,v) or scalar (w) Dataset")
+
+    # Stack all samples across space and time.
+    vecs: list[np.ndarray] = []
+    zeros = 0
+    for ds in fields:
+        w = np.asarray(ds["w"].values, dtype=float)
+        vec = w.ravel()
+        zeros += int(np.sum(vec == 0))
+        vecs.append(vec)
+    f_vect = np.concatenate(vecs)
+    nz = f_vect != 0
+    f_vect = f_vect[nz]
+    if f_vect.size == 0:
+        f_vect = np.asarray([0.0], dtype=float)
+
+    mean = float(np.mean(f_vect))
+    std = float(np.std(f_vect, ddof=0))
+    rms = float(np.sqrt(np.mean(f_vect**2)))
+    stat: dict[str, object] = {
+        "mean": mean,
+        "std": std,
+        "rms": rms,
+        "min": float(np.min(f_vect)),
+        "max": float(np.max(f_vect)),
+        "nfields": len(fields),
+        "n": int(f_vect.size),
+        "zeros": int(zeros),
+        "mom": np.zeros(maxorder, dtype=float),
+        "momabs": np.zeros(maxorder, dtype=float),
+        "cmom": np.zeros(maxorder, dtype=float),
+        "cmomabs": np.zeros(maxorder, dtype=float),
+    }
+
+    for order in range(1, maxorder + 1):
+        stat["cmom"][order - 1] = float(np.mean((f_vect - mean) ** order))
+        stat["cmomabs"][order - 1] = float(np.mean(np.abs(f_vect - mean) ** order))
+        stat["mom"][order - 1] = float(np.mean(f_vect**order))
+        stat["momabs"][order - 1] = float(np.mean(np.abs(f_vect) ** order))
+
+    if maxorder >= 3 and float(stat["mom"][1]) != 0.0:
+        stat["skewness"] = float(stat["mom"][2] / (stat["mom"][1] ** 1.5))
+        stat["flatness"] = float(stat["mom"][3] / (stat["mom"][1] ** 2))
+        stat["skewnessc"] = float(stat["cmom"][2] / (stat["cmom"][1] ** 1.5))
+        stat["flatnessc"] = float(stat["cmom"][3] / (stat["cmom"][1] ** 2))
+
+    stat["history"] = ["statf(ans)"]
+    return stat
+
+
+def stresstensor(v: xr.Dataset | list[xr.Dataset]):
+    """Reynolds stress tensor (PIVMAT-compatible).
+
+    Port of PIVMAT's ``stresstensor.m`` for 2-component vector datasets.
+
+    Returns
+    -------
+    tuple
+        ``(t, b)`` where ``t`` is the stress tensor and ``b`` the deviatoric tensor.
+    """
+
+    fields = _as_field_list(v)
+    if len(fields) == 0:
+        raise ValueError("Empty input")
+    ds0 = fields[0]
+    if not _is_vector(ds0):
+        raise ValueError("stresstensor requires a vector dataset with variables 'u' and 'v'")
+
+    u = np.concatenate([np.asarray(d["u"].values, dtype=float).ravel() for d in fields])
+    w = np.concatenate([np.asarray(d["v"].values, dtype=float).ravel() for d in fields])
+    valid = (u != 0) & (w != 0) & np.isfinite(u) & np.isfinite(w)
+    if not np.any(valid):
+        t = np.zeros((2, 2), dtype=float)
+        b = np.zeros((2, 2), dtype=float)
+        return t, b
+    u = u[valid]
+    w = w[valid]
+    t = np.zeros((2, 2), dtype=float)
+    t[0, 0] = float(np.mean(u * u))
+    t[1, 1] = float(np.mean(w * w))
+    t[0, 1] = t[1, 0] = float(np.mean(u * w))
+    tr = float(np.trace(t))
+    if tr == 0.0:
+        b = np.zeros_like(t)
+    else:
+        b = t / tr - np.eye(2) / 2.0
+    return t, b
+
+
+def subsbr(f: xr.Dataset | list[xr.Dataset], r0: ArrayLike | None = None) -> xr.Dataset | list[xr.Dataset]:
+    """Subtract the mean solid-body rotation (PIVMAT-compatible)."""
+
+    out_list: list[xr.Dataset] = []
+    for ds in _as_field_list(f):
+        if not _is_vector(ds):
+            raise ValueError("subsbr requires a vector dataset with variables 'u' and 'v'")
+
+        x = np.asarray(ds["x"].values, dtype=float)
+        y = np.asarray(ds["y"].values, dtype=float)
+        if r0 is None:
+            r0x = 0.5 * (float(x[0]) + float(x[-1]))
+            r0y = 0.5 * (float(y[0]) + float(y[-1]))
+        else:
+            rr = np.asarray(r0, dtype=float).ravel()
+            r0x, r0y = float(rr[0]), float(rr[1])
+
+        # Mean vorticity over space/time
+        u = np.asarray(ds["u"].values, dtype=float)
+        v = np.asarray(ds["v"].values, dtype=float)
+        dx = float(x[1] - x[0]) if x.size >= 2 else 1.0
+        dy = float(y[1] - y[0]) if y.size >= 2 else 1.0
+        x_units = str(ds["x"].attrs.get("units", "")).lower()
+        scale = 1000.0 if "mm" in x_units else 1.0
+        dx_m = dx / scale
+        dy_m = dy / scale
+        dvdx = np.gradient(v, dx_m, axis=1, edge_order=1)
+        dudy = np.gradient(u, dy_m, axis=0, edge_order=1)
+        rot = dvdx - dudy
+        meanrot = float(np.nanmean(rot))
+
+        ycol = ((y[:, None] - r0y) / scale).astype(float)  # (ny,1)
+        xrow = ((x[None, :] - r0x) / scale).astype(float)  # (1,nx)
+        sbr_u = np.broadcast_to(-ycol * meanrot / 2.0, (y.size, x.size))
+        sbr_v = np.broadcast_to(+xrow * meanrot / 2.0, (y.size, x.size))
+
+        out = ds.copy(deep=True)
+        out["u"] = out["u"] - xr.DataArray(sbr_u[:, :, None], dims=("y", "x", "t"))
+        out["v"] = out["v"] - xr.DataArray(sbr_v[:, :, None], dims=("y", "x", "t"))
+        out_list.append(_with_history(out, f"subsbr(ans, [{r0x}, {r0y}])"))
+    return out_list if isinstance(f, list) else out_list[0]
+
+
+def _rotate_about(ds: xr.Dataset, theta_rad: float, x0: float, y0: float) -> xr.Dataset:
+    if _nd_map_coordinates is None:
+        raise ImportError("subsbr2 requires SciPy (scipy.ndimage.map_coordinates)")
+
+    x = np.asarray(ds["x"].values, dtype=float)
+    y = np.asarray(ds["y"].values, dtype=float)
+    nx = x.size
+    ny = y.size
+    if nx < 2 or ny < 2:
+        return ds
+
+    dx = float(x[1] - x[0])
+    dy = float(y[1] - y[0])
+
+    # Target grid points
+    xx, yy = np.meshgrid(x, y)
+    # Antecedent (inverse rotation)
+    ct = float(np.cos(theta_rad))
+    st = float(np.sin(theta_rad))
+    xa = x0 + (xx - x0) * ct - (yy - y0) * st
+    ya = y0 + (xx - x0) * st + (yy - y0) * ct
+
+    # Convert physical -> fractional indices
+    ix = (xa - x[0]) / dx
+    iy = (ya - y[0]) / dy
+    coords = np.vstack([iy.ravel(), ix.ravel()])
+
+    out = ds.copy(deep=True)
+    for name in ("u", "v"):
+        arr = np.asarray(ds[name].values, dtype=float)
+        out_arr = np.zeros_like(arr)
+        for ti in range(arr.shape[2]):
+            samp = _nd_map_coordinates(arr[:, :, ti], coords, order=1, mode="constant", cval=0.0).reshape(ny, nx)
+            out_arr[:, :, ti] = samp
+        out[name] = xr.DataArray(out_arr, dims=("y", "x", "t"), attrs=ds[name].attrs)
+
+    # Rotate vector components
+    u = out["u"].values
+    v = out["v"].values
+    out["u"].values[...] = u * ct - v * st
+    out["v"].values[...] = u * st + v * ct
+    return out
+
+
+def subsbr2(
+    f: xr.Dataset | list[xr.Dataset],
+    dt: float = 1.0,
+    r0: ArrayLike | None = None,
+) -> xr.Dataset | list[xr.Dataset]:
+    """Subtract mean rotation and compensate integrated camera rotation (PIVMAT-compatible)."""
+
+    dt = float(dt)
+    out_list: list[xr.Dataset] = []
+    theta = 0.0
+
+    for ds in _as_field_list(f):
+        out = subsbr(ds, r0=r0)
+        assert isinstance(out, xr.Dataset)
+
+        # Recompute mean vorticity after subtraction (to match PIVMAT's integrated omega estimate).
+        x = np.asarray(out["x"].values, dtype=float)
+        y = np.asarray(out["y"].values, dtype=float)
+        u = np.asarray(out["u"].values, dtype=float)
+        v = np.asarray(out["v"].values, dtype=float)
+        dx = float(x[1] - x[0]) if x.size >= 2 else 1.0
+        dy = float(y[1] - y[0]) if y.size >= 2 else 1.0
+        x_units = str(out["x"].attrs.get("units", "")).lower()
+        scale = 1000.0 if "mm" in x_units else 1.0
+        dx_m = dx / scale
+        dy_m = dy / scale
+        dvdx = (np.roll(v, -1, axis=1) - np.roll(v, 1, axis=1)) / (2.0 * dx_m)
+        dudy = (np.roll(u, -1, axis=0) - np.roll(u, 1, axis=0)) / (2.0 * dy_m)
+        meanrot = float(np.nanmean(dvdx - dudy))
+
+        theta += (meanrot / 2.0) * dt
+
+        if r0 is None:
+            r0x = 0.5 * (float(x[0]) + float(x[-1]))
+            r0y = 0.5 * (float(y[0]) + float(y[-1]))
+        else:
+            rr = np.asarray(r0, dtype=float).ravel()
+            r0x, r0y = float(rr[0]), float(rr[1])
+
+        out = _rotate_about(out, theta_rad=theta, x0=r0x, y0=r0y)
+        out_list.append(_with_history(out, f"subsbr2(ans, {dt}, [{r0x}, {r0y}])"))
+
+    return out_list if isinstance(f, list) else out_list[0]
+
+
+def tempfilterf(v: xr.Dataset, indexpos: ArrayLike, *opts: str) -> xr.Dataset:
+    """Fourier temporal filter of a vector/scalar time series (PIVMAT-compatible).
+
+    Port of PIVMAT's ``tempfilterf.m``.
+
+    Parameters
+    ----------
+    indexpos:
+        Integer frequency index/indices (PIVMAT/Matlab 1-based indexing into FFT bins).
+
+    Options
+    -------
+    - 'remove': remove specified indices instead of keeping them
+    - 'complex': keep only positive frequencies (output may be complex)
+    - 'phaseaverf': for single frequency index, phase-average one period
+    """
+
+    if "t" not in v.dims:
+        raise ValueError("tempfilterf requires a time dimension 't'")
+
+    nt = int(v.sizes["t"])
+    if nt <= 0:
+        raise ValueError("Empty time dimension")
+
+    idx = np.asarray(indexpos, dtype=int).ravel()
+    if idx.size == 0:
+        raise ValueError("indexpos must be non-empty")
+    if np.any(idx < 1) or np.any(idx > nt):
+        raise ValueError("indexpos values must be in [1, len(t)]")
+
+    opts_l = {str(o).lower() for o in opts}
+    complex_mode = any(o.startswith("comp") for o in opts_l)
+    remove = any(o.startswith("rem") for o in opts_l)
+
+    idx0 = (idx - 1).astype(int)
+    mask = np.zeros(nt, dtype=bool)
+    if complex_mode:
+        mask[idx0] = True
+    else:
+        neg = (-idx0) % nt
+        mask[idx0] = True
+        mask[neg] = True
+    if remove:
+        mask = ~mask
+
+    def _filt(a: np.ndarray) -> np.ndarray:
+        A = np.fft.fft(a, axis=2)
+        A *= mask[None, None, :]
+        out = np.fft.ifft(A, axis=2)
+        return out if complex_mode else out.real
+
+    out = v.copy(deep=True)
+    if _is_vector(out):
+        out["u"] = xr.DataArray(_filt(np.asarray(v["u"].values)), dims=("y", "x", "t"), attrs=v["u"].attrs)
+        out["v"] = xr.DataArray(_filt(np.asarray(v["v"].values)), dims=("y", "x", "t"), attrs=v["v"].attrs)
+    elif _is_scalar(out):
+        out["w"] = xr.DataArray(_filt(np.asarray(v["w"].values)), dims=("y", "x", "t"), attrs=v["w"].attrs)
+    else:
+        raise ValueError("tempfilterf expects a vector (u,v) or scalar (w) Dataset")
+
+    # Phase average option for a single index.
+    if any(o.startswith("phase") for o in opts_l):
+        if idx.size != 1:
+            raise ValueError("Option 'phaseaverf' works only with a scalar frequency index")
+        period = float(nt) / float(idx[0] - 1) if idx[0] > 1 else float(nt)
+        out = out.piv.phaseaverf(period)  # type: ignore[attr-defined]
+
+        if complex_mode:
+            omega = 2.0 * np.pi / period
+            t = np.arange(out.sizes["t"], dtype=float)
+            ph = np.exp(-1j * omega * t)
+            if _is_vector(out):
+                out["u"] = out["u"] * xr.DataArray(ph, dims=("t",))
+                out["v"] = out["v"] * xr.DataArray(ph, dims=("t",))
+                out = out.isel(t=[0]).copy(deep=True)
+                out["u"] = out["u"].mean(dim="t")
+                out["v"] = out["v"].mean(dim="t")
+            else:
+                out["w"] = out["w"] * xr.DataArray(ph, dims=("t",))
+                out = out.isel(t=[0]).copy(deep=True)
+                out["w"] = out["w"].mean(dim="t")
+
+    return _with_history(out, f"tempfilterf(ans, {idx.tolist()})")
+
+
+def surfheight(
+    dr: xr.Dataset | list[xr.Dataset],
+    h0: float,
+    H: float = np.inf,
+    n: float = 1.33,
+    ctr: ArrayLike | None = None,
+    *opts: str,
+) -> xr.Dataset | list[xr.Dataset]:
+    """Surface height reconstruction for FS-SS (PIVMAT-compatible, simplified).
+
+    Port of PIVMAT's ``surfheight.m``.
+
+    This implementation reconstructs height from gradients using a Fourier Poisson solver
+    (periodic boundary assumption). It supports the main options:
+    - 'submean'
+    - 'nosetzero'
+    - 'remap' (requires SciPy)
+    """
+
+    h0 = float(h0)
+    H = float(H)
+    n = float(n)
+    opts_l = {str(o).lower() for o in opts}
+    submean = any(o.startswith("subm") for o in opts_l)
+    nosetzero = any(o.startswith("nose") for o in opts_l)
+    remap = any(o.startswith("rema") for o in opts_l)
+
+    def _integrate_grad_fft(dhdx: np.ndarray, dhdy: np.ndarray, dx: float, dy: float) -> np.ndarray:
+        # Solve Laplacian(h) = d/dx dhdx + d/dy dhdy in Fourier space.
+        ny, nx = dhdx.shape
+        kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=dx)
+        ky = 2.0 * np.pi * np.fft.fftfreq(ny, d=dy)
+        kx2d, ky2d = np.meshgrid(kx, ky)
+        denom = kx2d * kx2d + ky2d * ky2d
+
+        F = np.fft.fft2(dhdx)
+        G = np.fft.fft2(dhdy)
+        rhs = 1j * kx2d * F + 1j * ky2d * G
+        Hhat = np.zeros_like(rhs)
+        mask = denom != 0
+        Hhat[mask] = -rhs[mask] / denom[mask]
+        h = np.fft.ifft2(Hhat).real
+        return h
+
+    out_fields: list[xr.Dataset] = []
+    for ds in _as_field_list(dr):
+        if not _is_vector(ds):
+            raise ValueError("surfheight expects a vector dataset with variables 'u' and 'v' (displacements)")
+
+        x = np.asarray(ds["x"].values, dtype=float)
+        y = np.asarray(ds["y"].values, dtype=float)
+        dx = abs(float(x[1] - x[0])) if x.size >= 2 else 1.0
+        dy = abs(float(y[1] - y[0])) if y.size >= 2 else 1.0
+
+        if ctr is None:
+            ctrx = float(np.mean(x))
+            ctry = float(np.mean(y))
+        else:
+            cc = np.asarray(ctr, dtype=float).ravel()
+            ctrx, ctry = float(cc[0]), float(cc[1])
+
+        alpha = 1.0 - 1.0 / n
+        factor = 1.0 / H - 1.0 / (alpha * h0)
+
+        out = ds.isel(t=[0]).copy(deep=True)
+        out = out.drop_vars([v for v in out.data_vars if v not in {"u", "v", "chc"}], errors="ignore")
+
+        # Subtract mean displacement if requested.
+        u = np.asarray(ds["u"].isel(t=0).values, dtype=float)
+        v = np.asarray(ds["v"].isel(t=0).values, dtype=float)
+        if submean:
+            u = u - float(np.mean(u))
+            v = v - float(np.mean(v))
+
+        dhdx = u * factor
+        dhdy = v * factor
+
+        if remap:
+            if _sp_griddata is None:
+                raise ImportError("surfheight(...,'remap') requires SciPy (scipy.interpolate.griddata)")
+            yy, xx = np.meshgrid(y, x, indexing="ij")
+            xxmes = (1.0 - h0 / H) * (xx + u - ctrx) + ctrx
+            yymes = (1.0 - h0 / H) * (yy + v - ctry) + ctry
+            pts = np.column_stack([xxmes.ravel(), yymes.ravel()])
+            grid = (xx.ravel(), yy.ravel())
+            dhdx = _sp_griddata(pts, dhdx.ravel(), grid, method="cubic").reshape(dhdx.shape)
+            dhdy = _sp_griddata(pts, dhdy.ravel(), grid, method="cubic").reshape(dhdy.shape)
+            dhdx = np.nan_to_num(dhdx, nan=0.0)
+            dhdy = np.nan_to_num(dhdy, nan=0.0)
+
+        h = _integrate_grad_fft(dhdx, dhdy, dx=dx, dy=dy)
+        if not nosetzero:
+            h = h - float(np.mean(h)) + h0
+
+        # Return scalar dataset with 'w'
+        out = out.drop_vars(["u", "v"], errors="ignore")
+        out["w"] = xr.DataArray(h[:, :, None], dims=("y", "x", "t"), attrs={"units": ds["x"].attrs.get("units", ""), "standard_name": "height"})
+        out.attrs = dict(ds.attrs)
+        out_fields.append(_with_history(out, f"surfheight(ans,{h0},{H},{n})"))
+
+    return out_fields if isinstance(dr, list) else out_fields[0]
 
 
 def Γ1_moving_window_function(

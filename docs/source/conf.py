@@ -81,3 +81,37 @@ source_suffix = {
     ".txt": "restructuredtext",
     ".md": "markdown",
 }
+
+# Add a small cross-link on the rendered tutorial notebook page without
+# modifying the notebook file itself.
+nbsphinx_prolog = r"""
+{% if env.docname == 'tutorial' %}
+.. note::
+
+   Looking for a written, copy/paste friendly version? See :doc:`pivpy_tutorial`.
+{% endif %}
+"""
+
+# The docs are often built with Sphinx's nitpicky mode (-n), which turns all
+# unresolved cross-references into warnings. Many of our docstrings include
+# external types (numpy/xarray/matplotlib, etc.) that aren't resolvable without
+# intersphinx inventories. To keep -n builds usable (and compatible with -W),
+# ignore these common external/type-hint references.
+nitpick_ignore_regex = [
+    (r"py:class", r"collections\.abc\..*"),
+    (r"py:class", r"(?:numpy|np)\..*"),
+    (r"py:class", r"(?:xarray|xr)\..*"),
+    (r"py:class", r"matplotlib\..*"),
+    (r"py:class", r"ArrayLike"),
+    (r"py:class", r"Quiver"),
+    (r"py:class", r"plt\.Axes"),
+    (r"py:class", r"optional"),
+    (r"py:class", r"-"),
+    (r"py:class", r"2\*n\+1"),
+    (r"py:class", r"If return_std_rms is False"),
+    (r"py:class", r".*moving window.*"),
+    (r"py:class", r"the dataset"),
+    (r"py:class", r"fWin = field rolling window"),
+    (r"py:class", r"n=1 means a 3x3 rolling window"),
+    (r"py:class", r"vortexfitting\.VelocityField"),
+]

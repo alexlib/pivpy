@@ -103,6 +103,14 @@ Additional PIVMat-inspired utilities:
     # Fill holes encoded as zeros (similar to PIVMat interpolat.m behavior)
     ds_filled = ds.piv.fill_zeros(max_iter=10)
 
+    # Extract a rectangular region (similar to PIVMat extractf)
+    sub = ds.piv.extractf([0.0, 0.0, 10.0, 5.0], 'phys')   # [x1,y1,x2,y2] in physical units
+    sub = ds.piv.extractf([10, 5, 50, 40], 'mesh')         # 1-based mesh indices (MATLAB-like)
+
+    # Spatial convolution filter (similar to PIVMat filterf)
+    ds_smooth = ds.piv.filterf(1.0, 'gauss', 'same')   # keep same size
+    ds_smooth_valid = ds.piv.filterf(1.0, 'gauss')     # smaller (conv2(...,'valid') behavior)
+
     # 2D Butterworth filter (similar to PIVMat bwfilterf)
     ds_low = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='low', trunc=True)
     ds_high = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='high')

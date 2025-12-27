@@ -21,3 +21,4 @@ pivpy.egg-info/SOURCES.txt
 pivpy.egg-info/top_level.txt
 tmp.nc
 /README_files
+/docs/_build

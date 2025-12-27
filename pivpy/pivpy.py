@@ -27,6 +27,8 @@ from pivpy.compute_funcs import (
     bwfilter2d,
     corrf,
     corrm,
+    filter2d,
+    filter2d_kernel,
     interpolat_zeros_2d,
 )
 
@@ -146,6 +148,127 @@ class PIVAccessor(object):
 
         return self._obj
 
+    def extractf(
+        self,
+        rect,
+        opt: str = "phys",
+        *,
+        return_rect: bool = False,
+    ):
+        """Extract a rectangular area from the dataset (PIVMAT-inspired).
+
+        Parameters
+        ----------
+        rect:
+            Rectangle as ``[x1, y1, x2, y2]``.
+
+            If ``opt='phys'`` (default), coordinates are in physical units and the
+            selection is expanded to the nearest grid points (start behaves like a
+            floor, end behaves like a ceil) before clamping.
+
+            If ``opt='mesh'``, coordinates are mesh indices (1-based, inclusive,
+            MATLAB-like) before clamping.
+        opt:
+            'phys' (default) or 'mesh'.
+        return_rect:
+            If True, also returns the effective rectangle in mesh indices
+            ``[ix1, iy1, ix2, iy2]`` (1-based, inclusive) after clamping.
+
+        Returns
+        -------
+        xr.Dataset | tuple
+            Extracted dataset and optionally the effective mesh rectangle.
+
+        Notes
+        -----
+        Interactive rectangle selection (PIVMAT's 'draw') is not supported.
+        """
+
+        ds = self._obj
+        if rect is None:
+            raise ValueError("extractf requires rect=[x1, y1, x2, y2]")
+        if isinstance(rect, str) and rect.lower().startswith("draw"):
+            raise NotImplementedError("Interactive rectangle selection is not supported; pass rect explicitly.")
+
+        if not hasattr(rect, "__len__") or len(rect) != 4:
+            raise ValueError("rect must be a sequence of 4 values: [x1, y1, x2, y2]")
+
+        x1, y1, x2, y2 = rect
+
+        if "x" not in ds.dims or "y" not in ds.dims:
+            raise ValueError("extractf requires dataset dims 'x' and 'y'")
+
+        def _bounds_from_phys(coord_vals: np.ndarray, a: float, b: float) -> tuple[int, int]:
+            vals = np.asarray(coord_vals, dtype=float)
+            n = int(vals.shape[0])
+            if n == 0:
+                return 0, -1
+            if n == 1:
+                return 0, 0
+
+            lo = float(min(a, b))
+            hi = float(max(a, b))
+
+            reversed_axis = bool(vals[1] < vals[0])
+            sorted_vals = vals[::-1] if reversed_axis else vals
+
+            i1 = int(np.searchsorted(sorted_vals, lo, side="right") - 1)
+            i2 = int(np.searchsorted(sorted_vals, hi, side="left"))
+
+            if i1 < 0:
+                i1 = 0
+            if i2 < 0:
+                i2 = 0
+            if i1 > n - 1:
+                i1 = n - 1
+            if i2 > n - 1:
+                i2 = n - 1
+
+            if reversed_axis:
+                start = (n - 1) - i2
+                stop = (n - 1) - i1
+            else:
+                start = i1
+                stop = i2
+
+            if start > stop:
+                # Degenerate selection: choose nearest index.
+                target = 0.5 * (lo + hi)
+                nearest = int(np.argmin(np.abs(vals - target)))
+                return nearest, nearest
+
+            return int(start), int(stop)
+
+        def _bounds_from_mesh(n: int, a: float, b: float) -> tuple[int, int]:
+            if n <= 0:
+                return 0, -1
+            lo = int(np.floor(min(a, b))) - 1
+            hi = int(np.ceil(max(a, b))) - 1
+            lo = max(lo, 0)
+            hi = min(hi, n - 1)
+            if lo > hi:
+                lo = hi
+            return lo, hi
+
+        opt_l = str(opt).lower()
+        if opt_l.startswith("phys"):
+            xs, xe = _bounds_from_phys(ds["x"].values, float(x1), float(x2))
+            ys, ye = _bounds_from_phys(ds["y"].values, float(y1), float(y2))
+        elif opt_l.startswith("mesh"):
+            xs, xe = _bounds_from_mesh(int(ds.sizes["x"]), float(x1), float(x2))
+            ys, ye = _bounds_from_mesh(int(ds.sizes["y"]), float(y1), float(y2))
+        else:
+            raise ValueError("opt must be 'phys' or 'mesh'")
+
+        out = ds.isel(x=slice(xs, xe + 1), y=slice(ys, ye + 1))
+        out.attrs = dict(ds.attrs)
+        self._obj = out
+
+        mesh_rect = [xs + 1, ys + 1, xe + 1, ye + 1]
+        if return_rect:
+            return out, mesh_rect
+        return out
+
     def pan(self, shift_x=0.0, shift_y=0.0):
         """Shifts the coordinate system by specified amounts
         
@@ -258,46 +381,128 @@ class PIVAccessor(object):
         
         return result
 
-    def filterf(self, sigma: List[float]=[1.,1.,0], **kwargs):
-        """Applies Gaussian filtering to velocity fields
-        
-        Args:
-            sigma (List[float], optional): Standard deviation for Gaussian kernel 
-                in [y, x, t] dimensions. Defaults to [1., 1., 0] (spatial filtering only).
-            **kwargs: Additional keyword arguments passed to scipy.ndimage.gaussian_filter
-            
-        Returns:
-            xr.Dataset: Filtered dataset with smoothed velocity fields
-            
-        Raises:
-            ValueError: If sigma has wrong length or contains invalid values
-            
-        Example:
-            >>> data = data.piv.filterf(sigma=[2., 2., 0])  # Smooth with sigma=2 in space
+    def filterf(self, sigma: List[float] | float = [1.0, 1.0, 0.0], method: str = "gauss", *opts: str, **kwargs):
+        """Apply a spatial filter to a vector/scalar field (PIVMAT-inspired).
+
+        This method supports two calling conventions:
+
+        1) Legacy PIVPy Gaussian smoothing (kept for backward compatibility)::
+
+             ds = ds.piv.filterf([sigma_y, sigma_x, sigma_t], **gaussian_kwargs)
+
+           This uses :func:`scipy.ndimage.gaussian_filter` on ``u`` and ``v``.
+
+        2) PIVMAT-style normalized 2D convolution (NaN-aware)::
+
+             ds = ds.piv.filterf(filtsize, method, 'same')
+             ds = ds.piv.filterf(filtsize, method)         # default is 'valid'
+
+           where ``method`` is one of: ``'gauss'`` (default), ``'flat'``, ``'igauss'``.
+           The option ``'same'`` keeps the original shape; otherwise the result is
+           smaller (Matlab ``conv2(...,'valid')`` behavior) and the x/y coordinates are
+           truncated accordingly.
         """
-        if len(sigma) != 3:
-            raise ValueError(
-                f"sigma must have 3 elements [sigma_y, sigma_x, sigma_t], "
-                f"got {len(sigma)} elements"
+
+        # --- Legacy path: sigma is a 3-vector
+        if isinstance(sigma, (list, tuple, np.ndarray)):
+            sigma_list = list(sigma)
+            if len(sigma_list) != 3:
+                raise ValueError(
+                    f"sigma must have 3 elements [sigma_y, sigma_x, sigma_t], got {len(sigma_list)} elements"
+                )
+            if any(float(s) < 0 for s in sigma_list):
+                raise ValueError(f"All sigma values must be non-negative, got {sigma_list}")
+
+            self._obj["u"] = xr.DataArray(
+                gaussian_filter(self._obj["u"].values, sigma_list, **kwargs),
+                dims=("y", "x", "t"),
+                attrs=self._obj["u"].attrs,
             )
-        
-        if any(s < 0 for s in sigma):
-            raise ValueError(f"All sigma values must be non-negative, got {sigma}")
-
-        self._obj["u"] = xr.DataArray(
-            gaussian_filter(
-                self._obj["u"].values, sigma, **kwargs),
+            self._obj["v"] = xr.DataArray(
+                gaussian_filter(self._obj["v"].values, sigma_list, **kwargs),
                 dims=("y", "x", "t"),
-                attrs = self._obj["u"].attrs,
-        )
-        self._obj["v"] = xr.DataArray(
-            gaussian_filter(
-                self._obj["v"].values, sigma, **kwargs),
-                dims=("y", "x", "t"),
-                attrs = self._obj["v"].attrs,
-        )
+                attrs=self._obj["v"].attrs,
+            )
+            return self._obj
 
-        return self._obj
+        # --- PIVMAT-style path: sigma is actually filtsize (float)
+        if kwargs:
+            raise TypeError(
+                "PIVMAT-style filterf(filtsize, ...) does not accept **kwargs. "
+                "Pass a 3-element sigma list for gaussian_filter kwargs."
+            )
+
+        ds = self._obj
+        if "x" not in ds.dims or "y" not in ds.dims:
+            raise ValueError("filterf requires spatial dims 'y' and 'x'")
+
+        fs = float(sigma)
+        if fs == 0.0:
+            return ds
+
+        mode = "valid"
+        for opt in opts:
+            o = str(opt).lower()
+            if o.startswith("same"):
+                mode = "same"
+            elif o.startswith("valid"):
+                mode = "valid"
+            elif o == "":
+                continue
+            else:
+                raise ValueError(f"Unknown filterf option: {opt!r}")
+
+        k = filter2d_kernel(fs, method)
+        ky, kx = (int(k.shape[0]), int(k.shape[1]))
+        ny = int(ds.sizes["y"])
+        nx = int(ds.sizes["x"])
+        if mode == "same":
+            ny_out, nx_out = ny, nx
+            base = ds
+        else:
+            ny_out = ny - ky + 1
+            nx_out = nx - kx + 1
+            if ny_out <= 0 or nx_out <= 0:
+                raise ValueError("filter kernel larger than input")
+
+            ly = (ky - 1) // 2
+            ry = (ky - 1) - ly
+            lx = (kx - 1) // 2
+            rx = (kx - 1) - lx
+            base = ds.isel(y=slice(ly, ny - ry), x=slice(lx, nx - rx))
+
+        def _core(a2: np.ndarray) -> np.ndarray:
+            return filter2d(a2, fs, method, mode=mode)
+
+        out = base.copy(deep=True)
+        for name in ("u", "v"):
+            if name not in out.data_vars:
+                continue
+            da_in = ds[name]
+            da_out_template = out[name]
+            if "y" not in da_in.dims or "x" not in da_in.dims:
+                continue
+            filtered = xr.apply_ufunc(
+                _core,
+                da_in,
+                input_core_dims=[["y", "x"]],
+                output_core_dims=[["y", "x"]],
+                exclude_dims={"y", "x"},
+                vectorize=True,
+                dask="parallelized",
+                dask_gufunc_kwargs={"output_sizes": {"y": ny_out, "x": nx_out}},
+                output_dtypes=[float],
+            )
+            # Preserve original dim order (typically ('y','x','t')).
+            filtered = filtered.transpose(*da_in.dims)
+            # Attach the truncated coordinates from the base dataset.
+            filtered = filtered.assign_coords({"y": base["y"], "x": base["x"]})
+            out[name] = filtered
+            out[name].attrs = dict(ds[name].attrs)
+
+        out.attrs = dict(ds.attrs)
+        self._obj = out
+        return out
 
     def bwfilterf(
         self,
@@ -683,37 +888,33 @@ class PIVAccessor(object):
     ):
         """Azimuthal average of a vector/scalar field.
 
-        This method is inspired by PIVMat's `azaverf`.
+        Inspired by PIVMAT's ``azaverf``.
 
-        Modes:
-        - Vector mode (default): uses 'u' and 'v' and returns either an azimuthally
-          averaged field (u/v) or radial profiles (r, ur, ut).
-        - Scalar mode: specify `var` (e.g. 'w') to average that scalar and return
-          either an averaged field or profiles (r, p).
+        Parameters
+        ----------
+        x0, y0:
+            Center location.
+        center_units:
+            'phys' (default) for coordinate units or 'mesh' for index units
+            (0-based indices in x/y arrays).
+        rmax:
+            Optional maximum radius.
+        keepzero:
+            If False (default), zero elements are treated as invalid and excluded.
+        return_profiles:
+            If True, return radial profiles instead of an averaged field.
+        var:
+            Scalar variable name to average. If None, uses vector mode (u, v).
+        frame:
+            Optional integer time index to process a single frame.
 
-        Notes:
-        - By default, zero elements are treated as invalid and are excluded.
-          Set `keepzero=True` to include zeros.
-        - Binning is performed with bin width approximately equal to the grid spacing.
-
-        Args:
-            x0, y0: Center location.
-            center_units: 'phys' for coordinate units (default) or 'mesh' for index
-                units (0-based indices in x/y arrays).
-            rmax: Optional maximum radius (same units as coordinates, unless
-                center_units='mesh' in which case it's in index units).
-            keepzero: Include zero-valued samples in averages.
-            return_profiles: If True, return profiles instead of a field.
-            var: Scalar variable name to azimuthally-average. If None, uses vector mode.
-            frame: Optional integer time index to process a single frame.
-
-        Returns:
-            If return_profiles is False:
-                xr.Dataset with azimuthally-averaged field (same dims as input).
-            If return_profiles is True:
-                Vector mode: (r, ur, ut)
-                Scalar mode: (r, p)
-            where profiles are numpy arrays and include one column per time step.
+        Returns
+        -------
+        xr.Dataset | tuple
+            If ``return_profiles`` is False, returns an ``xr.Dataset``.
+            If ``return_profiles`` is True:
+            - Vector mode: (r, ur, ut)
+            - Scalar mode: (r, p)
         """
 
         ds = self._obj
@@ -1059,28 +1260,27 @@ class PIVAccessor(object):
         opt: str = "",
         method: Literal["linear", "nearest"] = "linear",
     ):
-        """Phase average a vector/scalar dataset over a period.
+        """Phase-average a vector/scalar dataset over a period.
 
-        This method is inspired by PIVMat's `phaseaverf`.
+        Inspired by PIVMAT's ``phaseaverf``.
 
-        Rules:
-        - If `period` is an integer P: returns P phase-averaged fields, where phase i
-          is the average of frames i, i+P, i+2P, ...
-        - If `period` is a non-integer float: first re-samples linearly in time, then
-          averages. The result has length floor(period).
-        - If `period` is a sequence: performs loop averaging with step=period[-1],
-          starting at each value in the sequence.
+        Parameters
+        ----------
+        period:
+            If integer P: returns P phase-averaged fields, where phase i is the
+            average of frames i, i+P, i+2P, ...
+            If non-integer float: resamples linearly in time and averages. The
+            result has length floor(period).
+            If sequence: performs loop averaging with step=period[-1].
+        opt:
+            Passed to ``averf``. By default, zeros are excluded; pass '0' to include.
+        method:
+            Interpolation method used for non-integer periods.
 
-        The output is returned as a Dataset concatenated along 't' with length equal to
-        the number of phases.
-
-        Args:
-            period: int | float | sequence of floats.
-            opt: Passed to averf. By default, zeros are excluded; pass '0' to include.
-            method: Interpolation method for non-integer periods.
-
-        Returns:
-            xr.Dataset: phase-averaged dataset with dim 't' == n_phases.
+        Returns
+        -------
+        xr.Dataset
+            Phase-averaged dataset with dim 't' == n_phases.
         """
 
         ds = self._obj

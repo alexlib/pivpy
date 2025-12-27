@@ -2,11 +2,141 @@ import warnings
 
 import numpy as np
 import xarray as xr
+from numpy.typing import ArrayLike
 
 try:
     from scipy.ndimage import convolve as _nd_convolve
 except Exception:  # pragma: no cover
     _nd_convolve = None
+
+try:
+    from scipy.signal import convolve2d as _signal_convolve2d
+except Exception:  # pragma: no cover
+    _signal_convolve2d = None
+
+
+def _kernel_flat(filtsize: float) -> np.ndarray:
+    n = int(np.ceil(float(filtsize)))
+    if n <= 0:
+        return np.ones((1, 1), dtype=float)
+    k = np.ones((n, n), dtype=float)
+    k /= float(np.sum(k))
+    return k
+
+
+def _kernel_gauss(filtsize: float, *, integrated: bool = False) -> np.ndarray:
+    fs = float(filtsize)
+    if fs <= 0.0 or not np.isfinite(fs):
+        return np.ones((1, 1), dtype=float)
+
+    half_width = int(np.ceil(3.5 * fs))
+    coords = np.arange(-half_width, half_width + 1, dtype=float)
+
+    if integrated:
+        # Integrated Gaussian over pixel area [-0.5, 0.5], to reduce discretization
+        # effects for small filtsize.
+        try:
+            from scipy.special import erf  # type: ignore
+        except Exception as exc:  # pragma: no cover
+            raise ImportError("filterf(method='igauss') requires SciPy (scipy.special.erf)") from exc
+
+        s = np.sqrt(2.0) * fs
+        left = (coords - 0.5) / s
+        right = (coords + 0.5) / s
+        g1 = 0.5 * (erf(right) - erf(left))
+        k = np.outer(g1, g1)
+    else:
+        X, Y = np.meshgrid(coords, coords)
+        k = np.exp(-(X * X + Y * Y) / (2.0 * fs * fs))
+
+    k = np.asarray(k, dtype=float)
+    s = float(np.sum(k))
+    if not np.isfinite(s) or s == 0.0:
+        return np.ones((1, 1), dtype=float)
+    k /= s
+    return k
+
+
+def filter2d_kernel(filtsize: float = 1.0, method: str = "gauss") -> np.ndarray:
+    """Return the normalized 2D kernel used by :func:`filter2d`.
+
+    Parameters
+    ----------
+    filtsize:
+        Filter size in mesh units.
+    method:
+        'gauss', 'flat', or 'igauss'.
+    """
+
+    m = str(method).lower()
+    fs = float(filtsize)
+    if m.startswith("flat"):
+        return _kernel_flat(fs)
+    if m.startswith("igauss"):
+        return _kernel_gauss(fs, integrated=True)
+    return _kernel_gauss(fs, integrated=False)
+
+
+def filter2d(
+    arr2: ArrayLike,
+    filtsize: float = 1.0,
+    method: str = "gauss",
+    *,
+    mode: str = "valid",
+) -> np.ndarray:
+    """2D spatial filter by normalized convolution (PIVMAT-inspired).
+
+    Parameters
+    ----------
+    arr2:
+        2D field to filter.
+    filtsize:
+        Filter size in mesh units (Gaussian sigma-like scale).
+    method:
+        'gauss', 'flat', or 'igauss' (integrated Gaussian).
+    mode:
+        'valid' (default) or 'same'. Matches Matlab conv2 modes.
+
+    Notes
+    -----
+    Missing values are treated as NaN and excluded from the convolution by
+    using a weight-mask normalization.
+    """
+
+    a = np.asarray(arr2, dtype=float)
+    if a.ndim != 2:
+        raise ValueError("filter2d expects a 2D array")
+
+    fs = float(filtsize)
+    if fs == 0.0:
+        return a
+
+    m = str(method).lower()
+    if m.startswith("flat"):
+        k = _kernel_flat(fs)
+    elif m.startswith("igauss"):
+        k = _kernel_gauss(fs, integrated=True)
+    else:
+        k = _kernel_gauss(fs, integrated=False)
+
+    if _signal_convolve2d is None:  # pragma: no cover
+        raise ImportError("filter2d requires scipy.signal.convolve2d")
+
+    finite = np.isfinite(a)
+    a0 = np.where(finite, a, 0.0)
+    w = finite.astype(float)
+
+    mode_l = str(mode).lower()
+    if mode_l not in ("valid", "same"):
+        raise ValueError("mode must be 'valid' or 'same'")
+
+    num = _signal_convolve2d(a0, k, mode=mode_l, boundary="fill", fillvalue=0.0)
+    den = _signal_convolve2d(w, k, mode=mode_l, boundary="fill", fillvalue=0.0)
+
+    out = np.full_like(num, np.nan, dtype=float)
+    good = den > 0
+    out[good] = num[good] / den[good]
+    return out
 
 
 def bwfilter2d(arr2: np.ndarray, filtsize: float, order: float) -> np.ndarray:
@@ -82,10 +212,10 @@ def corrx(
 ) -> np.ndarray:
     """Vector correlation (PIVMAT-compatible).
 
-    This ports the behavior of PIVMAT's ``corrx.m``:
-    - Zero-padding is used outside the signal support.
-    - Each lag is normalized by the number of *non-zero* products
-      (so missing data encoded as zeros does not bias the result).
+    This ports the behavior of PIVMAT's ``corrx.m``. Zero-padding is used
+    outside the signal support, and each lag is normalized by the number of
+    non-zero products (so missing data encoded as zeros does not bias the
+    result).
 
     Parameters
     ----------

@@ -831,10 +831,9 @@ def batchf(
     Parameters
     ----------
     filename:
-        File pattern or path. Supports:
-        - glob wildcards like ``*``
-        - PIVMAT-style bracket expansion via :func:`pivpy.pivmat_compat.expandstr`,
-          e.g. ``'Run[1:10,6].vec'``.
+        File pattern or path. Supports glob wildcards (e.g. ``*``) and a safe
+        subset of PIVMAT-style bracket expansion via
+        :func:`pivpy.pivmat_compat.expandstr` (e.g. ``'Run[1:10,6].vec'``).
     fun:
         Either a callable ``fun(ds, *args, **kwargs)`` or a string naming a
         PIV accessor method (e.g. ``'azprofile'`` will call ``ds.piv.azprofile``).

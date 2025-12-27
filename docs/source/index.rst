@@ -12,6 +12,7 @@ PIVPy
    intro
    notebook
    tutorial
+   pivpy_tutorial
    api_reference
 
 

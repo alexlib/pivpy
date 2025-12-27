@@ -54,6 +54,14 @@ Core (no optional deps):
 - OpenPIV ``.txt`` (5- or 6-column exports; when present, the 6th column is loaded as ``mask``)
 
 
+----------------------
+Tutorials
+----------------------
+
+- :doc:`tutorial` (Jupyter notebook)
+- :doc:`pivpy_tutorial` (written tutorial)
+
+
 
 
 

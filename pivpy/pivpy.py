@@ -21,7 +21,8 @@ from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
 from pivpy.graphics import streamplot as gstreamplot
 from pivpy.graphics import autocorrelation_plot as gautocorrelation_plot
-from pivpy.compute_funcs import Γ1_moving_window_function, Γ2_moving_window_function
+from pivpy.compute_funcs import Γ1_moving_window_function, Γ2_moving_window_function, corrm
+from pivpy.compute_funcs import Γ1_moving_window_function, Γ2_moving_window_function, corrm, interpolat_zeros_2d
 
 # """ learn from this example
 # import xarray as xr
@@ -1150,6 +1151,43 @@ class PIVAccessor(object):
 
         return self._obj
 
+    def fill_zeros(
+        self,
+        *,
+        fill: bool = False,
+        max_iter: int | None = None,
+        variables: list[str] | None = None,
+    ) -> xr.Dataset:
+        """Fill zero-valued holes using 4-neighbor interpolation.
+
+        This is a PIVMAT ``interpolat``-style helper, useful when invalid vectors
+        are encoded as zeros.
+
+        Parameters
+        ----------
+        fill:
+            If True, iterate until no zeros remain (or until max_iter).
+        max_iter:
+            Optional iteration cap.
+        variables:
+            Variables to process. Default: ['u', 'v'] if present; otherwise all data_vars.
+        """
+
+        ds = self._obj
+        if variables is None:
+            variables = [v for v in ("u", "v") if v in ds.data_vars] or list(ds.data_vars)
+
+        out = ds.copy(deep=True)
+        for name in variables:
+            da = out[name]
+            if da.ndim < 2:
+                continue
+            out[name] = interpolat_zeros_2d(da, fill=fill, max_iter=max_iter)
+            out[name].attrs = dict(ds[name].attrs)
+
+        out.attrs = dict(ds.attrs)
+        return out
+
     def __add__(self, other):
         """add two datasets means that we sum up the velocities, assume
         that x,y,t,delta_t are all identical
@@ -1728,6 +1766,42 @@ class PIVAccessor(object):
         """
         return gautocorrelation_plot(self._obj, variable=variable, 
                                      spatial_average=spatial_average, **kwargs)
+
+    def corrm(
+        self,
+        variable: str = "u",
+        dim: int | str = "x",
+        *,
+        half: bool = False,
+        nan_as_zero: bool = True,
+        lag_dim: str = "lag",
+    ) -> xr.DataArray:
+        """PIVMAT-style matrix correlation for a variable.
+
+        Parameters
+        ----------
+        variable:
+            Name of the DataArray variable in the Dataset.
+        dim:
+            Dimension name (recommended) or 1/2 like MATLAB for 2D arrays.
+        half:
+            If True, return only non-negative lags (including zero-lag).
+        nan_as_zero:
+            If True, treat NaNs as missing data and replace by 0 before correlating.
+        lag_dim:
+            Name of the lag dimension in the returned DataArray.
+        """
+
+        if variable not in self._obj:
+            raise KeyError(f"Variable {variable} not in dataset")
+
+        return corrm(
+            self._obj[variable],
+            dim=dim,
+            half=half,
+            nan_as_zero=nan_as_zero,
+            lag_dim=lag_dim,
+        )
 
     # @property
     # def vel_units(self):

@@ -47,3 +47,7 @@ full = ["lvpyio", "readim", "netcdf4", "vortexfitting", "h5py"]
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["pivpy*"]
+exclude = ["README_files*", "docs*", "examples*", "tests*"]

@@ -96,6 +96,46 @@ Notes:
 - Writing ``.gif`` uses Matplotlib's Pillow writer (Pillow must be installed).
 - Use ``show='scalar'`` and ``scalar='w'`` to render scalar-only datasets.
 
+Interpolate missing data (PIVMAT-style ``interpf``)
+===================================================
+
+PIVMAT's ``interpf`` fills missing values (0 or NaN) inside fields. In PIVPy
+this is available as:
+
+.. code-block:: python
+
+   import pivpy.pivpy  # registers the .piv accessor
+   from pivpy import io
+
+   ds = io.create_sample_Dataset(n_frames=5)
+   ds_filled = ds.piv.interpf(method=0)  # Laplacian inpainting (smooth)
+
+   # Faster options:
+   ds_nn = ds.piv.interpf(method=1)      # nearest-neighbor
+   ds_lin = ds.piv.interpf(method=2)     # linear + nearest fallback
+
+   # Control what is considered "missing":
+   ds_nan_only = ds.piv.interpf(method=1, missing='nan')
+   ds_zero_only = ds.piv.interpf(method=1, missing='0')
+
+Joint PDF of two scalar fields (PIVMAT-style ``jpdfscal``)
+=================================================================
+
+You can compute a joint histogram ("joint PDF" in PIVMAT terminology) of two
+scalar variables and display it with filled contours:
+
+.. code-block:: python
+
+   import pivpy.pivpy  # registers the .piv accessor
+   from pivpy import io
+
+   ds = io.create_sample_Dataset(n_frames=10)
+   ds = ds.piv.vec2scal('vorticity', name='w')
+   ds = ds.piv.vec2scal('divergence', name='div')
+
+   jpdf = ds.piv.jpdfscal('w', 'div', nbin=101)
+   fig, ax = ds.piv.jpdfscal_disp('w', 'div', nbin=101)
+
 Gradient of a scalar field (PIVMAT-style ``gradientf``)
 =======================================================
 

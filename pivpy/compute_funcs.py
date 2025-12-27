@@ -874,6 +874,300 @@ def interpolat_zeros_2d(
         out = new
 
 
+def inpaint_missing_2d(
+    a2: ArrayLike,
+    *,
+    method: int = 0,
+    missing: str = "0nan",
+) -> np.ndarray:
+    """Inpaint missing values in a 2D array (PIVMAT ``interpf``-style).
+
+    Missing values are defined as NaNs and/or zeros.
+
+    Parameters
+    ----------
+    a2:
+        2D array.
+    method:
+        Integer method selector (PIVMAT-inspired):
+
+        - ``0``: Laplacian (harmonic) inpainting via sparse linear solve.
+        - ``1``: Nearest-neighbor fill (fast, robust).
+        - ``2``: Linear interpolation via ``scipy.interpolate.griddata``.
+    missing:
+        Missing-value definition:
+        - ``"0nan"`` (default): treat both ``0`` and ``NaN`` as missing.
+        - ``"nan"``: treat only NaNs as missing.
+        - ``"0"``: treat only zeros as missing.
+
+    Returns
+    -------
+    numpy.ndarray
+        Filled array (float).
+    """
+
+    a = np.asarray(a2, dtype=float)
+    if a.ndim != 2:
+        raise ValueError("inpaint_missing_2d expects a 2D array")
+
+    missing_l = str(missing).lower()
+    if missing_l not in {"0nan", "nan", "0"}:
+        raise ValueError("missing must be one of: '0nan', 'nan', '0'")
+
+    mask_nan = ~np.isfinite(a)
+    mask_zero = a == 0.0
+    if missing_l == "0nan":
+        miss = mask_nan | mask_zero
+    elif missing_l == "nan":
+        miss = mask_nan
+    else:
+        miss = mask_zero
+
+    if not np.any(miss):
+        return a
+
+    # If everything is missing, return zeros to match common PIV conventions.
+    if np.all(miss):
+        return np.zeros_like(a, dtype=float)
+
+    m = int(method)
+    if m == 1:
+        # Nearest-neighbor fill via distance transform.
+        try:
+            from scipy.ndimage import distance_transform_edt  # type: ignore
+        except Exception as exc:  # pragma: no cover
+            raise ImportError("method=1 requires SciPy (scipy.ndimage.distance_transform_edt)") from exc
+
+        valid = ~miss
+        # distance_transform_edt expects False for features; compute indices of nearest valid.
+        _, (iy, ix) = distance_transform_edt(~valid, return_indices=True)
+        out = a.copy()
+        out[miss] = out[iy[miss], ix[miss]]
+        out[~np.isfinite(out)] = 0.0
+        return out
+
+    if m == 2:
+        try:
+            from scipy.interpolate import griddata  # type: ignore
+        except Exception as exc:  # pragma: no cover
+            raise ImportError("method=2 requires SciPy (scipy.interpolate.griddata)") from exc
+
+        ny, nx = a.shape
+        yy, xx = np.mgrid[0:ny, 0:nx]
+        pts = np.column_stack([yy[~miss].ravel(), xx[~miss].ravel()])
+        vals = a[~miss].ravel()
+        xi = (yy[miss], xx[miss])
+        out = a.copy()
+        filled = griddata(pts, vals, xi, method="linear")
+        # griddata returns NaN outside convex hull; fall back to nearest for those.
+        if np.any(~np.isfinite(filled)):
+            filled2 = griddata(pts, vals, xi, method="nearest")
+            filled = np.where(np.isfinite(filled), filled, filled2)
+        out[miss] = filled
+        out[~np.isfinite(out)] = 0.0
+        return out
+
+    if m != 0:
+        raise ValueError("Unsupported method. Supported: 0, 1, 2")
+
+    # Method 0: solve Laplace equation on missing nodes with Dirichlet boundary on known nodes.
+    try:
+        from scipy.sparse import lil_matrix  # type: ignore
+        from scipy.sparse.linalg import spsolve  # type: ignore
+    except Exception as exc:  # pragma: no cover
+        raise ImportError("method=0 requires SciPy sparse (scipy.sparse, scipy.sparse.linalg)") from exc
+
+    ny, nx = a.shape
+    idx = -np.ones((ny, nx), dtype=int)
+    unknown_positions = np.argwhere(miss)
+    n_unknown = int(unknown_positions.shape[0])
+    for k, (iy, ix) in enumerate(unknown_positions):
+        idx[iy, ix] = k
+
+    A = lil_matrix((n_unknown, n_unknown), dtype=float)
+    b = np.zeros(n_unknown, dtype=float)
+
+    # 4-neighbor Laplacian stencil; adjust at borders.
+    for k, (iy, ix) in enumerate(unknown_positions):
+        coeff_center = 0.0
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            y2 = iy + dy
+            x2 = ix + dx
+            if y2 < 0 or y2 >= ny or x2 < 0 or x2 >= nx:
+                continue
+            coeff_center += 1.0
+            if miss[y2, x2]:
+                A[k, idx[y2, x2]] = -1.0
+            else:
+                b[k] += float(a[y2, x2])
+        A[k, k] = float(coeff_center)
+
+    sol = spsolve(A.tocsr(), b)
+    out = a.copy()
+    out[miss] = sol
+    out[~np.isfinite(out)] = 0.0
+    return out
+
+
+def interpf(
+    data: xr.Dataset,
+    *,
+    method: int = 0,
+    variables: list[str] | None = None,
+    missing: str = "0nan",
+) -> xr.Dataset:
+    """Interpolate missing data in a Dataset (PIVMAT ``interpf`` port).
+
+    Missing data are values equal to 0 and/or NaN (configurable via ``missing``).
+    The interpolation is applied frame-by-frame along ``t`` if present.
+
+    Parameters
+    ----------
+    data:
+        Input Dataset.
+    method:
+        See :func:`inpaint_missing_2d`.
+    variables:
+        Variables to process. Default: ['u','v'] if present, else ['w'] if present,
+        else all data variables.
+    missing:
+        See :func:`inpaint_missing_2d`.
+
+    Returns
+    -------
+    xarray.Dataset
+        New Dataset with missing values filled.
+    """
+
+    ds = data
+    if variables is None:
+        if "u" in ds.data_vars and "v" in ds.data_vars:
+            variables = ["u", "v"]
+        elif "w" in ds.data_vars:
+            variables = ["w"]
+        else:
+            variables = list(ds.data_vars)
+
+    out = ds.copy(deep=True)
+    for name in variables:
+        if name not in out.data_vars:
+            raise KeyError(f"Variable {name} not found in dataset")
+        da = out[name]
+        if da.ndim < 2:
+            continue
+
+        # Determine the 2D core dims (y,x) and keep remaining dims vectorized.
+        y_dim, x_dim = da.dims[0], da.dims[1]
+
+        def _core(arr2: np.ndarray) -> np.ndarray:
+            return inpaint_missing_2d(arr2, method=method, missing=missing)
+
+        filled = xr.apply_ufunc(
+            _core,
+            da,
+            input_core_dims=[[y_dim, x_dim]],
+            output_core_dims=[[y_dim, x_dim]],
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[float],
+        )
+        # apply_ufunc may reorder non-core dims; restore original dim order.
+        try:
+            filled = filled.transpose(*da.dims)
+        except Exception:
+            pass
+        filled = filled.assign_coords({y_dim: da[y_dim], x_dim: da[x_dim]})
+        filled.attrs = dict(ds[name].attrs)
+        out[name] = filled
+
+    out.attrs = dict(ds.attrs)
+    return out
+
+
+def jpdfscal(
+    s1: xr.DataArray,
+    s2: xr.DataArray,
+    *,
+    nbin: int = 101,
+) -> xr.Dataset:
+    """Joint histogram ("joint PDF" in PIVMAT terminology) of two scalar fields.
+
+    This ports the behavior of PIVMAT's ``jpdfscal``. The output is a 2D count
+    matrix over symmetric bin centers spanning ``[-max(abs(s)), +max(abs(s))]``
+    for each scalar.
+
+    Parameters
+    ----------
+    s1, s2:
+        Scalar fields as DataArrays. They must be broadcastable to the same
+        shape; non-finite pairs are ignored.
+    nbin:
+        Number of bin centers per axis (default: 101).
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with coordinates ``bin1`` and ``bin2`` and a 2D variable ``hi``
+        containing counts.
+    """
+
+    if not isinstance(s1, xr.DataArray) or not isinstance(s2, xr.DataArray):
+        raise TypeError("jpdfscal expects two xarray.DataArray inputs")
+
+    n = int(nbin)
+    if n < 3 or n % 2 == 0:
+        # PIVMAT uses odd default (101). Odd makes the center bin land at 0.
+        raise ValueError("nbin must be an odd integer >= 3")
+
+    a1, a2 = xr.align(s1, s2, join="exact")
+    v1 = np.asarray(a1.values, dtype=float).ravel()
+    v2 = np.asarray(a2.values, dtype=float).ravel()
+
+    finite = np.isfinite(v1) & np.isfinite(v2)
+    v1 = v1[finite]
+    v2 = v2[finite]
+
+    if v1.size == 0:
+        max1 = 0.0
+    else:
+        max1 = float(np.max(np.abs(v1)))
+    if v2.size == 0:
+        max2 = 0.0
+    else:
+        max2 = float(np.max(np.abs(v2)))
+
+    bin1 = np.linspace(-max1, max1, n, dtype=float) if max1 > 0 else np.linspace(-1.0, 1.0, n, dtype=float)
+    bin2 = np.linspace(-max2, max2, n, dtype=float) if max2 > 0 else np.linspace(-1.0, 1.0, n, dtype=float)
+
+    rg = (n - 1) / 2.0
+
+    def _to_index(v: np.ndarray, vmax: float) -> np.ndarray:
+        if vmax <= 0.0 or not np.isfinite(vmax):
+            return np.full_like(v, int(rg), dtype=int)
+        idx = np.rint(rg * (1.0 + (v / vmax))).astype(int)
+        return np.clip(idx, 0, n - 1)
+
+    i1 = _to_index(v1, max1)
+    i2 = _to_index(v2, max2)
+
+    hi = np.zeros((n, n), dtype=float)
+    # Vectorized 2D bincount
+    flat = i1 * n + i2
+    bc = np.bincount(flat, minlength=n * n)
+    hi[:, :] = bc.reshape((n, n))
+
+    ds = xr.Dataset(
+        data_vars={"hi": (("bin1", "bin2"), hi)},
+        coords={"bin1": ("bin1", bin1), "bin2": ("bin2", bin2)},
+    )
+
+    ds["hi"].attrs["long_name"] = "joint histogram"
+    # Carry basic metadata if present.
+    ds.attrs["namew1"] = str(a1.attrs.get("long_name", a1.name or "s1"))
+    ds.attrs["namew2"] = str(a2.attrs.get("long_name", a2.name or "s2"))
+    ds.attrs["unitw1"] = str(a1.attrs.get("units", ""))
+    ds.attrs["unitw2"] = str(a2.attrs.get("units", ""))
+    return ds
 def Γ1_moving_window_function(
         fWin: xr.Dataset,
         n: int,

@@ -24,6 +24,7 @@ from pivpy.graphics import autocorrelation_plot as gautocorrelation_plot
 from pivpy.graphics import histscal_disp as ghistscal_disp
 from pivpy.graphics import histvec_disp as ghistvec_disp
 from pivpy.graphics import to_movie as gto_movie
+from pivpy.graphics import jpdfscal_disp as gjpdfscal_disp
 from pivpy.compute_funcs import (
     Γ1_moving_window_function,
     Γ2_moving_window_function,
@@ -35,6 +36,8 @@ from pivpy.compute_funcs import (
     filter2d,
     filter2d_kernel,
     interpolat_zeros_2d,
+    interpf as cinterpf,
+    jpdfscal as cjpdfscal,
 )
 
 # """ learn from this example
@@ -1712,6 +1715,39 @@ class PIVAccessor(object):
         out.attrs = dict(ds.attrs)
         return out
 
+    def interpf(
+        self,
+        method: int = 0,
+        *,
+        variables: list[str] | None = None,
+        missing: str = "0nan",
+    ) -> xr.Dataset:
+        """Interpolate missing data (PIVMAT-style ``interpf``).
+
+        Missing values are defined as 0 and/or NaN (see ``missing``). The
+        interpolation is applied frame-by-frame along ``t`` if present.
+
+        Parameters
+        ----------
+        method:
+            Interpolation method selector:
+            ``0`` Laplacian inpainting (sparse solve),
+            ``1`` nearest-neighbor fill,
+            ``2`` linear interpolation with nearest fallback.
+        variables:
+            Variables to process. Default: ['u','v'] if present; otherwise ['w']
+            if present; otherwise all data variables.
+        missing:
+            Missing-value definition: ``'0nan'`` (default), ``'nan'``, or ``'0'``.
+
+        Returns
+        -------
+        xarray.Dataset
+            Filled dataset.
+        """
+
+        return cinterpf(self._obj, method=int(method), variables=variables, missing=missing)
+
     def __add__(self, other):
         """add two datasets means that we sum up the velocities, assume
         that x,y,t,delta_t are all identical
@@ -2286,6 +2322,29 @@ class PIVAccessor(object):
         """
 
         return gto_movie(self._obj, output, **kwargs)
+
+    def jpdfscal(self, var1: str, var2: str, nbin: int = 101) -> xr.Dataset:
+        """Joint PDF (2D histogram) of two scalar variables (PIVMAT-style).
+
+        Parameters
+        ----------
+        var1, var2:
+            Names of scalar variables in the Dataset.
+        nbin:
+            Number of bins per axis (odd integer, default 101).
+        """
+
+        if var1 not in self._obj:
+            raise KeyError(f"Variable {var1} not found in dataset")
+        if var2 not in self._obj:
+            raise KeyError(f"Variable {var2} not found in dataset")
+        return cjpdfscal(self._obj[var1], self._obj[var2], nbin=int(nbin))
+
+    def jpdfscal_disp(self, var1: str, var2: str, nbin: int = 101, **kwargs):
+        """Compute and display the joint PDF of two scalar variables."""
+
+        jpdf = self.jpdfscal(var1, var2, nbin=nbin)
+        return gjpdfscal_disp(jpdf, **kwargs)
 
     def histscal_disp(self, *args, **kwargs):
         """method for graphics.histscal_disp"""

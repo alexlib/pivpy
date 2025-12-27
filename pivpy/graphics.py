@@ -1012,6 +1012,68 @@ def imvectomovie(
     )
 
 
+def jpdfscal_disp(
+    jpdf: xr.Dataset,
+    *,
+    ax: Axes | None = None,
+) -> tuple[Figure, Axes]:
+    """Display a joint PDF computed by :func:`pivpy.compute_funcs.jpdfscal`.
+
+    This mimics PIVMAT's ``jpdfscal_disp``: it plots ``log10(hi)`` as filled
+    contours and draws dashed zero lines.
+
+    Parameters
+    ----------
+    jpdf:
+        Dataset produced by ``jpdfscal`` with coords ``bin1``/``bin2`` and data
+        variable ``hi``.
+    ax:
+        Optional axes.
+
+    Returns
+    -------
+    tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        The figure and axes.
+    """
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+
+    if "hi" not in jpdf:
+        raise KeyError("jpdf dataset must contain variable 'hi'")
+    if "bin1" not in jpdf.coords or "bin2" not in jpdf.coords:
+        raise KeyError("jpdf dataset must contain coords 'bin1' and 'bin2'")
+
+    bin1 = np.asarray(jpdf["bin1"].values, dtype=float)
+    bin2 = np.asarray(jpdf["bin2"].values, dtype=float)
+    hi = np.asarray(jpdf["hi"].values, dtype=float)
+
+    # Avoid log10(0) warnings by masking zeros.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        z = np.where(hi > 0, np.log10(hi), np.nan)
+
+    levels = [0, 1, 2, 3, 4, 5, 6]
+    m = ax.contourf(bin1, bin2, z.T, levels=levels)
+
+    namew1 = str(jpdf.attrs.get("namew1", "s1"))
+    namew2 = str(jpdf.attrs.get("namew2", "s2"))
+    unitw1 = str(jpdf.attrs.get("unitw1", ""))
+    unitw2 = str(jpdf.attrs.get("unitw2", ""))
+
+    xlab = f"{namew1} ({unitw1})" if unitw1 else namew1
+    ylab = f"{namew2} ({unitw2})" if unitw2 else namew2
+    ax.set_xlabel(xlab)
+    ax.set_ylabel(ylab)
+    ax.set_title(f"Log joint PDF of {namew1} and {namew2}")
+
+    ax.plot([bin1[0], bin1[-1]], [0, 0], "k--")
+    ax.plot([0, 0], [bin2[0], bin2[-1]], "k--")
+    plt.colorbar(m, ax=ax)
+    return fig, ax
+
+
 def contour_plot(
     data: xr.Dataset,
     property: str = "mag",

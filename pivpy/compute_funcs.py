@@ -575,6 +575,148 @@ def corrf(
     return out
 
 
+def gradientf(scalar: xr.DataArray) -> xr.Dataset:
+    """Gradient of a scalar field (PIVMAT-inspired).
+
+    This is a Python/xarray equivalent of PIVMAT's ``gradientf.m``.
+
+    Parameters
+    ----------
+    scalar:
+        Scalar field as an ``xarray.DataArray`` with dims including ``x`` and ``y``.
+        A time dimension (typically ``t``) is allowed and is preserved.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with variables ``u`` and ``v`` containing the partial derivatives
+        ``d(scalar)/dx`` and ``d(scalar)/dy``.
+
+    Notes
+    -----
+    - Coordinates are taken from the input DataArray.
+    - Units are propagated if both the scalar and coordinate units are available.
+    """
+
+    if not isinstance(scalar, xr.DataArray):
+        raise TypeError("gradientf expects an xarray.DataArray")
+
+    if "x" not in scalar.dims or "y" not in scalar.dims:
+        raise ValueError("gradientf requires dims 'x' and 'y'")
+
+    gx = scalar.differentiate("x")
+    gy = scalar.differentiate("y")
+
+    out = xr.Dataset({"u": gx, "v": gy})
+
+    # Best-effort metadata propagation.
+    w_units = str(scalar.attrs.get("units", ""))
+    x_units = str(getattr(scalar.coords.get("x", None), "attrs", {}).get("units", ""))
+    y_units = str(getattr(scalar.coords.get("y", None), "attrs", {}).get("units", ""))
+
+    name = scalar.name or "scalar"
+    out["u"].attrs = dict(gx.attrs)
+    out["v"].attrs = dict(gy.attrs)
+    out["u"].attrs.setdefault("long_name", f"d/dx({name})")
+    out["v"].attrs.setdefault("long_name", f"d/dy({name})")
+
+    if w_units and x_units:
+        out["u"].attrs["units"] = f"{w_units}/{x_units}"
+    if w_units and y_units:
+        out["v"].attrs["units"] = f"{w_units}/{y_units}"
+
+    return out
+
+
+def _hist_counts(values: np.ndarray, centers: np.ndarray) -> np.ndarray:
+    """Histogram counts using bin centers (MATLAB hist-like behavior)."""
+
+    c = np.asarray(centers, dtype=float).ravel()
+    if c.size == 0:
+        return np.asarray([], dtype=int)
+
+    v = np.asarray(values, dtype=float).ravel()
+    v = v[np.isfinite(v)]
+    if v.size == 0:
+        return np.zeros(c.size, dtype=int)
+
+    # Use midpoints between centers as bin edges, with infinite end caps.
+    mids = 0.5 * (c[:-1] + c[1:])
+    edges = np.concatenate(([-np.inf], mids, [np.inf]))
+    h, _ = np.histogram(v, bins=edges)
+    return np.asarray(h, dtype=int)
+
+
+def histf(
+    scalar: xr.DataArray,
+    bin: np.ndarray | None = None,
+    opt: str = "",
+) -> xr.Dataset:
+    """Histogram of a scalar field (PIVMAT-inspired).
+
+    This is a Python/xarray equivalent of PIVMAT's ``histf.m`` for scalar
+    fields. Values are stacked over all dimensions.
+
+    Parameters
+    ----------
+    scalar:
+        Scalar field as an ``xarray.DataArray``.
+    bin:
+        Optional 1D array of bin centers. If not provided, a default binning is
+        estimated from the mean and standard deviation of the first frame
+        (if a ``t`` dimension exists) or from the full field otherwise.
+    opt:
+        Option string. If it contains ``'0'``, zero values are included.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with coordinate ``bin`` and variable ``h``.
+    """
+
+    if not isinstance(scalar, xr.DataArray):
+        raise TypeError("histf expects an xarray.DataArray")
+
+    include_zeros = "0" in str(opt)
+
+    da0 = scalar
+    if "t" in scalar.dims:
+        try:
+            da0 = scalar.isel(t=0)
+        except Exception:
+            da0 = scalar
+
+    ref = np.asarray(da0.values, dtype=float).ravel()
+    ref = ref[np.isfinite(ref)]
+    if not include_zeros:
+        ref = ref[ref != 0]
+
+    if bin is None:
+        if ref.size == 0:
+            centers = np.linspace(-1.0, 1.0, 200)
+        else:
+            mean = float(np.mean(ref))
+            std = float(np.std(ref))
+            if not np.isfinite(std) or std == 0.0:
+                std = 1.0
+            if mean < std:
+                centers = np.linspace(-20.0 * std, 20.0 * std, 200)
+            else:
+                centers = np.linspace(mean - 20.0 * std, mean + 20.0 * std, 200)
+    else:
+        centers = np.asarray(bin, dtype=float).ravel()
+
+    vals = np.asarray(scalar.values, dtype=float).ravel()
+    vals = vals[np.isfinite(vals)]
+    if not include_zeros:
+        vals = vals[vals != 0]
+
+    h = _hist_counts(vals, centers)
+    out = xr.Dataset({"h": ("bin", h)}, coords={"bin": centers})
+    out["h"].attrs["long_name"] = "histogram"
+    return out
+
+
 def meannz(
     x: xr.DataArray | np.ndarray,
     dim: int | str | None = None,

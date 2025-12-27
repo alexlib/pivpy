@@ -27,6 +27,8 @@ from pivpy.compute_funcs import (
     bwfilter2d,
     corrf,
     corrm,
+    gradientf,
+    histf,
     filter2d,
     filter2d_kernel,
     interpolat_zeros_2d,
@@ -2347,6 +2349,77 @@ class PIVAccessor(object):
             nan_as_zero=nan_as_zero,
             nowarning=nowarning,
         )
+
+    def gradientf(self, variable: str = "w") -> xr.Dataset:
+        """PIVMAT-style gradient of a scalar variable.
+
+        This wraps :func:`pivpy.compute_funcs.gradientf` and returns a new
+        Dataset containing gradient components as variables ``u`` and ``v``.
+
+        Parameters
+        ----------
+        variable:
+            Name of the scalar variable in the Dataset (default: ``'w'``).
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset with variables ``u`` and ``v``.
+        """
+
+        if variable not in self._obj:
+            raise KeyError(f"Variable {variable} not in dataset")
+
+        return gradientf(self._obj[variable])
+
+    def histf(
+        self,
+        variable: str | None = None,
+        bin=None,
+        opt: str = "",
+    ) -> xr.Dataset:
+        """PIVMAT-style histogram of a vector/scalar field.
+
+        - Scalar mode: pass ``variable='w'`` (or any scalar var name) to get a
+          Dataset with coordinate ``bin`` and variable ``h``.
+        - Vector mode: pass ``variable=None`` (default) to compute histograms
+          for both components (``u``/``v`` or ``vx``/``vy``), returning variables
+          ``hx`` and ``hy``.
+
+        By default, zero values are treated as invalid and excluded. Pass
+        ``opt`` containing ``'0'`` to include zeros.
+        """
+
+        ds = self._obj
+        include_zeros = "0" in str(opt)
+
+        if variable is not None:
+            if variable not in ds:
+                raise KeyError(f"Variable {variable} not in dataset")
+            return histf(ds[variable], bin=bin, opt="0" if include_zeros else "")
+
+        # Vector mode
+        if "u" in ds and "v" in ds:
+            xname, yname = "u", "v"
+        elif "vx" in ds and "vy" in ds:
+            xname, yname = "vx", "vy"
+        else:
+            raise ValueError("histf vector mode requires ('u','v') or ('vx','vy')")
+
+        hx_ds = histf(ds[xname], bin=bin, opt="0" if include_zeros else "")
+        centers = hx_ds["bin"].values
+        hy_ds = histf(ds[yname], bin=centers, opt="0" if include_zeros else "")
+
+        out = xr.Dataset(
+            {
+                "hx": ("bin", np.asarray(hx_ds["h"].values, dtype=int)),
+                "hy": ("bin", np.asarray(hy_ds["h"].values, dtype=int)),
+            },
+            coords={"bin": centers},
+        )
+        out["hx"].attrs["long_name"] = f"histogram({xname})"
+        out["hy"].attrs["long_name"] = f"histogram({yname})"
+        return out
 
     # @property
     # def vel_units(self):

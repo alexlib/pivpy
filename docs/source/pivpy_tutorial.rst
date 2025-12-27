@@ -42,6 +42,56 @@ Typical dataset structure:
 - Dims: ``('y', 'x', 't')``
 - Variables: ``u``, ``v``, and (often) ``chc``
 
+Gradient of a scalar field (PIVMAT-style ``gradientf``)
+=======================================================
+
+Compute the gradient of any scalar variable (for example a vorticity field
+stored in ``ds['w']``). The result is a new Dataset with vector components
+stored as ``u`` and ``v``:
+
+.. code-block:: python
+
+   import pivpy.pivpy  # registers the .piv accessor
+   from pivpy import io
+
+   ds = io.create_sample_Dataset(n_frames=1)
+   ds = ds.piv.vec2scal('vorticity', name='w')
+
+   grad = ds.piv.gradientf(variable='w')
+   # grad contains grad['u'] = dw/dx and grad['v'] = dw/dy
+
+You can plot it like any other vector field:
+
+.. code-block:: python
+
+   grad.piv.showf()
+
+Histogram of a field (PIVMAT-style ``histf``)
+=============================================
+
+Compute a histogram for a scalar field (values are stacked over the full field
+and all time frames):
+
+.. code-block:: python
+
+   h = ds.piv.histf(variable='w')
+   # h is a Dataset with coordinate h['bin'] and counts h['h']
+
+By default, zeros are treated as invalid and excluded. To include zeros, pass
+``opt='0'``:
+
+.. code-block:: python
+
+   h0 = ds.piv.histf(variable='w', opt='0')
+
+Vector mode (no variable specified) computes histograms for both components of
+the velocity field:
+
+.. code-block:: python
+
+   hv = ds.piv.histf()
+   # hv contains hv['hx'] for u (or vx) and hv['hy'] for v (or vy)
+
 Extract a rectangular region (PIVMAT-style ``extractf``)
 ================================================================
 

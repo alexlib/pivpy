@@ -43,7 +43,7 @@ Typical dataset structure:
 - Variables: ``u``, ``v``, and (often) ``chc``
 
 Create a scalar dataset from an image (PIVMAT-style ``im2pivmat``)
-===============================================================
+========================================================================================
 
 If you have a 2D image array (shape ``(y, x)``), you can wrap it into a PIVPy
 scalar Dataset using :func:`pivpy.io.im2pivmat`:
@@ -59,6 +59,42 @@ scalar Dataset using :func:`pivpy.io.im2pivmat`:
 
    # Plot the scalar field
    ds_im.piv.showscal(property='w')
+
+Save animations (PIVMAT-style ``showf`` / ``imvectomovie``)
+===========================================================
+
+PIVPy can render a Dataset as a movie efficiently by creating the Matplotlib
+artists once and updating them frame-by-frame (fast renderer).
+
+In-memory Dataset (uses the ``t`` dimension as frames):
+
+.. code-block:: python
+
+   import pivpy.pivpy  # registers the .piv accessor
+   from pivpy import io
+
+   ds = io.create_sample_Dataset(n_frames=20)
+
+   # Write a movie (requires FFmpeg for mp4/avi)
+   ds.piv.to_movie('movie.mp4', fps=10, show='vector', nthArr=2, scalingFactor=10.0)
+
+   # Or collect frames as RGBA arrays (no external encoders required)
+   frames = ds.piv.to_movie(None, return_frames=True, show='vector')
+
+Streaming from disk (loads files one-by-one, PIVMAT ``imvectomovie``-style):
+
+.. code-block:: python
+
+   from pivpy import graphics
+
+   # Convert many files to a movie without loading all of them into RAM
+   graphics.imvectomovie('data/*.vc7', 'movie.mp4', fps=10, show='vector', nthArr=3)
+
+Notes:
+
+- Writing ``.mp4``/``.avi`` uses Matplotlib's FFmpeg writer (FFmpeg must be installed).
+- Writing ``.gif`` uses Matplotlib's Pillow writer (Pillow must be installed).
+- Use ``show='scalar'`` and ``scalar='w'`` to render scalar-only datasets.
 
 Gradient of a scalar field (PIVMAT-style ``gradientf``)
 =======================================================

@@ -727,11 +727,15 @@ class NetCDFReader(PIVReader):
             ycoord = np.arange(int(ds0.sizes["y"]))
 
         if "t" in ds0.coords:
-            tcoord = np.asarray(ds0.coords["t"].values)
+            tcoord = np.asarray(ds0.coords["t"].values, dtype=float)
         elif "t" in ds0.dims:
             tcoord = np.arange(int(ds0.sizes["t"]), dtype=float)
         else:
             tcoord = np.asarray([0.0], dtype=float)
+
+        # Some NetCDF files may represent single-step time as a scalar coordinate.
+        if np.asarray(tcoord).ndim == 0:
+            tcoord = np.asarray([float(tcoord)], dtype=float)
 
         # Ensure we end up with ('y','x','t') ordering.
         def _ensure_yxt(da: xr.DataArray) -> xr.DataArray:

@@ -14,6 +14,8 @@ Important behavioral expectations (tests rely on these):
 from __future__ import annotations
 
 import warnings
+import pathlib
+import glob
 from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
@@ -21,6 +23,7 @@ import numpy as np
 import xarray as xr
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from matplotlib.quiver import Quiver
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
@@ -333,13 +336,680 @@ def streamplot(
 
 
 def showf(data: xr.Dataset, **kwargs) -> tuple[plt.Figure, plt.Axes]:
-    """Simple vector-field display (compat shim).
+    """Display a vector or scalar field (PIVMAT-inspired dispatcher).
 
-    Historically, `showf` existed as a convenience wrapper. For the tests we only
-    need it to be callable without error.
+    This is a lightweight Python analogue of PIVMAT's ``showf``:
+
+    - If the dataset contains ``u`` and ``v``, it displays a vector field.
+    - Otherwise, it displays a scalar field (default variable ``w``).
+
+    Parameters
+    ----------
+    data:
+        Dataset to display.
+    background:
+        Optional scalar background shown behind vectors.
+
+        Use ``None``/``''``/``'off'`` for no background. If ``background`` matches
+        an existing variable name, that variable is displayed. Otherwise, it is
+        interpreted as a vector-derived flow property and computed using
+        ``data.piv.vec2scal(background, name='w')``.
+    scalar:
+        Scalar variable to display if the dataset is scalar-only.
+    ax:
+        Optional axes.
+    **kwargs:
+        Forwarded to :func:`quiver` (vector mode) or matplotlib pcolormesh
+        (scalar mode). Recognized scalar kwargs: ``cmap``, ``clim``.
+
+    Returns
+    -------
+    matplotlib.figure.Figure, matplotlib.axes.Axes
+        Figure and axes used for plotting.
     """
 
-    return quiver(data, **kwargs)
+    background = kwargs.pop("background", None)
+    scalar = kwargs.pop("scalar", "w")
+    ax = kwargs.pop("ax", None)
+
+    is_vector = "u" in data and "v" in data
+    if is_vector:
+        if background is None or str(background).strip() == "" or str(background).lower() == "off":
+            return quiver(data, ax=ax, **kwargs)
+        # Vector field with scalar background
+        fig, ax = quiver(data, ax=ax, **kwargs)
+        try:
+            _plot_scalar_background(ax, data, background=background, clim=kwargs.get("clim", None), cmap=kwargs.get("cmap", None))
+        except Exception:
+            # Keep showf usable even if background fails.
+            pass
+        return fig, ax
+
+    # Scalar field
+    return _showscal_axes(data, property=str(scalar), ax=ax, **kwargs)
+
+
+def _showscal_axes(
+    data: xr.Dataset,
+    property: str = "w",
+    *,
+    ax: Axes | None = None,
+    clim: tuple[float, float] | str | None = None,
+    cmap: str | None = None,
+    **kwargs,
+) -> tuple[Figure, Axes]:
+    from pivpy.graphics_utils import dataset_to_array
+
+    ds = data
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+
+    x, y, _, _ = dataset_to_array(ds if "t" not in ds.dims else ds.isel(t=0))
+    if property not in ds:
+        raise KeyError(f"Property {property} not found in dataset")
+    da = ds[property]
+    z = np.asarray(da.isel(t=0).values if "t" in da.dims else da.values)
+
+    plot_kwargs: dict = {"shading": "auto"}
+    if cmap is not None:
+        plot_kwargs["cmap"] = cmap
+
+    m = ax.pcolormesh(x, y, z, **plot_kwargs, **kwargs)
+    if clim is not None and isinstance(clim, (tuple, list)) and len(clim) == 2:
+        m.set_clim(float(clim[0]), float(clim[1]))
+    plt.colorbar(m, ax=ax, label=property)
+    ax.set_aspect("equal")
+    return fig, ax
+
+
+def _plot_scalar_background(
+    ax: Axes,
+    data: xr.Dataset,
+    *,
+    background: str,
+    clim: tuple[float, float] | str | None,
+    cmap: str | None,
+) -> "plt.collections.QuadMesh":
+    from pivpy.graphics_utils import dataset_to_array
+
+    ds = data
+    bg = str(background)
+    if bg in ds:
+        bg_var = bg
+        ds_bg = ds
+    else:
+        import pivpy.pivpy  # registers the .piv accessor
+
+        ds_bg = ds.copy()
+        ds_bg = ds_bg.piv.vec2scal(bg, name="__bg")
+        bg_var = "__bg"
+
+    x, y, _, _ = dataset_to_array(ds_bg if "t" not in ds_bg.dims else ds_bg.isel(t=0))
+    da = ds_bg[bg_var]
+    z = np.asarray(da.isel(t=0).values if "t" in da.dims else da.values)
+
+    plot_kwargs: dict = {"shading": "auto"}
+    if cmap is not None:
+        plot_kwargs["cmap"] = cmap
+
+    m = ax.pcolormesh(x, y, z, **plot_kwargs)
+    if clim is not None and isinstance(clim, (tuple, list)) and len(clim) == 2:
+        m.set_clim(float(clim[0]), float(clim[1]))
+    return m
+
+
+class _FrameCollector:
+    def __init__(self):
+        self.frames: list[np.ndarray] = []
+
+    def grab(self, fig: Figure) -> None:
+        fig.canvas.draw()
+        self.frames.append(np.asarray(fig.canvas.buffer_rgba()).copy())
+
+
+def _format_title(
+    title: str | None,
+    *,
+    i: int,
+    t: float | None,
+    file: str | None,
+) -> str | None:
+    if title is None:
+        return None
+    try:
+        return str(title).format(i=i, t=t, file=file)
+    except Exception:
+        return str(title)
+
+
+class _VectorMovieRenderer:
+    def __init__(
+        self,
+        *,
+        first: xr.Dataset,
+        ax: Axes | None,
+        background: str | None,
+        title: str | None,
+        clim: tuple[float, float] | str | None,
+        cmap: str | None,
+        quiver_kwargs: dict,
+    ):
+        from pivpy.graphics_utils import dataset_to_array
+
+        self.background = background
+        self.title = title
+        self.clim = clim
+        self.cmap = cmap
+
+        if ax is None:
+            self.fig, self.ax = plt.subplots()
+        else:
+            self.ax = ax
+            self.fig = ax.figure
+
+        # Parse a subset of existing quiver() compat kwargs.
+        self.nthArr = quiver_kwargs.pop("nthArr", None)
+        self.aspectratio = quiver_kwargs.pop("aspectratio", None)
+        self.add_guide = quiver_kwargs.pop("add_guide", True)
+        self.streamlines = bool(quiver_kwargs.pop("streamlines", False))
+        self.colorbar = bool(quiver_kwargs.pop("colorbar", False))
+        self.colorbar_orient = quiver_kwargs.pop("colorbar_orient", "vertical")
+        self.arrowColor = quiver_kwargs.pop("arrowColor", "k")
+        self.scalingFactor = float(quiver_kwargs.pop("scalingFactor", 1.0))
+        self.widthFactor = float(quiver_kwargs.pop("widthFactor", 0.002))
+        self.quiverKey = quiver_kwargs.pop("quiverKey", "Q")
+
+        x, y, u, v = dataset_to_array(first)
+        if self.nthArr is not None:
+            step = max(1, int(self.nthArr))
+            x = x[::step, ::step]
+            y = y[::step, ::step]
+            u = u[::step, ::step]
+            v = v[::step, ::step]
+
+        self._bg_mesh = None
+        if background is not None and str(background).strip() != "" and str(background).lower() != "off":
+            try:
+                self._bg_mesh = _plot_scalar_background(self.ax, first, background=str(background), clim=clim, cmap=cmap)
+            except Exception:
+                self._bg_mesh = None
+
+        quiver_plot_kwargs: dict = {"scale": self.scalingFactor, "width": self.widthFactor}
+        if self.colorbar:
+            mag = np.sqrt(u**2 + v**2)
+            self._Q = self.ax.quiver(x, y, u, v, mag, cmap=cmap, **quiver_plot_kwargs, **quiver_kwargs)
+            plt.colorbar(self._Q, ax=self.ax, orientation=self.colorbar_orient)
+        else:
+            self._Q = self.ax.quiver(x, y, u, v, color=self.arrowColor, **quiver_plot_kwargs, **quiver_kwargs)
+
+        if self.aspectratio is None:
+            self.ax.set_aspect("equal")
+        elif isinstance(self.aspectratio, str) and self.aspectratio.lower() == "auto":
+            self.ax.set_aspect("auto")
+        else:
+            try:
+                self.ax.set_aspect(float(self.aspectratio))
+            except Exception:
+                self.ax.set_aspect("equal")
+
+        if self.add_guide:
+            try:
+                self.ax.quiverkey(self._Q, 0.9, 0.9, 1, str(self.quiverKey), labelpos="E", coordinates="figure")
+            except Exception:
+                pass
+
+        if self.streamlines:
+            try:
+                streamplot(first, ax=self.ax)
+            except Exception:
+                pass
+
+    @property
+    def figax(self) -> tuple[Figure, Axes]:
+        return self.fig, self.ax
+
+    def update(self, ds: xr.Dataset, *, i: int, file: str | None = None) -> None:
+        from pivpy.graphics_utils import dataset_to_array
+
+        x, y, u, v = dataset_to_array(ds)
+        if self.nthArr is not None:
+            step = max(1, int(self.nthArr))
+            x = x[::step, ::step]
+            y = y[::step, ::step]
+            u = u[::step, ::step]
+            v = v[::step, ::step]
+
+        if self._bg_mesh is not None and self.background is not None:
+            try:
+                bg = str(self.background)
+                if bg in ds:
+                    da = ds[bg]
+                    z = np.asarray(da.isel(t=0).values if "t" in da.dims else da.values)
+                else:
+                    import pivpy.pivpy  # registers the .piv accessor
+
+                    tmp = ds.copy()
+                    tmp = tmp.piv.vec2scal(bg, name="__bg")
+                    da = tmp["__bg"]
+                    z = np.asarray(da.isel(t=0).values if "t" in da.dims else da.values)
+
+                if self.nthArr is not None:
+                    step = max(1, int(self.nthArr))
+                    z = z[::step, ::step]
+
+                self._bg_mesh.set_array(z.ravel())
+                if isinstance(self.clim, str) and self.clim.lower() == "each":
+                    finite = z[np.isfinite(z)]
+                    if finite.size:
+                        self._bg_mesh.set_clim(float(np.min(finite)), float(np.max(finite)))
+            except Exception:
+                pass
+
+        self._Q.set_UVC(u, v)
+        if self.colorbar:
+            mag = np.sqrt(u**2 + v**2)
+            self._Q.set_array(mag.ravel())
+            if isinstance(self.clim, str) and self.clim.lower() == "each":
+                finite = mag[np.isfinite(mag)]
+                if finite.size:
+                    self._Q.set_clim(float(np.min(finite)), float(np.max(finite)))
+
+        t_val: float | None
+        if "t" in ds.coords and ds["t"].size:
+            try:
+                t_val = float(ds["t"].values[0])
+            except Exception:
+                t_val = None
+        else:
+            t_val = None
+
+        ttl = _format_title(self.title, i=i, t=t_val, file=file)
+        if ttl is not None:
+            self.ax.set_title(ttl)
+
+
+class _ScalarMovieRenderer:
+    def __init__(
+        self,
+        *,
+        first: xr.Dataset,
+        ax: Axes | None,
+        variable: str,
+        title: str | None,
+        clim: tuple[float, float] | str | None,
+        cmap: str | None,
+        pcolormesh_kwargs: dict,
+    ):
+        self.variable = variable
+        self.title = title
+        self.clim = clim
+        self.cmap = cmap
+
+        if ax is None:
+            self.fig, self.ax = plt.subplots()
+        else:
+            self.ax = ax
+            self.fig = ax.figure
+
+        ds0 = first.isel(t=0) if "t" in first.dims else first
+        if "x" not in ds0.coords or "y" not in ds0.coords:
+            raise KeyError("Scalar movie rendering requires 1D coords 'x' and 'y'")
+
+        x1 = np.asarray(ds0["x"].values)
+        y1 = np.asarray(ds0["y"].values)
+        x2d, y2d = np.meshgrid(x1, y1)
+
+        if variable not in ds0:
+            raise KeyError(f"Variable {variable} not found in dataset")
+        da = ds0[variable]
+        z = np.asarray(da.values)
+
+        kwargs = dict(pcolormesh_kwargs)
+        kwargs.setdefault("shading", "auto")
+        if cmap is not None:
+            kwargs.setdefault("cmap", cmap)
+
+        self._mesh = self.ax.pcolormesh(x2d, y2d, z, **kwargs)
+        self._cbar = plt.colorbar(self._mesh, ax=self.ax, label=variable)
+
+        if isinstance(clim, (tuple, list)) and len(clim) == 2:
+            self._mesh.set_clim(float(clim[0]), float(clim[1]))
+        self.ax.set_aspect("equal")
+
+    @property
+    def figax(self) -> tuple[Figure, Axes]:
+        return self.fig, self.ax
+
+    def update(self, ds: xr.Dataset, *, i: int, file: str | None = None) -> None:
+        if self.variable not in ds:
+            raise KeyError(f"Variable {self.variable} not found in dataset")
+        da = ds[self.variable]
+        z = np.asarray(da.isel(t=0).values if "t" in da.dims else da.values)
+        self._mesh.set_array(z.ravel())
+        if isinstance(self.clim, str) and self.clim.lower() == "each":
+            finite = z[np.isfinite(z)]
+            if finite.size:
+                self._mesh.set_clim(float(np.min(finite)), float(np.max(finite)))
+
+        t_val: float | None
+        if "t" in ds.coords and ds["t"].size:
+            try:
+                t_val = float(ds["t"].values[0])
+            except Exception:
+                t_val = None
+        else:
+            t_val = None
+
+        ttl = _format_title(self.title, i=i, t=t_val, file=file)
+        if ttl is not None:
+            self.ax.set_title(ttl)
+
+
+def _resolve_files(pattern: str | list[str] | tuple[str, ...]) -> list[pathlib.Path]:
+    pats = [str(p) for p in pattern] if isinstance(pattern, (list, tuple)) else [str(pattern)]
+
+    expanded: list[str] = []
+    for pat in pats:
+        if "[" in pat and "]" in pat:
+            try:
+                from pivpy.pivmat_compat import expandstr
+
+                expanded.extend(expandstr(pat))
+                continue
+            except Exception:
+                pass
+        expanded.append(pat)
+
+    files: list[pathlib.Path] = []
+    for pat in expanded:
+        matches = [pathlib.Path(p) for p in glob.glob(pat)]
+        if matches:
+            files.extend(matches)
+        else:
+            p = pathlib.Path(pat)
+            if p.exists() and p.is_file():
+                files.append(p)
+
+    # Stable order, de-duplicate.
+    uniq: dict[str, pathlib.Path] = {}
+    for f in sorted(files, key=lambda x: str(x)):
+        uniq[str(f)] = f
+    return list(uniq.values())
+
+
+def _movie_from_iter(
+    datasets: "Iterable[tuple[xr.Dataset, str | None]]",
+    *,
+    output: str | pathlib.Path | None,
+    show: str = "auto",
+    background: str | None = None,
+    scalar: str = "w",
+    fps: int = 10,
+    dpi: int = 150,
+    writer: str | None = None,
+    codec: str | None = None,
+    title: str | None = None,
+    clim: tuple[float, float] | str | None = None,
+    cmap: str | None = None,
+    return_frames: bool = False,
+    close: bool = True,
+    ax: Axes | None = None,
+    **kwargs,
+) -> list[np.ndarray] | None:
+    """Core movie loop shared by to_movie() and imvectomovie()."""
+
+    iterator = iter(datasets)
+    first, first_file = next(iterator)
+
+    mode = str(show).lower() if show is not None else "auto"
+    if mode == "auto":
+        mode = "vector" if ("u" in first and "v" in first) else "scalar"
+    if mode not in {"vector", "scalar"}:
+        raise ValueError("show must be 'auto', 'vector', or 'scalar'")
+
+    # Split kwargs: keep them for artist creation.
+    pcolormesh_kwargs = {}
+    quiver_kwargs = dict(kwargs)
+
+    if mode == "scalar":
+        # pcolormesh accepts lots of kwargs; don't forward quiver compat kwargs.
+        for k in list(quiver_kwargs.keys()):
+            if k in {"nthArr", "aspectratio", "add_guide", "streamlines", "colorbar", "colorbar_orient", "arrowColor", "scalingFactor", "widthFactor", "quiverKey"}:
+                quiver_kwargs.pop(k)
+        pcolormesh_kwargs = quiver_kwargs
+        quiver_kwargs = {}
+
+    if mode == "vector":
+        renderer = _VectorMovieRenderer(
+            first=first,
+            ax=ax,
+            background=background,
+            title=title,
+            clim=clim,
+            cmap=cmap,
+            quiver_kwargs=quiver_kwargs,
+        )
+    else:
+        renderer = _ScalarMovieRenderer(
+            first=first,
+            ax=ax,
+            variable=scalar,
+            title=title,
+            clim=clim,
+            cmap=cmap,
+            pcolormesh_kwargs=pcolormesh_kwargs,
+        )
+
+    fig, _ = renderer.figax
+
+    collector = _FrameCollector() if return_frames else None
+
+    movie_writer = None
+    if output is not None:
+        out_path = pathlib.Path(str(output))
+        ext = out_path.suffix.lower()
+        if writer is None:
+            if ext in {".gif"}:
+                writer = "pillow"
+            else:
+                writer = "ffmpeg"
+
+        from matplotlib import animation
+
+        if str(writer).lower() == "pillow":
+            movie_writer = animation.PillowWriter(fps=int(fps))
+        elif str(writer).lower() == "ffmpeg":
+            if codec is not None:
+                movie_writer = animation.FFMpegWriter(fps=int(fps), codec=str(codec))
+            else:
+                movie_writer = animation.FFMpegWriter(fps=int(fps))
+        else:
+            raise ValueError("writer must be None, 'ffmpeg', or 'pillow'")
+
+        movie_writer.setup(fig, str(out_path), dpi=int(dpi))
+
+    # First frame
+    renderer.update(first, i=0, file=first_file)
+    if collector is not None:
+        collector.grab(fig)
+    if movie_writer is not None:
+        movie_writer.grab_frame()
+
+    # Remaining frames
+    frame_index = 1
+    for ds, fname in iterator:
+        renderer.update(ds, i=frame_index, file=fname)
+        if collector is not None:
+            collector.grab(fig)
+        if movie_writer is not None:
+            movie_writer.grab_frame()
+        frame_index += 1
+
+    if movie_writer is not None:
+        try:
+            movie_writer.finish()
+        except Exception:
+            # Some writers raise on finish if encoding failed.
+            raise
+
+    if close:
+        plt.close(fig)
+
+    return collector.frames if collector is not None else None
+
+
+def to_movie(
+    data: xr.Dataset,
+    output: str | pathlib.Path | None,
+    *,
+    show: str = "auto",
+    background: str | None = None,
+    scalar: str = "w",
+    fps: int = 10,
+    dpi: int = 150,
+    writer: str | None = None,
+    codec: str | None = None,
+    title: str | None = None,
+    clim: tuple[float, float] | str | None = None,
+    cmap: str | None = None,
+    return_frames: bool = False,
+    close: bool = True,
+    ax: Axes | None = None,
+    **kwargs,
+) -> list[np.ndarray] | None:
+    """Save an in-memory Dataset as a movie (fast artist-updating renderer).
+
+    Parameters
+    ----------
+    data:
+        Dataset to render. If it contains a ``t`` dimension, each ``t`` step is
+        rendered as one frame.
+    output:
+        Output path (e.g. ``'movie.mp4'``, ``'movie.gif'``). If ``None`` and
+        ``return_frames=True``, returns a list of RGBA frames.
+    show:
+        ``'auto'`` (default), ``'vector'``, or ``'scalar'``.
+    background:
+        In vector mode, optionally draw a scalar background behind vectors.
+        See :func:`showf`.
+    scalar:
+        Variable name to render in scalar mode.
+    writer:
+        ``None`` (infer from extension), ``'ffmpeg'``, or ``'pillow'``.
+    clim:
+        Either a fixed ``(vmin, vmax)`` tuple, or ``'each'`` to auto-scale per
+        frame.
+    return_frames:
+        If True, returns a list of RGBA arrays (uint8) for each frame.
+
+    Notes
+    -----
+    MP4/AVI writing requires FFmpeg. GIF writing requires Pillow.
+    """
+
+    ds = data
+    if "t" in ds.dims:
+        datasets = ((ds.isel(t=i), None) for i in range(int(ds.sizes["t"])))
+    else:
+        datasets = ((ds, None),)
+
+    return _movie_from_iter(
+        datasets,
+        output=output,
+        show=show,
+        background=background,
+        scalar=scalar,
+        fps=fps,
+        dpi=dpi,
+        writer=writer,
+        codec=codec,
+        title=title,
+        clim=clim,
+        cmap=cmap,
+        return_frames=return_frames,
+        close=close,
+        ax=ax,
+        **kwargs,
+    )
+
+
+def imvectomovie(
+    filename: str | list[str] | tuple[str, ...],
+    output: str | pathlib.Path | None,
+    *,
+    format: str | None = None,
+    show: str = "auto",
+    background: str | None = None,
+    scalar: str = "w",
+    fps: int = 10,
+    dpi: int = 150,
+    writer: str | None = None,
+    codec: str | None = None,
+    title: str | None = None,
+    clim: tuple[float, float] | str | None = None,
+    cmap: str | None = None,
+    verbose: bool = False,
+    return_frames: bool = False,
+    close: bool = True,
+    ax: Axes | None = None,
+    **kwargs,
+) -> list[np.ndarray] | None:
+    """Convert a series of vector/scalar files into a movie (PIVMAT-inspired).
+
+    This is the Python analogue of PIVMAT's ``imvectomovie``:
+    it loads files one-by-one from disk (no big in-memory list) and writes each
+    frame directly to the movie writer.
+
+    Parameters
+    ----------
+    filename:
+        File pattern (glob) or list of patterns/paths.
+    output:
+        Output movie file (e.g. ``.mp4`` / ``.gif``). If ``None`` and
+        ``return_frames=True``, returns a list of RGBA frames.
+    format:
+        Optional explicit format for ``pivpy.io.read_piv``.
+    verbose:
+        If True, prints each file loaded.
+
+    Notes
+    -----
+    Other parameters match :func:`to_movie`.
+    """
+
+    import pivpy.io as pio
+
+    files = _resolve_files(filename)
+    if not files:
+        raise FileNotFoundError("No files matched the given pattern")
+
+    def gen():
+        for i, fp in enumerate(files):
+            if verbose:
+                print(f"Loading file #{i + 1}/{len(files)}: {fp}")
+            ds = pio.read_piv(fp, format=format, frame=i)
+            yield ds, str(fp)
+
+    return _movie_from_iter(
+        gen(),
+        output=output,
+        show=show,
+        background=background,
+        scalar=scalar,
+        fps=fps,
+        dpi=dpi,
+        writer=writer,
+        codec=codec,
+        title=title,
+        clim=clim,
+        cmap=cmap,
+        return_frames=return_frames,
+        close=close,
+        ax=ax,
+        **kwargs,
+    )
 
 
 def contour_plot(

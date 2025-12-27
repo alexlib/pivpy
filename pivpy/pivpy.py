@@ -23,6 +23,7 @@ from pivpy.graphics import streamplot as gstreamplot
 from pivpy.graphics import autocorrelation_plot as gautocorrelation_plot
 from pivpy.graphics import histscal_disp as ghistscal_disp
 from pivpy.graphics import histvec_disp as ghistvec_disp
+from pivpy.graphics import to_movie as gto_movie
 from pivpy.compute_funcs import (
     Γ1_moving_window_function,
     Γ2_moving_window_function,
@@ -2263,11 +2264,28 @@ class PIVAccessor(object):
 
     def showf(self, **kwargs):
         """method for graphics.showf"""
-        gshowf(self._obj, **kwargs)
+        fig, ax = gshowf(self._obj, **kwargs)
+        return fig, ax
 
     def showscal(self, **kwargs):
         """method for graphics.showscal"""
         gshowscal(self._obj, **kwargs)
+
+    def to_movie(self, output, **kwargs):
+        """Save the Dataset as a movie (fast artist-updating renderer).
+
+        This is a convenience wrapper around :func:`pivpy.graphics.to_movie`.
+
+        Parameters
+        ----------
+        output:
+            Output path (e.g. ``'movie.mp4'`` / ``'movie.gif'``). If ``None`` and
+            ``return_frames=True`` is passed, returns a list of RGBA frames.
+        **kwargs:
+            Passed through to :func:`pivpy.graphics.to_movie`.
+        """
+
+        return gto_movie(self._obj, output, **kwargs)
 
     def histscal_disp(self, *args, **kwargs):
         """method for graphics.histscal_disp"""

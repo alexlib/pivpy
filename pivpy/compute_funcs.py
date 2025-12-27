@@ -1562,6 +1562,715 @@ def jpdfscal(
     ds.attrs["unitw1"] = str(a1.attrs.get("units", ""))
     ds.attrs["unitw2"] = str(a2.attrs.get("units", ""))
     return ds
+
+
+# -----------------------------------------------------------------------------
+# PIVMAT-inspired spectral / structure-function methods
+# -----------------------------------------------------------------------------
+
+
+def _as_frames(obj: xr.Dataset | xr.DataArray) -> list[xr.Dataset | xr.DataArray]:
+    """Normalize input into a list of 2D fields (frame-wise)."""
+
+    if isinstance(obj, xr.Dataset) and "t" in obj.dims:
+        return [obj.isel(t=i) for i in range(int(obj.sizes["t"]))]
+    if isinstance(obj, xr.DataArray) and "t" in obj.dims:
+        return [obj.isel(t=i) for i in range(int(obj.sizes["t"]))]
+    return [obj]
+
+
+def _hann(n: int) -> np.ndarray:
+    # MATLAB hann(n) matches numpy.hanning(n)
+    return np.hanning(int(n))
+
+
+def _kx_ky_from_coords(x: np.ndarray, y: np.ndarray, nx: int, ny: int) -> tuple[np.ndarray, np.ndarray]:
+    dx = float(np.abs(x[1] - x[0])) if x.size >= 2 else 1.0
+    dy = float(np.abs(y[1] - y[0])) if y.size >= 2 else 1.0
+    nkx = nx // 2
+    nky = ny // 2
+    kx = np.linspace(0.0, np.pi * (1.0 - 1.0 / nkx), nkx) / dx
+    ky = np.linspace(0.0, np.pi * (1.0 - 1.0 / nky), nky) / dy
+    return kx, ky
+
+
+def _bin_centers_to_edges(bin_centers: np.ndarray) -> np.ndarray:
+    b = np.asarray(bin_centers, dtype=float)
+    if b.size < 2:
+        raise ValueError("bin must have at least 2 entries")
+    w = float(np.abs(b[1] - b[0]))
+    edges = np.concatenate([b - w / 2.0, [b[-1] + w / 2.0]])
+    return edges
+
+
+def _azimuthal_average_square(mat: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Azimuthal average for a square 2D matrix around its center.
+
+    Returns a (k_index, avg) where k_index is in mesh-index units.
+    """
+
+    a = np.asarray(mat, dtype=float)
+    if a.ndim != 2 or a.shape[0] != a.shape[1]:
+        raise ValueError("Azimuthal average requires a square 2D array")
+    n = a.shape[0]
+    # radius in index space relative to center
+    c = (n - 1) / 2.0
+    yy, xx = np.indices((n, n), dtype=float)
+    rr = np.sqrt((xx - c) ** 2 + (yy - c) ** 2)
+    r_int = np.rint(rr).astype(int)
+    r_max = int(n // 2)
+
+    out = np.zeros(r_max + 1, dtype=float)
+    cnt = np.zeros(r_max + 1, dtype=float)
+    valid = np.isfinite(a)
+    for r in range(r_max + 1):
+        mask = (r_int == r) & valid
+        if np.any(mask):
+            out[r] = float(np.mean(a[mask]))
+            cnt[r] = float(np.sum(mask))
+    k = np.arange(r_max + 1, dtype=float)
+    return k, out
+
+
+def specf(f: xr.Dataset | xr.DataArray, *opts: str) -> xr.Dataset:
+    """1D power spectrum of vector/scalar fields (PIVMAT-inspired).
+
+    This follows PIVMAT's conventions:
+    - Requires even x/y sizes (drops last row/col if odd)
+    - Optional Hann apodization via the option ``'hann'``
+    - Normalization such that \n\n
+    $$\\int E(k)\\,dk \approx \\langle s^2 \\rangle$$
+
+    Returns an :class:`xarray.Dataset` with coordinates ``kx`` and ``ky``.
+    For vector fields, returns ``exvx, exvy, eyvx, eyvy``.
+    For scalar fields, returns ``ex, ey``.
+    If the field is square, also returns isotropic components ``k`` and ``e``.
+    """
+
+    use_hann = any(str(o).lower().startswith("hann") for o in opts)
+
+    frames = _as_frames(f)
+    first = frames[0]
+
+    if isinstance(first, xr.Dataset):
+        is_vector = ("u" in first.data_vars and "v" in first.data_vars)
+        is_scalar = ("w" in first.data_vars) and not is_vector
+    else:
+        # DataArray treated as scalar
+        is_vector = False
+        is_scalar = True
+
+    # Extract coords and sizes
+    if isinstance(first, xr.Dataset):
+        x = np.asarray(first["x"].values, dtype=float)
+        y = np.asarray(first["y"].values, dtype=float)
+        ny = int(first.sizes["y"])
+        nx = int(first.sizes["x"])
+    else:
+        # DataArray
+        if "x" not in first.dims or "y" not in first.dims:
+            raise ValueError("specf expects DataArray with dims ('y','x')")
+        x = np.asarray(first["x"].values, dtype=float)
+        y = np.asarray(first["y"].values, dtype=float)
+        ny = int(first.sizes["y"])
+        nx = int(first.sizes["x"])
+
+    # Enforce even sizes (PIVMAT behavior)
+    nx2 = nx - (nx % 2)
+    ny2 = ny - (ny % 2)
+    if nx2 != nx or ny2 != ny:
+        frames2: list[xr.Dataset | xr.DataArray] = []
+        for fr in frames:
+            frames2.append(fr.isel(x=slice(0, nx2), y=slice(0, ny2)))
+        frames = frames2
+        nx, ny = nx2, ny2
+        x = x[:nx]
+        y = y[:ny]
+
+    nkx = nx // 2
+    nky = ny // 2
+    kx, ky = _kx_ky_from_coords(x, y, nx, ny)
+
+    # Hann windows
+    if use_hann:
+        hann_x = _hann(nx)[None, :]  # along x
+        hann_y = _hann(ny)[:, None]  # along y
+
+    def _fft_power_x(a2: np.ndarray) -> np.ndarray:
+        # mean(|fft(a, axis=x)|^2, over y)
+        aa = a2
+        if use_hann:
+            aa = aa * hann_x
+        fx = np.fft.fft(aa, axis=1)
+        return np.mean(np.abs(fx) ** 2, axis=0)
+
+    def _fft_power_y(a2: np.ndarray) -> np.ndarray:
+        aa = a2
+        if use_hann:
+            aa = aa * hann_y
+        fy = np.fft.fft(aa, axis=0)
+        return np.mean(np.abs(fy) ** 2, axis=1)
+
+    if is_vector:
+        exvx_i = []
+        exvy_i = []
+        eyvx_i = []
+        eyvy_i = []
+        for fr in frames:
+            assert isinstance(fr, xr.Dataset)
+            u2 = np.asarray(fr["u"].values, dtype=float)
+            v2 = np.asarray(fr["v"].values, dtype=float)
+            exvx_i.append(_fft_power_x(u2))
+            exvy_i.append(_fft_power_x(v2))
+            eyvx_i.append(_fft_power_y(u2))
+            eyvy_i.append(_fft_power_y(v2))
+
+        exvx = np.mean(np.stack(exvx_i, axis=0), axis=0)
+        exvy = np.mean(np.stack(exvy_i, axis=0), axis=0)
+        eyvx = np.mean(np.stack(eyvx_i, axis=0), axis=0)
+        eyvy = np.mean(np.stack(eyvy_i, axis=0), axis=0)
+
+        # PIVMAT normalization
+        dkx = float(kx[1]) if kx.size >= 2 else 1.0
+        dky = float(ky[1]) if ky.size >= 2 else 1.0
+        exvx = 2.0 * exvx[:nkx] / (nx * ny) / dkx
+        exvy = 2.0 * exvy[:nkx] / (nx * ny) / dkx
+        eyvx = 2.0 * eyvx[:nky] / (nx * ny) / dky
+        eyvy = 2.0 * eyvy[:nky] / (nx * ny) / dky
+        exvx[0] /= 2.0
+        exvy[0] /= 2.0
+        eyvx[0] /= 2.0
+        eyvy[0] /= 2.0
+
+        ds = xr.Dataset(
+            data_vars={
+                "exvx": ("kx", exvx),
+                "exvy": ("kx", exvy),
+                "eyvx": ("ky", eyvx),
+                "eyvy": ("ky", eyvy),
+            },
+            coords={"kx": ("kx", kx), "ky": ("ky", ky)},
+        )
+        ds.attrs["appod"] = "Hann" if use_hann else "None"
+    else:
+        # scalar
+        ex_i = []
+        ey_i = []
+        for fr in frames:
+            if isinstance(fr, xr.Dataset):
+                if "w" not in fr.data_vars:
+                    raise ValueError("specf scalar path expects variable 'w'")
+                a2 = np.asarray(fr["w"].values, dtype=float)
+            else:
+                a2 = np.asarray(fr.values, dtype=float)
+            ex_i.append(_fft_power_x(a2))
+            ey_i.append(_fft_power_y(a2))
+        ex = np.mean(np.stack(ex_i, axis=0), axis=0)
+        ey = np.mean(np.stack(ey_i, axis=0), axis=0)
+
+        dkx = float(kx[1]) if kx.size >= 2 else 1.0
+        dky = float(ky[1]) if ky.size >= 2 else 1.0
+        ex = 2.0 * ex[:nkx] / (nx * ny) / dkx
+        ey = 2.0 * ey[:nky] / (nx * ny) / dky
+        ex[0] /= 2.0
+        ey[0] /= 2.0
+
+        ds = xr.Dataset(data_vars={"ex": ("kx", ex), "ey": ("ky", ey)}, coords={"kx": ("kx", kx), "ky": ("ky", ky)})
+        ds.attrs["appod"] = "Hann" if use_hann else "None"
+
+    # isotropic spectrum for square domain
+    # NOTE: xarray will broadcast (kx + ky) into 2D if we add DataArrays
+    # with different dimension names. Keep this explicitly 1D.
+    if nx == ny:
+        k = 0.5 * (np.asarray(ds["kx"].values, dtype=float) + np.asarray(ds["ky"].values, dtype=float))
+        ds = ds.assign_coords({"k": ("k", k)})
+        if is_vector:
+            el = 0.5 * (np.asarray(ds["exvx"].values, dtype=float) + np.asarray(ds["eyvy"].values, dtype=float))
+            et = 0.5 * (np.asarray(ds["exvy"].values, dtype=float) + np.asarray(ds["eyvx"].values, dtype=float))
+            e = el + et
+            ds["el"] = ("k", el)
+            ds["et"] = ("k", et)
+            ds["e"] = ("k", e)
+        else:
+            e = 0.5 * (np.asarray(ds["ex"].values, dtype=float) + np.asarray(ds["ey"].values, dtype=float))
+            ds["e"] = ("k", e)
+
+    return ds
+
+
+def spec2f(f: xr.Dataset | xr.DataArray, *opts: str) -> xr.Dataset:
+    """2D power spectrum (PIVMAT-inspired)."""
+
+    use_hann = any(str(o).lower().startswith("hann") for o in opts)
+    frames = _as_frames(f)
+    first = frames[0]
+
+    if isinstance(first, xr.Dataset):
+        is_vector = ("u" in first.data_vars and "v" in first.data_vars)
+        is_scalar = ("w" in first.data_vars) and not is_vector
+        x = np.asarray(first["x"].values, dtype=float)
+        y = np.asarray(first["y"].values, dtype=float)
+        ny = int(first.sizes["y"])
+        nx = int(first.sizes["x"])
+    else:
+        is_vector = False
+        is_scalar = True
+        x = np.asarray(first["x"].values, dtype=float)
+        y = np.asarray(first["y"].values, dtype=float)
+        ny = int(first.sizes["y"])
+        nx = int(first.sizes["x"])
+
+    nx2 = nx - (nx % 2)
+    ny2 = ny - (ny % 2)
+    if nx2 != nx or ny2 != ny:
+        frames = [fr.isel(x=slice(0, nx2), y=slice(0, ny2)) for fr in frames]
+        nx, ny = nx2, ny2
+        x = x[:nx]
+        y = y[:ny]
+
+    nkx = nx // 2
+    nky = ny // 2
+    kx, ky = _kx_ky_from_coords(x, y, nx, ny)
+    dkx = float(kx[1]) if kx.size >= 2 else 1.0
+    dky = float(ky[1]) if ky.size >= 2 else 1.0
+
+    if use_hann:
+        hann_x = _hann(nx)[None, :]
+        hann_y = _hann(ny)[:, None]
+
+    def _spec2(a2: np.ndarray) -> np.ndarray:
+        aa = a2
+        if use_hann:
+            aa = (aa * hann_x) * hann_y
+        # Full shifted spectrum is (ny, nx). PIVMAT-style outputs are typically
+        # reported on the positive (one-sided) wavenumber grid only.
+        ft = np.fft.fftshift(np.abs(np.fft.fft2(aa)) ** 2)
+        return ft[ny // 2 : ny, nx // 2 : nx]
+
+    if is_vector:
+        ex_i = []
+        ey_i = []
+        for fr in frames:
+            assert isinstance(fr, xr.Dataset)
+            ex_i.append(_spec2(np.asarray(fr["u"].values, dtype=float)))
+            ey_i.append(_spec2(np.asarray(fr["v"].values, dtype=float)))
+        ex = np.mean(np.stack(ex_i, axis=0), axis=0)
+        ey = np.mean(np.stack(ey_i, axis=0), axis=0)
+
+        ex = ex / (nx * ny) ** 2 / dkx
+        ey = ey / (nx * ny) ** 2 / dky
+        e = ex + ey
+        ds = xr.Dataset(
+            data_vars={"ex": (("ky", "kx"), ex), "ey": (("ky", "kx"), ey), "e": (("ky", "kx"), e)},
+            coords={"kx": ("kx", kx), "ky": ("ky", ky)},
+        )
+        ds.attrs["appod"] = "Hann" if use_hann else "None"
+    else:
+        if not is_scalar:
+            raise ValueError("spec2f expects a scalar DataArray or a Dataset with 'w'")
+        e_i = []
+        for fr in frames:
+            if isinstance(fr, xr.Dataset):
+                a2 = np.asarray(fr["w"].values, dtype=float)
+            else:
+                a2 = np.asarray(fr.values, dtype=float)
+            e_i.append(_spec2(a2))
+        e = np.mean(np.stack(e_i, axis=0), axis=0)
+        e = e / (nx * ny) ** 2 / dkx
+        ds = xr.Dataset(data_vars={"e": (("ky", "kx"), e)}, coords={"kx": ("kx", kx), "ky": ("ky", ky)})
+        ds.attrs["appod"] = "Hann" if use_hann else "None"
+
+    # Azimuthal average for square domains
+    if nx == ny:
+        kk, ep = _azimuthal_average_square(np.asarray(ds["e"].values))
+        ds["k"] = ("k", kk * float(np.abs(kx[1] - kx[0])))
+        ds["ep"] = ("k", ep)
+
+    return ds
+
+
+def tempspecf(v: xr.Dataset | xr.DataArray, freq: float = 1.0, *opts: str) -> xr.Dataset:
+    """Temporal power spectrum averaged over space (PIVMAT-inspired)."""
+
+    if isinstance(v, xr.Dataset):
+        if "t" not in v.dims:
+            raise ValueError("tempspecf expects a time series Dataset with dim 't'")
+        is_vector = ("u" in v and "v" in v)
+        is_scalar = ("w" in v) and not is_vector
+    else:
+        if "t" not in v.dims:
+            raise ValueError("tempspecf expects a DataArray with dim 't'")
+        is_vector = False
+        is_scalar = True
+
+    if int(v.sizes["t"]) < 4:
+        raise ValueError("Sample size too small")
+
+    use_hann = any(str(o).lower().startswith("hann") for o in opts)
+    include_zero = any(str(o).lower().startswith("zero") for o in opts)
+    doublex = any(str(o).lower().startswith("doublex") for o in opts)
+    doubley = any(str(o).lower().startswith("doubley") for o in opts)
+
+    nt = int(v.sizes["t"])
+    # match PIVMAT: length floor(nt/2) (exclude DC)
+    nfreq = nt // 2
+    f_hz = (np.arange(1, nfreq + 1, dtype=float) * float(freq) / float(nt))
+    w = 2.0 * np.pi * f_hz
+    df = float(freq) / float(nt)
+
+    win = np.ones(nt, dtype=float)
+    if use_hann:
+        win = _hann(nt)
+
+    def _one_series_psd(x: np.ndarray) -> np.ndarray | None:
+        x = np.asarray(x, dtype=float)
+        if not include_zero:
+            if np.any(x == 0.0) or np.any(~np.isfinite(x)):
+                return None
+        if np.any(~np.isfinite(x)):
+            x = np.nan_to_num(x, nan=0.0)
+        x = x - float(np.mean(x))
+        x = x * win
+        X = np.fft.rfft(x)
+        # one-sided density (exclude DC at k=0)
+        # Parseval: mean(x^2) ~= sum(S(f))*df
+        S = (2.0 * (np.abs(X[1 : nfreq + 1]) ** 2)) / (nt * nt) / df
+        # Nyquist term (if present) should not be doubled
+        if nt % 2 == 0:
+            S[-1] /= 2.0
+        return S
+
+    if isinstance(v, xr.Dataset) and is_vector:
+        u = np.asarray(v["u"].values, dtype=float)
+        vv = np.asarray(v["v"].values, dtype=float)
+        # shapes: (y,x,t)
+        # iterate all points
+        acc = np.zeros(nfreq, dtype=float)
+        nnz = 0
+        for iy in range(u.shape[0]):
+            for ix in range(u.shape[1]):
+                su = _one_series_psd(u[iy, ix, :])
+                sv = _one_series_psd(vv[iy, ix, :])
+                if su is None or sv is None:
+                    continue
+                if doublex:
+                    acc += 2.0 * su + sv
+                elif doubley:
+                    acc += su + 2.0 * sv
+                else:
+                    acc += su + sv
+                nnz += 1
+        etot = acc / float(nnz if nnz else 1)
+    else:
+        # scalar
+        if isinstance(v, xr.Dataset):
+            a = np.asarray(v["w"].values, dtype=float)
+        else:
+            a = np.asarray(v.values, dtype=float)
+        acc = np.zeros(nfreq, dtype=float)
+        nnz = 0
+        for iy in range(a.shape[0]):
+            for ix in range(a.shape[1]):
+                s = _one_series_psd(a[iy, ix, :])
+                if s is None:
+                    continue
+                acc += s
+                nnz += 1
+        etot = acc / float(nnz if nnz else 1)
+
+    # Return density vs w (rad/s) to match the signature.
+    # Convert from per-Hz to per-(rad/s): E(w) = E(f) / (2*pi)
+    etot_w = etot / (2.0 * np.pi)
+    return xr.Dataset(data_vars={"e": ("w", etot_w)}, coords={"w": ("w", w)})
+
+
+def ssf(s: xr.Dataset, dim: int | str = 1, *opts: str) -> xr.Dataset:
+    """Structure functions of a scalar field (PIVMAT-inspired)."""
+
+    if "w" not in s:
+        raise ValueError("ssf expects a scalar Dataset with variable 'w'")
+
+    # options
+    include_zero = any(str(o) == "0" for o in opts)
+    maxorder = 4
+    if any(str(o).lower().startswith("maxorder") for o in opts):
+        # accept ('maxorder', N) style
+        try:
+            idx = [i for i, o in enumerate(opts) if str(o).lower().startswith("maxorder")][-1]
+            maxorder = max(4, int(opts[idx + 1]))
+        except Exception:
+            raise ValueError("ssf: expected integer after 'maxorder'")
+    if maxorder > 30:
+        raise ValueError("Maximum order too large")
+
+    if isinstance(dim, str):
+        dim_l = dim.lower()
+        if dim_l == "x":
+            dim_i = 1
+        elif dim_l == "y":
+            dim_i = 2
+        else:
+            raise ValueError("dim must be 1,2,'x','y'")
+    else:
+        dim_i = int(dim)
+
+    w0 = s["w"].isel(t=0) if "t" in s.dims else s["w"]
+    rms = float(np.nanstd(w0.values))
+    bin_centers = None
+    if any(str(o).lower().startswith("bin") for o in opts):
+        idx = [i for i, o in enumerate(opts) if str(o).lower().startswith("bin")][-1]
+        try:
+            bin_centers = np.asarray(opts[idx + 1], dtype=float)
+        except Exception:
+            raise ValueError("ssf: expected a numeric bin vector after 'bin'")
+    if bin_centers is None:
+        maxbin = 10.0 * rms
+        bin_centers = np.linspace(-maxbin, maxbin, 1000)
+    binwidth = float(np.abs(bin_centers[1] - bin_centers[0]))
+    edges = _bin_centers_to_edges(bin_centers)
+
+    r_list = None
+    if any(str(o).lower() == "r" for o in opts):
+        idx = [i for i, o in enumerate(opts) if str(o).lower() == "r"][-1]
+        r_list = np.asarray(opts[idx + 1], dtype=int)
+    if r_list is None:
+        default_r = np.asarray(
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96, 112, 128, 142, 160, 176, 192, 224, 256],
+            dtype=int,
+        )
+        maxdr = min(int(s.sizes["x"]), int(s.sizes["y"]))
+        r_list = default_r[default_r < maxdr]
+
+    frames = _as_frames(s)
+    hsi = np.zeros((r_list.size, bin_centers.size), dtype=float)
+
+    for fr in frames:
+        assert isinstance(fr, xr.Dataset)
+        a = np.asarray(fr["w"].values, dtype=float)
+        nx = a.shape[1]
+        ny = a.shape[0]
+        for ir, rr in enumerate(r_list):
+            if dim_i == 1:
+                if rr >= nx:
+                    continue
+                dsx = a[:, rr:] - a[:, : nx - rr]
+                if not include_zero:
+                    valid = (a[:, rr:] != 0) & (a[:, : nx - rr] != 0) & np.isfinite(dsx)
+                    dsx = np.where(valid, dsx, 0.0)
+                vals = dsx.ravel()
+            else:
+                if rr >= ny:
+                    continue
+                dsy = a[rr:, :] - a[: ny - rr, :]
+                if not include_zero:
+                    valid = (a[rr:, :] != 0) & (a[: ny - rr, :] != 0) & np.isfinite(dsy)
+                    dsy = np.where(valid, dsy, 0.0)
+                vals = dsy.ravel()
+            vals = vals[(vals != 0.0) & np.isfinite(vals)]
+            if vals.size:
+                hist, _ = np.histogram(vals, bins=edges)
+                hsi[ir, :] += hist
+
+    pdfsi = np.zeros_like(hsi)
+    sf = np.zeros((r_list.size, maxorder), dtype=float)
+    sfabs = np.zeros((r_list.size, maxorder), dtype=float)
+    skew = np.zeros(r_list.size, dtype=float)
+    flat = np.zeros(r_list.size, dtype=float)
+    n_used = np.zeros(r_list.size, dtype=float)
+
+    for ir in range(r_list.size):
+        nsi = float(np.sum(hsi[ir, :]))
+        n_used[ir] = nsi
+        if nsi > 0:
+            pdfsi[ir, :] = hsi[ir, :] / (nsi * binwidth)
+        for order in range(1, maxorder + 1):
+            sf[ir, order - 1] = float(np.sum(pdfsi[ir, :] * (bin_centers**order)) * binwidth)
+            sfabs[ir, order - 1] = float(np.sum(pdfsi[ir, :] * (np.abs(bin_centers) ** order)) * binwidth)
+        if sf[ir, 1] != 0:
+            skew[ir] = sf[ir, 2] / (sf[ir, 1] ** 1.5)
+            flat[ir] = sf[ir, 3] / (sf[ir, 1] ** 2)
+
+    scaler = float(np.abs(s["x"].values[1] - s["x"].values[0])) if s["x"].size >= 2 else 1.0
+
+    return xr.Dataset(
+        data_vars={
+            "hsi": (("r", "bin"), hsi),
+            "pdfsi": (("r", "bin"), pdfsi),
+            "sf": (("r", "order"), sf),
+            "sfabs": (("r", "order"), sfabs),
+            "skew": ("r", skew),
+            "flat": ("r", flat),
+            "n": ("r", n_used),
+        },
+        coords={
+            "r": ("r", r_list.astype(float)),
+            "bin": ("bin", bin_centers),
+            "order": ("order", np.arange(1, maxorder + 1, dtype=int)),
+        },
+        attrs={"scaler": scaler, "binwidth": binwidth},
+    )
+
+
+def vsf(v: xr.Dataset, *opts: str) -> xr.Dataset:
+    """Structure functions of a vector field (PIVMAT-inspired)."""
+
+    if "u" not in v or "v" not in v:
+        raise ValueError("vsf expects a vector Dataset with variables 'u' and 'v'")
+
+    include_zero = any(str(o) == "0" for o in opts)
+    maxorder = 4
+    if any(str(o).lower().startswith("maxorder") for o in opts):
+        idx = [i for i, o in enumerate(opts) if str(o).lower().startswith("maxorder")][-1]
+        try:
+            maxorder = max(4, int(opts[idx + 1]))
+        except Exception:
+            raise ValueError("vsf: expected integer after 'maxorder'")
+    if maxorder > 30:
+        raise ValueError("Maximum order too large")
+
+    # default bins based on rms of u component
+    u0 = v["u"].isel(t=0) if "t" in v.dims else v["u"]
+    rms = float(np.nanstd(u0.values))
+    bin_centers = None
+    if any(str(o).lower().startswith("bin") for o in opts):
+        idx = [i for i, o in enumerate(opts) if str(o).lower().startswith("bin")][-1]
+        try:
+            bin_centers = np.asarray(opts[idx + 1], dtype=float)
+        except Exception:
+            raise ValueError("vsf: expected a numeric bin vector after 'bin'")
+    if bin_centers is None:
+        maxbin = 10.0 * rms
+        bin_centers = np.linspace(-maxbin, maxbin, 1000)
+    binwidth = float(np.abs(bin_centers[1] - bin_centers[0]))
+    edges = _bin_centers_to_edges(bin_centers)
+
+    r_list = None
+    if any(str(o).lower() == "r" for o in opts):
+        idx = [i for i, o in enumerate(opts) if str(o).lower() == "r"][-1]
+        r_list = np.asarray(opts[idx + 1], dtype=int)
+    if r_list is None:
+        default_r = np.asarray(
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96, 112, 128, 142, 160, 176, 192, 224, 256],
+            dtype=int,
+        )
+        maxdr = min(int(v.sizes["x"]), int(v.sizes["y"]))
+        r_list = default_r[default_r < maxdr]
+
+    frames = _as_frames(v)
+    hlvi = np.zeros((r_list.size, bin_centers.size), dtype=float)
+    htvi = np.zeros((r_list.size, bin_centers.size), dtype=float)
+
+    for fr in frames:
+        assert isinstance(fr, xr.Dataset)
+        u = np.asarray(fr["u"].values, dtype=float)
+        w = np.asarray(fr["v"].values, dtype=float)
+        ny, nx = u.shape
+        for ir, rr in enumerate(r_list):
+            # along x: longitudinal uses u, transverse uses v
+            if rr < nx:
+                dvlx = u[:, rr:] - u[:, : nx - rr]
+                dvty = w[:, rr:] - w[:, : nx - rr]
+                if not include_zero:
+                    vmask = (u[:, rr:] != 0) & (u[:, : nx - rr] != 0)
+                    tmask = (w[:, rr:] != 0) & (w[:, : nx - rr] != 0)
+                    dvlx = np.where(vmask, dvlx, 0.0)
+                    dvty = np.where(tmask, dvty, 0.0)
+                vals_lx = dvlx.ravel()
+                vals_ty = dvty.ravel()
+                vals_lx = vals_lx[(vals_lx != 0.0) & np.isfinite(vals_lx)]
+                vals_ty = vals_ty[(vals_ty != 0.0) & np.isfinite(vals_ty)]
+                if vals_lx.size:
+                    h, _ = np.histogram(vals_lx, bins=edges)
+                    hlvi[ir, :] += h
+                if vals_ty.size:
+                    h, _ = np.histogram(vals_ty, bins=edges)
+                    htvi[ir, :] += h
+
+            # along y: longitudinal uses v, transverse uses -u
+            if rr < ny:
+                dvly = w[rr:, :] - w[: ny - rr, :]
+                dvtx = -u[rr:, :] + u[: ny - rr, :]
+                if not include_zero:
+                    lmask = (w[rr:, :] != 0) & (w[: ny - rr, :] != 0)
+                    tmask = (u[rr:, :] != 0) & (u[: ny - rr, :] != 0)
+                    dvly = np.where(lmask, dvly, 0.0)
+                    dvtx = np.where(tmask, dvtx, 0.0)
+                vals_ly = dvly.ravel()
+                vals_tx = dvtx.ravel()
+                vals_ly = vals_ly[(vals_ly != 0.0) & np.isfinite(vals_ly)]
+                vals_tx = vals_tx[(vals_tx != 0.0) & np.isfinite(vals_tx)]
+                if vals_ly.size:
+                    h, _ = np.histogram(vals_ly, bins=edges)
+                    hlvi[ir, :] += h
+                if vals_tx.size:
+                    h, _ = np.histogram(vals_tx, bins=edges)
+                    htvi[ir, :] += h
+
+    pdflvi = np.zeros_like(hlvi)
+    pdftvi = np.zeros_like(htvi)
+    lsf = np.zeros((r_list.size, maxorder), dtype=float)
+    tsf = np.zeros((r_list.size, maxorder), dtype=float)
+    lsfabs = np.zeros((r_list.size, maxorder), dtype=float)
+    tsfabs = np.zeros((r_list.size, maxorder), dtype=float)
+    skew_long = np.zeros(r_list.size, dtype=float)
+    skew_trans = np.zeros(r_list.size, dtype=float)
+    flat_long = np.zeros(r_list.size, dtype=float)
+    flat_trans = np.zeros(r_list.size, dtype=float)
+    n_l = np.zeros(r_list.size, dtype=float)
+    n_t = np.zeros(r_list.size, dtype=float)
+
+    # centered structure functions (PIVMAT default)
+    for ir in range(r_list.size):
+        nl = float(np.sum(hlvi[ir, :]))
+        nt = float(np.sum(htvi[ir, :]))
+        n_l[ir] = nl
+        n_t[ir] = nt
+        if nl > 0:
+            pdflvi[ir, :] = hlvi[ir, :] / (nl * binwidth)
+        if nt > 0:
+            pdftvi[ir, :] = htvi[ir, :] / (nt * binwidth)
+
+        meanl = float(np.sum(pdflvi[ir, :] * bin_centers) * binwidth)
+        meant = float(np.sum(pdftvi[ir, :] * bin_centers) * binwidth)
+        for order in range(1, maxorder + 1):
+            lsf[ir, order - 1] = float(np.sum(pdflvi[ir, :] * ((bin_centers - meanl) ** order)) * binwidth)
+            tsf[ir, order - 1] = float(np.sum(pdftvi[ir, :] * ((bin_centers - meant) ** order)) * binwidth)
+            lsfabs[ir, order - 1] = float(np.sum(pdflvi[ir, :] * (np.abs(bin_centers - meanl) ** order)) * binwidth)
+            tsfabs[ir, order - 1] = float(np.sum(pdftvi[ir, :] * (np.abs(bin_centers - meant) ** order)) * binwidth)
+
+        if lsf[ir, 1] != 0:
+            skew_long[ir] = lsf[ir, 2] / (lsf[ir, 1] ** 1.5)
+            flat_long[ir] = lsf[ir, 3] / (lsf[ir, 1] ** 2)
+        if tsf[ir, 1] != 0:
+            skew_trans[ir] = tsf[ir, 2] / (tsf[ir, 1] ** 1.5)
+            flat_trans[ir] = tsf[ir, 3] / (tsf[ir, 1] ** 2)
+
+    scaler = float(np.abs(v["x"].values[1] - v["x"].values[0])) if v["x"].size >= 2 else 1.0
+
+    return xr.Dataset(
+        data_vars={
+            "hlvi": (("r", "bin"), hlvi),
+            "htvi": (("r", "bin"), htvi),
+            "pdflvi": (("r", "bin"), pdflvi),
+            "pdftvi": (("r", "bin"), pdftvi),
+            "lsf": (("r", "order"), lsf),
+            "tsf": (("r", "order"), tsf),
+            "lsfabs": (("r", "order"), lsfabs),
+            "tsfabs": (("r", "order"), tsfabs),
+            "skew_long": ("r", skew_long),
+            "skew_trans": ("r", skew_trans),
+            "flat_long": ("r", flat_long),
+            "flat_trans": ("r", flat_trans),
+            "n_long": ("r", n_l),
+            "n_trans": ("r", n_t),
+        },
+        coords={
+            "r": ("r", r_list.astype(float)),
+            "bin": ("bin", bin_centers),
+            "order": ("order", np.arange(1, maxorder + 1, dtype=int)),
+        },
+        attrs={"scaler": scaler, "binwidth": binwidth},
+    )
 def Γ1_moving_window_function(
         fWin: xr.Dataset,
         n: int,

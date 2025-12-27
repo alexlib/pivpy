@@ -22,7 +22,7 @@ import re
 import warnings
 from typing import Any, Optional
 import glob
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -984,3 +984,761 @@ def batchf(
         ds = read_piv(fp)
         results.append(_apply(ds))
     return results
+
+
+# -----------------------------------------------------------------------------
+# PIVMAT-inspired I/O compatibility layer
+# -----------------------------------------------------------------------------
+
+
+def _expand_pivmat_file_patterns(pattern: Any) -> list[pathlib.Path]:
+    """Expand a PIVMAT-style filename pattern into concrete paths.
+
+    Supports:
+    - Glob wildcards (``*``)
+    - Safe bracket expansion via :func:`pivpy.pivmat_compat.expandstr`
+
+    Returns
+    -------
+    list[pathlib.Path]
+        Sorted, de-duplicated list of existing paths.
+    """
+
+    if isinstance(pattern, pathlib.Path):
+        patterns = [str(pattern)]
+    elif isinstance(pattern, str):
+        patterns = [pattern]
+    elif isinstance(pattern, Sequence):
+        patterns = [str(p) for p in pattern]
+    else:
+        patterns = [str(pattern)]
+
+    expanded: list[str] = []
+    for pat in patterns:
+        if "[" in pat and "]" in pat:
+            try:
+                from pivpy.pivmat_compat import expandstr
+
+                expanded.extend(expandstr(pat))
+            except Exception:
+                expanded.append(pat)
+        else:
+            expanded.append(pat)
+
+    out: list[pathlib.Path] = []
+    for pat in expanded:
+        matches = glob.glob(pat, recursive=True)
+        if matches:
+            out.extend([_to_path(m) for m in matches])
+        else:
+            # If it isn't a glob match, treat it as a direct path.
+            p = _to_path(pat)
+            if p.exists():
+                out.append(p)
+
+    # Normalize and de-duplicate.
+    uniq = sorted({p.resolve() for p in out if p.exists()})
+    return uniq
+
+
+def loadvec(filename: Any = None, *args: Any, **kwargs: Any) -> xr.Dataset | list[xr.Dataset]:
+    """PIVMAT-compatible loader (wrapper over :func:`read_piv`).
+
+    This is a Python port of the user-facing behavior of PIVMAT's ``loadvec.m``.
+    It supports file patterns (glob + bracket expansion) and can load multiple
+    files at once.
+
+    Parameters
+    ----------
+    filename:
+        Path/pattern, a sequence of paths, or a 1-based numeric index selecting
+        from files in the current directory (PIVMAT behavior).
+    frame:
+        Optional frame override passed through to :func:`read_piv`.
+    verbose:
+        If True, prints each file being loaded.
+
+    Returns
+    -------
+    xarray.Dataset | list[xarray.Dataset]
+        Single dataset if one file is matched, otherwise a list of datasets.
+    """
+
+    frame = kwargs.pop("frame", None)
+    verbose = bool(kwargs.pop("verbose", False))
+    if kwargs:
+        raise TypeError(f"Unsupported keyword arguments: {sorted(kwargs)}")
+
+    if filename is None:
+        raise ValueError("loadvec requires a filename/pattern (no GUI picker in Python)")
+
+    # Numeric index selects from common PIVMAT extensions in cwd.
+    if isinstance(filename, (int, np.integer)):
+        cwd = pathlib.Path.cwd()
+        exts = {".vec", ".vc7", ".imx", ".img", ".im7", ".cm0", ".uwo", ".txt", ".mat", ".nc"}
+        files = sorted([p for p in cwd.iterdir() if p.is_file() and p.suffix.lower() in exts])
+        idx = int(filename) - 1  # PIVMAT is 1-based
+        if idx < 0 or idx >= len(files):
+            raise IndexError("loadvec numeric index out of range")
+        paths = [files[idx]]
+    else:
+        paths = _expand_pivmat_file_patterns(filename)
+        if not paths:
+            raise FileNotFoundError("No file match")
+
+    out: list[xr.Dataset] = []
+    for i, p in enumerate(paths, start=1):
+        if verbose:
+            print(f"  Loading file #{i}/{len(paths)}: {str(p)!r}")
+        out.append(read_piv(p, frame=frame) if frame is not None else read_piv(p))
+
+    return out[0] if len(out) == 1 else out
+
+
+def openvec(filename: Any) -> xr.Dataset | list[xr.Dataset]:
+    """PIVMAT ``openvec`` equivalent.
+
+    In MATLAB, this is used by the file browser to populate the workspace.
+    In Python, this simply calls :func:`loadvec` and returns the dataset(s).
+    """
+
+    return loadvec(filename)
+
+
+def openvc7(filename: Any) -> xr.Dataset:
+    """PIVMAT ``openvc7`` equivalent (loads a single VC7 file)."""
+
+    ds = load_vc7(filename)
+    return ds
+
+
+def openim7(filename: Any, **kwargs: Any) -> xr.Dataset:
+    """PIVMAT ``openim7`` equivalent (loads a DaVis IM7 image as a scalar Dataset).
+
+    This requires ``lvpyio`` at runtime. If it is not available, a
+    :class:`ImportError` is raised.
+    """
+
+    path = _to_path(filename)
+    try:
+        from lvpyio import read_buffer  # type: ignore
+    except Exception as e:
+        raise ImportError("Reading .im7 requires the optional dependency 'lvpyio'") from e
+
+    buf = read_buffer(str(path))
+    data = buf[0]
+    # Heuristic: if image plane exists, expose as scalar 'w'.
+    # lvpyio naming may vary across versions; keep this conservative.
+    if hasattr(data, "images") and data.images:
+        img = data.images[0]
+        im = np.asarray(img, dtype=float)
+        return im2pivmat(im, namew="I", unit="pix")
+    raise ValueError("Unsupported IM7 content (no image planes found)")
+
+
+def openimx(filename: Any, **kwargs: Any) -> xr.Dataset:
+    """PIVMAT ``openimx`` equivalent (loads a DaVis IMX image as a scalar Dataset).
+
+    This requires ``lvpyio`` at runtime.
+    """
+
+    path = _to_path(filename)
+    try:
+        from lvpyio import read_buffer  # type: ignore
+    except Exception as e:
+        raise ImportError("Reading .imx requires the optional dependency 'lvpyio'") from e
+
+    buf = read_buffer(str(path))
+    data = buf[0]
+    if hasattr(data, "images") and data.images:
+        img = data.images[0]
+        im = np.asarray(img, dtype=float)
+        return im2pivmat(im, namew="I", unit="pix")
+    raise ValueError("Unsupported IMX content (no image planes found)")
+
+
+def openimg(filename: Any, **kwargs: Any) -> xr.Dataset:
+    """PIVMAT ``openimg`` equivalent (loads a DaVis IMG image as a scalar Dataset).
+
+    This requires ``lvpyio`` at runtime.
+    """
+
+    path = _to_path(filename)
+    try:
+        from lvpyio import read_buffer  # type: ignore
+    except Exception as e:
+        raise ImportError("Reading .img requires the optional dependency 'lvpyio'") from e
+
+    buf = read_buffer(str(path))
+    data = buf[0]
+    if hasattr(data, "images") and data.images:
+        img = data.images[0]
+        im = np.asarray(img, dtype=float)
+        return im2pivmat(im, namew="I", unit="pix")
+    raise ValueError("Unsupported IMG content (no image planes found)")
+
+
+def openset(filename: Any) -> xr.Dataset:
+    """PIVMAT ``openset`` equivalent.
+
+    PIVMAT loads all files in the directory associated with a `.set`.
+    In Python, this loads the directory adjacent to the `.set` file that shares
+    its base name (if present), otherwise loads the parent directory.
+    """
+
+    path = _to_path(filename)
+    if path.suffix.lower() not in {".set", ".exp"}:
+        raise ValueError("openset expects a .set or .exp file")
+
+    candidate = path.with_suffix("")
+    directory = candidate if candidate.exists() and candidate.is_dir() else path.parent
+    return read_directory(directory)
+
+
+def loadpivtxt(fname: Any) -> xr.Dataset:
+    """PIVMAT ``loadpivtxt`` compatible loader.
+
+    Reads a text export containing at least 4 columns: x y u v.
+    Header lines starting with non-numeric characters are preserved in
+    ``ds.attrs['Attributes']``.
+    """
+
+    path = _to_path(fname)
+    if not path.exists():
+        raise FileNotFoundError(str(path))
+
+    header: list[str] = []
+    data_lines: list[str] = []
+    with path.open("r", errors="ignore") as f:
+        for line in f:
+            s = line.strip()
+            if not s:
+                continue
+            # numeric line? allow leading sign/dot/digit
+            if re.match(r"^[\s,]*[+-]?(\d|\.)", s):
+                data_lines.append(s)
+            else:
+                header.append(s)
+
+    if not data_lines:
+        raise ValueError("No numeric data found in file")
+
+    # Normalize commas to spaces and parse floats.
+    rows: list[list[float]] = []
+    for l in data_lines:
+        l2 = l.replace(",", " ")
+        vals = [float(v) for v in l2.split() if v]
+        if len(vals) < 4:
+            continue
+        rows.append(vals[:6])
+
+    arr = np.asarray(rows, dtype=float)
+    x, y, u, v = (arr[:, 0], arr[:, 1], arr[:, 2], arr[:, 3])
+    mask = arr[:, 4] if arr.shape[1] >= 5 else None
+
+    # Infer grid
+    xu, xi = unsorted_unique(x)
+    yu, yi = unsorted_unique(y)
+    cols = len(xu)
+    rows_n = len(yu)
+    if cols * rows_n != len(x):
+        raise ValueError("Unsupported TXT layout (not a full rectilinear grid)")
+
+    # Reconstruct meshes in row-major order.
+    x2d, y2d = np.meshgrid(xu, yu)
+    u2 = u.reshape((rows_n, cols))
+    v2 = v.reshape((rows_n, cols))
+    if mask is not None:
+        m2 = mask.reshape((rows_n, cols))
+    else:
+        m2 = np.ones_like(u2, dtype=float)
+
+    ds = from_arrays(x2d, y2d, u2, v2, mask=m2, frame=_extract_frame_number(path))
+    ds.attrs["files"] = [str(path)]
+    if header:
+        ds.attrs["Attributes"] = "\n".join(header)
+    return ds
+
+
+def loadarrayvec(pathname: Any, fname: Any, *opts: str) -> list[list[xr.Dataset]]:
+    """PIVMAT ``loadarrayvec`` equivalent.
+
+    Loads a 2D array of vector fields: directories matched by ``pathname`` and
+    files matched by ``fname`` inside each directory.
+
+    Returns a nested list ``out[i][j]`` where ``i`` indexes directories and
+    ``j`` indexes files.
+    """
+
+    verbose = any(str(o).lower().startswith("verb") for o in opts)
+    dirs = _expand_pivmat_file_patterns(pathname)
+    dirs = [p for p in dirs if p.is_dir()]
+    if not dirs:
+        raise FileNotFoundError("No directory match")
+
+    out: list[list[xr.Dataset]] = []
+    for d in dirs:
+        # match files inside directory
+        files = _expand_pivmat_file_patterns(str(d / str(fname)))
+        if verbose:
+            print(f"Directory: {str(d)} ({len(files)} files)")
+        out.append([read_piv(fp) for fp in files])
+    return out
+
+
+def readvec(name: Any, comments: int = 1, columns: int = 5) -> tuple[str, np.ndarray]:
+    """Read a DaVis `.vec` text export into a numeric array (PIVMAT-inspired).
+
+    This is a light-weight port of PIVMAT's ``readvec.m``.
+
+    Returns
+    -------
+    tuple
+        ``(header, data)`` where ``data`` has shape ``(j, i, columns)``.
+    """
+
+    path = _to_path(name)
+    if path.suffix.lower() != ".vec":
+        path = path.with_suffix(".vec")
+    if not path.exists():
+        raise FileNotFoundError(str(path))
+
+    raw = path.read_text(errors="ignore")
+    # Normalize newlines and commas.
+    raw = raw.replace("\r\n", "\n").replace("\r", "\n").replace(",", " ")
+    lines = raw.split("\n")
+    comments = int(comments)
+    if comments < 0:
+        comments = 0
+    header_lines = lines[:comments] if comments else []
+    header = "\n".join(header_lines).lower()
+    body = "\n".join(lines[comments:])
+
+    # Attempt to infer columns and units from header.
+    x_units = ""
+    u_units = ""
+    m = re.search(r"variables=([^\n]+)", header)
+    if m:
+        variables = m.group(1)
+        # crude parsing of quoted strings
+        quoted = re.findall(r'"([^"]*)"', variables)
+        if len(quoted) >= 2:
+            x_units = quoted[1]
+        if len(quoted) >= 6:
+            u_units = quoted[5]
+        if quoted:
+            columns = max(4, len(quoted) // 2)
+    else:
+        columns = int(columns)
+
+    # Parse data values.
+    data = np.fromstring(body, sep=" ")
+    if data.size % columns != 0:
+        # best-effort truncation
+        data = data[: (data.size // columns) * columns]
+    data = data.reshape((-1, columns))
+    data[data > 9e9] = 0.0
+
+    mi = re.search(r"\bi=\s*([0-9]+)", header)
+    mj = re.search(r"\bj=\s*([0-9]+)", header)
+    if not mi or not mj:
+        raise ValueError("Could not determine i/j dimensions from header")
+    i_dim = int(mi.group(1))
+    j_dim = int(mj.group(1))
+
+    data3 = data.reshape((i_dim, j_dim, columns)).transpose((1, 0, 2))
+    return header, data3
+
+
+def readsetfile(filename: Any, attrname: str | None = None) -> dict[str, Any] | Any:
+    """Read attributes from a DaVis `.set` or `.exp` file (PIVMAT-inspired).
+
+    This is a pragmatic parser intended for typical DaVis key/value content.
+    It returns a flat dict of attributes.
+
+    If ``attrname`` is provided, returns only that value (case-insensitive,
+    ignoring underscores).
+    """
+
+    path = _to_path(filename)
+    if not path.exists():
+        raise FileNotFoundError(str(path))
+
+    txt = path.read_text(errors="ignore")
+    attrs: dict[str, Any] = {}
+    for line in txt.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or s.startswith(";"):
+            continue
+        # try key=value or key: value
+        if "=" in s:
+            k, v = s.split("=", 1)
+        elif ":" in s:
+            k, v = s.split(":", 1)
+        else:
+            continue
+        key = k.strip()
+        val = v.strip().strip('"')
+        # numeric conversion when possible
+        try:
+            if re.match(r"^[+-]?[0-9]+$", val):
+                val2: Any = int(val)
+            else:
+                val2 = float(val)
+            attrs[key] = val2
+        except Exception:
+            attrs[key] = val
+
+    if attrname is None:
+        return attrs
+
+    needle = re.sub(r"_+", "", str(attrname)).lower()
+    for k, v in attrs.items():
+        kk = re.sub(r"_+", "", str(k)).lower()
+        if kk == needle:
+            return v
+    raise KeyError(attrname)
+
+
+def getattribute(f: Any, attrname: str | None = None) -> Any:
+    """Get metadata/attributes for a field or file (PIVMAT-inspired)."""
+
+    if isinstance(f, xr.Dataset):
+        attrs = dict(f.attrs)
+    else:
+        paths = _expand_pivmat_file_patterns(f)
+        if not paths:
+            raise FileNotFoundError("No file match")
+        # Return attributes for the first match (common usage).
+        p = paths[0]
+        if p.suffix.lower() in {".set", ".exp"}:
+            attrs = readsetfile(p)
+        else:
+            reader = _REGISTRY.find_reader(p)
+            if reader is None:
+                raise ValueError("Unsupported file format")
+            md = reader.read_metadata(p)
+            attrs = {"frame": md.frame, "variables": md.variables}
+
+    if attrname is None:
+        return attrs
+    needle = re.sub(r"_+", "", str(attrname)).lower()
+    for k, v in attrs.items():
+        kk = re.sub(r"_+", "", str(k)).lower()
+        if kk == needle:
+            return v
+    raise KeyError(attrname)
+
+
+def getvar(s: Any, reqname: str | int | None = None, mode: str | None = None) -> Any:
+    """Parse variables encoded in a string like ``p1=v1_p2=v2_...`` (PIVMAT-inspired)."""
+
+    if isinstance(s, (list, tuple)):
+        return [getvar(x, reqname=reqname, mode=mode) for x in s]
+
+    text = str(s)
+    keep_strings = (str(mode).lower().startswith("str") if mode is not None else False)
+
+    parts = [p for p in re.split(r"_+", text) if p]
+    out: dict[str, Any] = {}
+    auto = 1
+    for part in parts:
+        if "=" in part:
+            k, v = part.split("=", 1)
+            key = k
+            val_s = v
+        else:
+            m = re.match(r"^([A-Za-z]+)(.*)$", part)
+            if m:
+                key = m.group(1)
+                val_s = m.group(2)
+            else:
+                key = f"var{auto}"
+                val_s = part
+                auto += 1
+
+        val: Any = val_s
+        if not keep_strings:
+            try:
+                if re.match(r"^[+-]?[0-9]+$", val_s):
+                    val = int(val_s)
+                else:
+                    val = float(val_s)
+            except Exception:
+                val = val_s
+        out[key] = val
+
+    if reqname is None:
+        return out
+    if isinstance(reqname, int):
+        keys = list(out.keys())
+        return out[keys[int(reqname) - 1]]
+    # name lookup (ignore underscores, case-insensitive)
+    needle = re.sub(r"_+", "", str(reqname)).lower()
+    for k, v in out.items():
+        kk = re.sub(r"_+", "", str(k)).lower()
+        if kk == needle:
+            return v
+    raise KeyError(reqname)
+
+
+def getsetname(curdir: Any = None) -> str:
+    """Return the last element of a path (PIVMAT-inspired)."""
+
+    p = pathlib.Path.cwd() if curdir is None else _to_path(curdir)
+    return p.name
+
+
+def getfilenum(name: Any, pat: str, opt: str = "filedir") -> list[float]:
+    """Extract numeric indices from matching file/dir names (PIVMAT-inspired)."""
+
+    paths = _expand_pivmat_file_patterns(name)
+    if not paths:
+        raise FileNotFoundError("No file match")
+
+    opt_l = str(opt).lower()
+    nums: list[float] = []
+    for p in paths:
+        hay: str
+        if opt_l == "dironly":
+            hay = str(p.parent)
+        elif opt_l == "fileonly":
+            hay = p.name
+        else:
+            hay = str(p)
+        idx = hay.find(pat)
+        if idx < 0:
+            continue
+        s = hay[idx + len(pat) :]
+        m = re.search(r"^[+-]?[0-9]+(?:\.[0-9]+)?", s)
+        if m:
+            nums.append(float(m.group(0)))
+    return nums
+
+
+def getpivtime(f: Any, *args: str) -> np.ndarray:
+    """Return acquisition times in seconds for dataset(s) or files (PIVMAT-inspired).
+
+    For PIVPy datasets, this uses ``ds['t']`` and ``ds.attrs['delta_t']``.
+    If the option `'0'` is provided, the first time is shifted to 0.
+    """
+
+    start_at_zero = any(str(a) == "0" for a in args)
+    if isinstance(f, xr.Dataset):
+        ds = f
+        dt = float(ds.attrs.get("delta_t", 0.0))
+        t = np.asarray(ds["t"].values, dtype=float) * dt
+        if start_at_zero and t.size:
+            t = t - float(t[0])
+        return t
+
+    paths = _expand_pivmat_file_patterns(f)
+    if not paths:
+        raise FileNotFoundError("No file match")
+    times: list[float] = []
+    for p in paths:
+        ds = read_piv(p)
+        t = getpivtime(ds, *args)
+        # PIVMAT returns one time per field; use first time for per-file.
+        times.append(float(t[0]) if t.size else 0.0)
+    return np.asarray(times, dtype=float)
+
+
+def getframedt(filename: Any) -> np.ndarray:
+    """Compute time interval(s) between frames for IMX/IM7 (PIVMAT-inspired).
+
+    This requires ``lvpyio`` and DaVis time series metadata. If unavailable,
+    returns ``array([0.0])``.
+    """
+
+    path = _to_path(filename)
+    try:
+        from lvpyio import read_buffer  # type: ignore
+    except Exception:
+        return np.asarray([0.0], dtype=float)
+
+    try:
+        buf = read_buffer(str(path))
+        data = buf[0]
+        # Best-effort: try common attribute locations.
+        ats = None
+        if hasattr(data, "attributes"):
+            ats = getattr(data, "attributes")
+        if ats and isinstance(ats, dict):
+            # Some exports may store AcqTimeSeries0 as list of timestamps.
+            for key in ("AcqTimeSeries0", "AcqTimeSeries"):
+                if key in ats:
+                    ts = np.asarray(ats[key], dtype=float)
+                    if ts.size <= 1:
+                        return np.asarray([0.0], dtype=float)
+                    return np.diff(ts) * 1e-3  # ms -> s
+    except Exception:
+        pass
+    return np.asarray([0.0], dtype=float)
+
+
+def getimx(A: Any, frame: int = 0):
+    """PIVMAT ``getimx`` equivalent.
+
+    In PIVPy, if ``A`` is an :class:`xarray.Dataset`, this returns the 2D
+    coordinate meshes and the scalar/vector arrays for the selected frame.
+    """
+
+    if not isinstance(A, xr.Dataset):
+        raise TypeError("getimx currently supports xarray.Dataset inputs")
+    ds = A
+    if "t" in ds.dims:
+        ds = ds.isel(t=int(frame))
+    x = np.asarray(ds["x"].values, dtype=float)
+    y = np.asarray(ds["y"].values, dtype=float)
+    x2d, y2d = np.meshgrid(x, y)
+    if "w" in ds:
+        return x2d, y2d, np.asarray(ds["w"].values, dtype=float)
+    u = np.asarray(ds["u"].values, dtype=float)
+    v = np.asarray(ds["v"].values, dtype=float)
+    chc = np.asarray(ds["chc"].values, dtype=float) if "chc" in ds else np.ones_like(u)
+    return x2d, y2d, u, v, chc
+
+
+# -----------------------------------------------------------------------------
+# PIVMAT vortex generators (synthetic fields)
+# -----------------------------------------------------------------------------
+
+
+def vortex(
+    n: int = 128,
+    r0: float = 10.0,
+    vorticity: float = 1.0,
+    mode: str = "burgers",
+    diver: float | None = None,
+) -> xr.Dataset:
+    """Generate a centered vortex field (PIVMAT-compatible).
+
+    Port of PIVMAT's ``vortex.m``.
+
+    Returns an xarray.Dataset with variables ``u`` and ``v``.
+    """
+
+    n = int(n)
+    if diver is None:
+        diver = float(vorticity)
+
+    mid = n / 2.0 + 1.0
+    omega = float(vorticity) / (2.0 * 1000.0)  # m/s/mm
+    gamma = float(diver) / (2.0 * 1000.0)  # m/s/mm
+
+    i = np.arange(1, n + 1, dtype=float)
+    j = np.arange(1, n + 1, dtype=float)
+    ii, jj = np.meshgrid(i, j, indexing="ij")
+    dx = ii - mid
+    dy = jj - mid
+    radius = np.sqrt(dx * dx + dy * dy)
+
+    u = np.zeros((n, n), dtype=float)
+    v = np.zeros((n, n), dtype=float)
+
+    mode_l = str(mode).lower()
+    if "rankine" in mode_l:
+        inside = radius <= float(r0)
+        # solid body inside
+        u[inside] = omega * dy[inside]
+        v[inside] = -omega * dx[inside]
+        # irrotational outside
+        outside = ~inside
+        r2 = np.where(outside, radius * radius, 1.0)
+        u[outside] = omega * float(r0) ** 2 * dy[outside] / r2[outside]
+        v[outside] = -omega * float(r0) ** 2 * dx[outside] / r2[outside]
+    elif "burgers" in mode_l:
+        safe_r2 = np.where(radius == 0, np.inf, radius * radius)
+        factor = float(r0) ** 2 / safe_r2 * (1.0 - np.exp(-((radius / float(r0)) ** 2)))
+        u = omega * factor * dy
+        v = -omega * factor * dx
+        if gamma != 0.0:
+            u = u + gamma * factor * dx
+            v = v + gamma * factor * dy
+    else:
+        raise ValueError("mode must contain 'burgers' or 'rankine'")
+
+    # Avoid a "false" zero (PIVMAT behavior).
+    u = u + np.max(np.abs(u)) * 1e-10
+    v = v + np.max(np.abs(v)) * 1e-10
+
+    x = np.arange(0, n, dtype=float)
+    y = np.arange(0, n, dtype=float)
+    x2d, y2d = np.meshgrid(x, y)
+    ds = from_arrays(x2d, y2d, u.T, v.T, mask=np.ones((n, n), dtype=float), frame=0)
+    ds["x"].attrs["units"] = "mm"
+    ds["y"].attrs["units"] = "mm"
+    ds["u"].attrs["units"] = "m/s"
+    ds["v"].attrs["units"] = "m/s"
+    ds.attrs["name"] = "Vortex"
+    ds.attrs["setname"] = "-"
+    ds.attrs["history"] = ["vortex"]
+    return ds
+
+
+def multivortex(
+    nfield: int = 1,
+    nsize: int = 128,
+    numvortex: float = 8,
+    *opts: str,
+) -> xr.Dataset:
+    """Generate random Burgers vortices (PIVMAT-compatible).
+
+    Port of PIVMAT's ``multivortex.m``.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with dims ``(y, x, t)`` where ``t`` indexes fields.
+    """
+
+    nfield = int(nfield)
+    nsize = int(nsize)
+    numvortex_i = int(np.ceil(float(numvortex) * 9.0))
+    opt_l = {str(o).lower() for o in opts}
+
+    rng = np.random.default_rng(0)
+    fields: list[xr.Dataset] = []
+    for k in range(nfield):
+        vx = np.zeros((nsize, nsize), dtype=float)
+        vy = np.zeros((nsize, nsize), dtype=float)
+
+        icenter = 1.0 + nsize * (3.0 * rng.random(numvortex_i) - 1.0)
+        jcenter = 1.0 + nsize * (3.0 * rng.random(numvortex_i) - 1.0)
+        omega = np.sign(rng.random(numvortex_i) - 0.5) * (2.0 + rng.standard_normal(numvortex_i))
+        if "asym" in opt_l:
+            omega = np.abs(omega)
+        if "2d" in opt_l:
+            div = np.zeros(numvortex_i, dtype=float)
+        else:
+            div = rng.standard_normal(numvortex_i) / 2.0
+        core = 0.015 * (4.0 + rng.standard_normal(numvortex_i)) * nsize
+
+        i = np.arange(1, nsize + 1, dtype=float)
+        j = np.arange(1, nsize + 1, dtype=float)
+        ii, jj = np.meshgrid(i, j, indexing="ij")
+
+        for num in range(numvortex_i):
+            dx = ii - icenter[num]
+            dy = jj - jcenter[num]
+            radius = np.sqrt(dx * dx + dy * dy)
+            safe_r2 = np.where(radius == 0, np.inf, radius * radius)
+            ampl = (core[num] ** 2) / safe_r2 * (1.0 - np.exp(-((radius / core[num]) ** 2))) / 1000.0
+            vx = vx + ampl * (-omega[num] * dy + div[num] * dx)
+            vy = vy + ampl * (omega[num] * dx + div[num] * dy)
+
+        x = np.arange(0, nsize, dtype=float)
+        y = np.arange(0, nsize, dtype=float)
+        x2d, y2d = np.meshgrid(x, y)
+        ds = from_arrays(x2d, y2d, vx.T, vy.T, mask=np.ones((nsize, nsize), dtype=float), frame=k)
+        ds["x"].attrs["units"] = "mm"
+        ds["y"].attrs["units"] = "mm"
+        ds["u"].attrs["units"] = "m/s"
+        ds["v"].attrs["units"] = "m/s"
+        ds.attrs["name"] = "Multivortex"
+        ds.attrs["setname"] = "-"
+        ds.attrs["history"] = ["multivortex"]
+        fields.append(ds)
+
+    return xr.concat(fields, dim="t")

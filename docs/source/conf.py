@@ -31,7 +31,7 @@ try:
 
     release = _pkg_version("pivpy")
 except Exception:
-    release = "0.1.0"
+    release = "0.1.1"
 
 
 # -- General configuration ---------------------------------------------------

@@ -10,9 +10,12 @@ PIVPy
    
    Home <self>
    intro
+   pivpy_data_model
+   pivpy_visualization
    notebook
    tutorial
    pivpy_tutorial
+   pivpy_faq
    api_reference
 
 

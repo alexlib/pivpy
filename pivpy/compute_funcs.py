@@ -2288,29 +2288,20 @@ def operf(
     f1: xr.Dataset | list[xr.Dataset],
     f2: xr.Dataset | list[xr.Dataset] | float | int | np.ndarray | None = None,
 ):
-    """Perform an operation on vector/scalar fields (PIVMAT-inspired).
+    """Perform algebraic/elementwise operations on vector/scalar fields.
 
-    This is a pragmatic port of PIVMAT's ``operf.m``.
+    This is a pragmatic, PIVMAT-inspired helper similar to MATLAB's ``operf``.
 
-    Inputs
-    ------
-    - Vector fields: xarray Dataset with variables ``u`` and ``v``
-    - Scalar fields: xarray Dataset with variable ``w``
-    - Lists of fields are supported (PIVMAT struct-array style)
-
-    Operations
+    Parameters
     ----------
-    Unary (``f2 is None``):
-    - ``'+'`` (no-op), ``'-'`` (negate)
-    - ``'log'``, ``'exp'``, ``'abs'``, ``'logabs'``, ``'real'``, ``'imag'``, ``'conj'``,
-      ``'angle'``, ``'sin'``, ``'cos'``, ``'tan'``, ``'asin'``, ``'acos'``, ``'atan'``
-    - Any supported vec2scal mode on a vector field (delegates to ``ds.piv.vec2scal(op)``)
-
-    Binary:
-    - Field-field: ``'+'``, ``'-'``, ``'.*'``, ``'./'`` (also accepts ``'*'`` and ``'/'``)
-    - Field-number: ``'+'``, ``'-'``, ``'*'``, ``'/'``, ``'.^'``
-    - Thresholding: ``'>'``, ``'<'``, ``'>='``, ``'<='``, ``'='``/``'=='`` (keep values else 0)
-    - Binarization: ``'b>'``, ``'b<'``, ``'b>='``, ``'b<='``, ``'b='``/``'b=='`` (0/1 output)
+    op:
+        Operation string (e.g. ``'+'``, ``'-'``, ``'.*'``, ``'./'``, comparisons like ``'>='``,
+        or unary ops like ``'abs'``).
+    f1:
+        A vector Dataset (contains ``u`` and ``v``) or scalar Dataset (contains ``w``),
+        or a list of such datasets.
+    f2:
+        Optional second operand: a Dataset (or list), or a scalar/array.
     """
 
     def _is_vector(ds: xr.Dataset) -> bool:

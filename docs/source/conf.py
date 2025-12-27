@@ -52,6 +52,49 @@ extensions = [
     "myst_parser"
     ]
 
+# Avoid rendering Python type hints into the docs.
+# In nitpicky mode (-n), many annotation constructs (typing aliases, forward refs,
+# and external types) get emitted as cross-references that aren't reliably
+# resolvable across projects/inventories. We rely on the docstrings for
+# human-readable type information instead.
+autodoc_typehints = "none"
+
+# Map common annotation aliases/shorthands to resolvable fully-qualified names.
+# This applies to function signatures/type hints (not just napoleon-parsed docstrings).
+autodoc_type_aliases = {
+    "xr.Dataset": "xarray.Dataset",
+    "xr.DataArray": "xarray.DataArray",
+    "np.ndarray": "numpy.ndarray",
+    "ArrayLike": "numpy.typing.ArrayLike",
+    "plt.Axes": "matplotlib.axes.Axes",
+    "plt.Figure": "matplotlib.figure.Figure",
+    "Quiver": "matplotlib.quiver.Quiver",
+}
+
+# External documentation targets for cross-references (helps in nitpicky mode).
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
+    "xarray": ("https://docs.xarray.dev/en/stable", None),
+}
+
+# Map common shorthand/aliases in docstrings to resolvable targets.
+napoleon_type_aliases = {
+    "xr.Dataset": "xarray.Dataset",
+    "xr.DataArray": "xarray.DataArray",
+    "np.ndarray": "numpy.ndarray",
+    "ArrayLike": "numpy.typing.ArrayLike",
+    "plt.Axes": "matplotlib.axes.Axes",
+    "Quiver": "matplotlib.quiver.Quiver",
+}
+
+# Keep napoleon's type preprocessing off.
+# Preprocessing tries to interpret unions/generics in type fields (e.g. ``A | None``,
+# ``tuple[...]``) as single importable classes, which breaks nitpicky builds.
+napoleon_preprocess_types = False
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -98,20 +141,8 @@ nbsphinx_prolog = r"""
 # intersphinx inventories. To keep -n builds usable (and compatible with -W),
 # ignore these common external/type-hint references.
 nitpick_ignore_regex = [
-    (r"py:class", r"collections\.abc\..*"),
-    (r"py:class", r"(?:numpy|np)\..*"),
-    (r"py:class", r"(?:xarray|xr)\..*"),
-    (r"py:class", r"matplotlib\..*"),
-    (r"py:class", r"ArrayLike"),
-    (r"py:class", r"Quiver"),
-    (r"py:class", r"plt\.Axes"),
-    (r"py:class", r"optional"),
-    (r"py:class", r"-"),
-    (r"py:class", r"2\*n\+1"),
-    (r"py:class", r"If return_std_rms is False"),
-    (r"py:class", r".*moving window.*"),
-    (r"py:class", r"the dataset"),
-    (r"py:class", r"fWin = field rolling window"),
-    (r"py:class", r"n=1 means a 3x3 rolling window"),
+    # These are not real importable types; they come from informal docstring
+    # type fields and/or unqualified names. Prefer fixing docstrings over
+    # expanding this list.
     (r"py:class", r"vortexfitting\.VelocityField"),
 ]

@@ -111,12 +111,12 @@ class PIVAccessor(object):
         """Crops xarray Dataset to specified spatial boundaries
         
         Args:
-            crop_vector (list, optional): List of [xmin, xmax, ymin, ymax] values 
+            crop_vector (list): List of [xmin, xmax, ymin, ymax] values 
                 to define cropping boundaries. Use None for any value to keep 
                 the original boundary. Defaults to None (no cropping).
                 
         Returns:
-            xr.Dataset: Cropped dataset
+            xarray.Dataset: Cropped dataset
             
         Raises:
             ValueError: If crop_vector has wrong length or invalid bounds
@@ -176,8 +176,12 @@ class PIVAccessor(object):
 
         Returns
         -------
-        xr.Dataset | tuple
-            Extracted dataset and optionally the effective mesh rectangle.
+        xarray.Dataset
+            Extracted dataset.
+
+        tuple
+            If ``return_rect=True``, returns ``(dataset, rect_mesh)`` where
+            ``rect_mesh`` is ``[ix1, iy1, ix2, iy2]`` (1-based, inclusive).
 
         Notes
         -----
@@ -273,11 +277,11 @@ class PIVAccessor(object):
         """Shifts the coordinate system by specified amounts
         
         Args:
-            shift_x (float, optional): Amount to shift in x direction. Defaults to 0.0.
-            shift_y (float, optional): Amount to shift in y direction. Defaults to 0.0.
+            shift_x (float): Amount to shift in x direction. Defaults to 0.0.
+            shift_y (float): Amount to shift in y direction. Defaults to 0.0.
             
         Returns:
-            xr.Dataset: Dataset with shifted coordinates
+            xarray.Dataset: Dataset with shifted coordinates
             
         Example:
             >>> data = data.piv.pan(10.0, -5.0)  # Shift x by +10, y by -5
@@ -302,22 +306,22 @@ class PIVAccessor(object):
         or scalar properties like magnitude).
         
         Args:
-            min (float or None, optional): Minimum value threshold. Values below this 
+            min (float or None): Minimum value threshold. Values below this 
                 will be masked/removed. If None, no lower clipping is performed. 
                 Defaults to None.
-            max (float or None, optional): Maximum value threshold. Values above this 
+            max (float or None): Maximum value threshold. Values above this 
                 will be masked/removed. If None, no upper clipping is performed. 
                 Defaults to None.
-            by (str or None, optional): Variable name to use for clipping criterion.
+            by (str or None): Variable name to use for clipping criterion.
                 Common values include 'u', 'v', or 'magnitude', but any scalar property 
                 name in the dataset is valid (e.g., 'w' for vorticity, 'tke', etc.).
                 If None, clips all variables independently. If 'magnitude', computes
                 velocity magnitude and uses it for filtering. Defaults to None.
-            keep_attrs (bool, optional): If True, attributes will be preserved. 
+            keep_attrs (bool): If True, attributes will be preserved. 
                 Defaults to True.
                 
         Returns:
-            xr.Dataset: Dataset with clipped values. If 'by' is specified, returns
+            xarray.Dataset: Dataset with clipped values. If 'by' is specified, returns
                 dataset with locations that don't meet the criteria set to NaN.
                 
         Raises:
@@ -390,7 +394,7 @@ class PIVAccessor(object):
 
              ds = ds.piv.filterf([sigma_y, sigma_x, sigma_t], **gaussian_kwargs)
 
-           This uses :func:`scipy.ndimage.gaussian_filter` on ``u`` and ``v``.
+                     This uses SciPy's ``gaussian_filter`` on ``u`` and ``v``.
 
         2) PIVMAT-style normalized 2D convolution (NaN-aware)::
 
@@ -649,6 +653,66 @@ class PIVAccessor(object):
             variables=variables,
         )
 
+    def flipf(self, dir: str = "x") -> xr.Dataset:
+        """Flip vector/scalar fields about vertical or horizontal axis (PIVMAT-inspired).
+
+        Parameters
+        ----------
+        dir:
+            Direction to flip:
+
+            - 'x': left-right mirror (flip along x; negate ``u``)
+            - 'y': top-bottom mirror (flip along y; negate ``v``)
+            - 'xy' or 'yx': both flips
+            - '': do nothing
+
+        Notes
+        -----
+        The x/y coordinate values are left unchanged (only the data are mirrored),
+        matching PIVMAT behavior.
+        """
+
+        ds = self._obj
+        d = str(dir)
+        dl = d.lower()
+        if dl in ("", "none"):
+            return ds
+
+        if dl not in ("x", "y", "xy", "yx"):
+            raise ValueError("dir must be one of: 'x', 'y', 'xy', 'yx', ''")
+
+        flip_x = "x" in dl
+        flip_y = "y" in dl
+
+        if (flip_x and "x" not in ds.dims) or (flip_y and "y" not in ds.dims):
+            raise ValueError("flipf requires spatial dims 'x' and 'y'")
+
+        out = ds.copy(deep=True)
+        if flip_x:
+            rev_x = np.arange(int(ds.sizes["x"]) - 1, -1, -1)
+        if flip_y:
+            rev_y = np.arange(int(ds.sizes["y"]) - 1, -1, -1)
+
+        for name, da in ds.data_vars.items():
+            flipped = da
+            if flip_x and "x" in da.dims:
+                flipped = flipped.isel(x=rev_x).assign_coords(x=ds["x"])
+            if flip_y and "y" in da.dims:
+                flipped = flipped.isel(y=rev_y).assign_coords(y=ds["y"])
+
+            # Velocity sign convention: u is x-component, v is y-component.
+            if flip_x and name in ("u", "vx"):
+                flipped = -flipped
+            if flip_y and name in ("v", "vy"):
+                flipped = -flipped
+
+            flipped.attrs = dict(da.attrs)
+            out[name] = flipped
+
+        out.attrs = dict(ds.attrs)
+        self._obj = out
+        return out
+
     def addnoisef(
         self,
         eps: float = 0.1,
@@ -669,7 +733,7 @@ class PIVAccessor(object):
             seed: Optional RNG seed for reproducibility.
 
         Returns:
-            xr.Dataset: Dataset with noisy u/v.
+            xarray.Dataset: Dataset with noisy u/v.
         """
 
         if eps is None or float(eps) == 0.0:
@@ -755,8 +819,8 @@ class PIVAccessor(object):
             return_std_rms: If True, also returns (std, rms) as scalar fields.
 
         Returns:
-            If return_std_rms is False: averaged dataset (single-frame, t=0).
-            If True: (avg_dataset, std_dataset, rms_dataset).
+            xarray.Dataset: Averaged dataset (single-frame, t=0) if ``return_std_rms=False``.
+            tuple: ``(avg, std, rms)`` if ``return_std_rms=True``.
         """
 
         include_zeros = "0" in str(opt)
@@ -910,11 +974,13 @@ class PIVAccessor(object):
 
         Returns
         -------
-        xr.Dataset | tuple
-            If ``return_profiles`` is False, returns an ``xr.Dataset``.
+        xarray.Dataset
+            If ``return_profiles`` is False, returns an averaged dataset.
+
+        tuple
             If ``return_profiles`` is True:
-            - Vector mode: (r, ur, ut)
-            - Scalar mode: (r, p)
+            - Vector mode: ``(r, ur, ut)``
+            - Scalar mode: ``(r, p)``
         """
 
         ds = self._obj
@@ -1191,12 +1257,16 @@ class PIVAccessor(object):
 
         Returns
         -------
-        Scalar mode:
-            (angle, p)
-        Vector mode:
-            (angle, ur, ut)
-        where returned arrays are NumPy arrays. If the dataset has a time dimension
-        and ``frame`` is None, the profiles have shape (na, nt).
+        tuple
+            Scalar mode: ``(angle, p)``.
+
+        tuple
+            Vector mode: ``(angle, ur, ut)``.
+
+        Notes
+        -----
+        Returned arrays are NumPy arrays. If the dataset has a time dimension and
+        ``frame`` is None, the profiles have shape ``(na, nt)``.
         """
 
         ds = self._obj
@@ -1279,7 +1349,7 @@ class PIVAccessor(object):
 
         Returns
         -------
-        xr.Dataset
+        xarray.Dataset
             Phase-averaged dataset with dim 't' == n_phases.
         """
 
@@ -1367,7 +1437,7 @@ class PIVAccessor(object):
             method: Interpolation method.
 
         Returns:
-            xr.Dataset: resampled dataset with dim 't' == len(tfin) and coords 't' == tfin.
+            xarray.Dataset: resampled dataset with dim 't' == len(tfin) and coords 't' == tfin.
         """
 
         ds = self._obj
@@ -1419,7 +1489,7 @@ class PIVAccessor(object):
                 vector components 'u' and 'v'.
 
         Returns:
-            xr.Dataset: Dataset with spatially-averaged variable(s), broadcast back
+            xarray.Dataset: Dataset with spatially-averaged variable(s), broadcast back
             to the original shape.
         """
 
@@ -1492,7 +1562,7 @@ class PIVAccessor(object):
             var: Scalar variable name (e.g. 'w'). If None, operates on 'u' and 'v'.
 
         Returns:
-            xr.Dataset: Dataset with mean-subtracted variable(s).
+            xarray.Dataset: Dataset with mean-subtracted variable(s).
         """
 
         ds = self._obj
@@ -1559,7 +1629,7 @@ class PIVAccessor(object):
         ----------
         src_data: Any
             Input data array.
-        method: {'linear', 'nearest', 'cubic'}, optional
+        method: {'linear', 'nearest', 'cubic'}
             The method to use for interpolation in `scipy.interpolate.griddata`.
         Returns
         -------
@@ -1658,7 +1728,7 @@ class PIVAccessor(object):
         adds it to the dataset
         
         Args:
-            name (str, optional): Name for the output scalar field. Defaults to "w".
+            name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
 
         Input:
@@ -1687,11 +1757,11 @@ class PIVAccessor(object):
         """Calculates rate of strain of a two component field
         
         Args:
-            name (str, optional): Name for the output scalar field. Defaults to "w".
+            name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
 
         Returns:
-            xr.Dataset: Dataset with added scalar field = du_dx^2 + dv_dy^2 + 0.5*(du_dy+dv_dx)^2
+            xarray.Dataset: Dataset with added scalar field = du_dx^2 + dv_dy^2 + 0.5*(du_dy+dv_dx)^2
             
         Example:
             >>> data.piv.strain()  # Creates data["w"] with strain
@@ -1712,11 +1782,11 @@ class PIVAccessor(object):
         """Calculates divergence field
         
         Args:
-            name (str, optional): Name for the output scalar field. Defaults to "w".
+            name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
 
         Returns:
-            xr.Dataset: Dataset with the new property [name] = divergence
+            xarray.Dataset: Dataset with the new property [name] = divergence
             
         Example:
             >>> data.piv.divergence()  # Creates data["w"] with divergence
@@ -1744,7 +1814,7 @@ class PIVAccessor(object):
         data array (single frame)
         
         Args:
-            name (str, optional): Name for the output scalar field. Defaults to "w".
+            name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
 
         Input:
@@ -1779,11 +1849,11 @@ class PIVAccessor(object):
         """Estimates kinetic energy
         
         Args:
-            name (str, optional): Name for the output scalar field. Defaults to "w".
+            name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
                 
         Returns:
-            xr.Dataset: Dataset with kinetic energy field
+            xarray.Dataset: Dataset with kinetic energy field
             
         Example:
             >>> data.piv.kinetic_energy()  # Creates data["w"] with KE
@@ -1798,11 +1868,11 @@ class PIVAccessor(object):
         """Estimates turbulent kinetic energy
         
         Args:
-            name (str, optional): Name for the output scalar field. Defaults to "w".
+            name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
                 
         Returns:
-            xr.Dataset: New dataset with TKE field (based on fluctuations from mean)
+            xarray.Dataset: New dataset with TKE field (based on fluctuations from mean)
             
         Raises:
             ValueError: If dataset has less than 2 time frames
@@ -1846,11 +1916,11 @@ class PIVAccessor(object):
         """Calculates Reynolds stress from velocity fluctuations
         
         Args:
-            name (str, optional): Name for the output scalar field. Defaults to "w".
+            name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
                 
         Returns:
-            xr.Dataset: Dataset with Reynolds stress field (-<u'v'>)
+            xarray.Dataset: Dataset with Reynolds stress field (-<u'v'>)
             
         Raises:
             ValueError: If dataset has less than 2 time frames
@@ -1879,11 +1949,11 @@ class PIVAccessor(object):
         """Root mean square of velocity fluctuations
         
         Args:
-            name (str, optional): Name for the output scalar field. Defaults to "w".
+            name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
                 
         Returns:
-            xr.Dataset: Dataset with RMS field (sqrt of TKE)
+            xarray.Dataset: Dataset with RMS field (sqrt of TKE)
             
         Example:
             >>> data.piv.rms()  # Creates data["w"] with RMS
@@ -1901,9 +1971,9 @@ class PIVAccessor(object):
            and applyies custom Γ1-calculating function to it in a parallel manner.
 
         Args:
-            self._obj (xr.Dataset) - must contain, at least, u, v, x, y and t
-            n (int) - (2*n+1) gives the rolling window size
-            convCoords (bool) - either True or False, convCoords = convert coordinates,
+            self._obj (xarray.Dataset): Must contain at least ``u``, ``v``, ``x``, ``y`` and ``t``.
+            n (int): Rolling window radius. Window size is ``(2*n+1) x (2*n+1)``.
+            convCoords (bool): Convert coordinates.
                                 if True - create two new data arrays within self._obj with
                                 the names "xCoordiantes" and "yCoordiantes" that store x and y
                                 coordinates as data arrays; always keep it "True" unless you
@@ -1911,7 +1981,7 @@ class PIVAccessor(object):
                                 (say, by running Γ1 or Γ2 functions before)
 
         Returns:
-            self._obj (xr.Dataset) - the argument with the Γ1 data array
+            self._obj (xarray.Dataset) - the argument with the Γ1 data array
         """
         # Xarray rolling window (below) doesn't roll over the coordinates. We're going to convert
         # them to data arrays. Xarray does't make the conversion procedure easy. So, instead of
@@ -1955,9 +2025,9 @@ class PIVAccessor(object):
            and applyies custom Γ2-calculating function to it in a parallel manner.
 
         Args:
-            self._obj (xr.Dataset) - must contain, at least, u, v, x, y and t
-            n (int) - (2*n+1) gives the rolling window size
-            convCoords (bool) - either True or False, convCoords = convert coordinates,
+            self._obj (xarray.Dataset): Must contain at least ``u``, ``v``, ``x``, ``y`` and ``t``.
+            n (int): Rolling window radius. Window size is ``(2*n+1) x (2*n+1)``.
+            convCoords (bool): Convert coordinates.
                                 if True - create two new data arrays within self._obj with
                                 the names "xCoordiantes" and "yCoordiantes" that store x and y
                                 coordinates as data arrays; always keep it "True" unless you
@@ -1965,7 +2035,7 @@ class PIVAccessor(object):
                                 (say, by running Γ1 or Γ2 functions before)
 
         Returns:
-            self._obj (xr.Dataset) - the argument with the Γ2 data array
+            self._obj (xarray.Dataset) - the argument with the Γ2 data array
         """
         # Xarray rolling window (below) doesn't roll over the coordinates. We're going to convert
         # them to data arrays. Xarray does't make the conversion procedure easy. So, instead of
@@ -2007,15 +2077,15 @@ class PIVAccessor(object):
         """Creates a scalar flow property field from velocity data
         
         Args:
-            flow_property (str, optional): Name of the flow property to compute.
+            flow_property (str): Name of the flow property to compute.
                 Valid options: 'curl'/'vorticity'/'vort', 'ke'/'ken'/'kinetic_energy',
                 'strain', 'divergence', 'acceleration', 'tke', 'reynolds_stress', 'rms'.
                 Defaults to "curl".
-            name (str, optional): Name for the output scalar field. Defaults to "w".
+            name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
                 
         Returns:
-            xr.Dataset: Dataset with computed scalar field
+            xarray.Dataset: Dataset with computed scalar field
             
         Raises:
             AttributeError: If the specified flow property method doesn't exist
@@ -2055,7 +2125,7 @@ class PIVAccessor(object):
             scalar (float): Scaling factor
             
         Returns:
-            xr.Dataset: Scaled dataset
+            xarray.Dataset: Scaled dataset
             
         Example:
             >>> scaled_data = data.piv * 2.0  # Double all velocities
@@ -2074,7 +2144,7 @@ class PIVAccessor(object):
             scalar (float): Division factor
             
         Returns:
-            xr.Dataset: Scaled dataset
+            xarray.Dataset: Scaled dataset
             
         Raises:
             ValueError: If scalar is zero
@@ -2094,10 +2164,10 @@ class PIVAccessor(object):
         """Sets the time interval attribute for PIV measurements
         
         Args:
-            delta_t (float, optional): Time interval between frame A and B. Defaults to 0.0.
+            delta_t (float): Time interval between frame A and B. Defaults to 0.0.
             
         Returns:
-            xr.Dataset: Dataset with updated delta_t attribute
+            xarray.Dataset: Dataset with updated delta_t attribute
             
         Raises:
             ValueError: If delta_t is negative
@@ -2115,10 +2185,10 @@ class PIVAccessor(object):
         """Scales all spatial coordinates and velocities by a factor
         
         Args:
-            scale (float, optional): Scaling factor. Defaults to 1.0.
+            scale (float): Scaling factor. Defaults to 1.0.
             
         Returns:
-            xr.Dataset: Dataset with scaled coordinates and velocities
+            xarray.Dataset: Dataset with scaled coordinates and velocities
             
         Raises:
             ValueError: If scale is zero or negative
@@ -2138,10 +2208,10 @@ class PIVAccessor(object):
         """Rotates the coordinate system and velocity field
         
         Args:
-            theta (float, optional): Rotation angle in degrees (clockwise). Defaults to 0.0.
+            theta (float): Rotation angle in degrees (clockwise). Defaults to 0.0.
             
         Returns:
-            xr.Dataset: Rotated dataset
+            xarray.Dataset: Rotated dataset
             
         Note:
             This method works best for cases with equal grid spacing in x and y directions.
@@ -2199,9 +2269,9 @@ class PIVAccessor(object):
         """Creates autocorrelation plot of a specified variable
         
         Args:
-            variable (str, optional): Variable name to plot autocorrelation for 
+            variable (str): Variable name to plot autocorrelation for 
                 (e.g., 'u', 'v', 'w', 'c', or any other data variable). Defaults to "u".
-            spatial_average (bool, optional): If True and time dimension exists, compute 
+            spatial_average (bool): If True and time dimension exists, compute 
                 spatial average before temporal autocorrelation. If False, flatten all 
                 dimensions. Defaults to True for proper temporal analysis.
             **kwargs: Additional keyword arguments passed to graphics.autocorrelation_plot

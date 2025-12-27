@@ -228,7 +228,7 @@ def corrx(
 
     Returns
     -------
-    np.ndarray
+    numpy.ndarray
         Correlation vector of length ``2*N-1`` (or ``N`` if ``half=True``).
     """
 
@@ -510,7 +510,7 @@ def corrf(
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with 1D variable ``f`` over coordinate ``r`` and scalar
         variables ``isinf, r0, is0, r1, is1, r2, is2, r5, is5``.
     """
@@ -754,12 +754,11 @@ def Γ1_moving_window_function(
     This function works only for 2D velocity field.
 
     Args:
-        fWin (xarray.Dataset) - a moving window of the dataset (fWin = field rolling window)
-        n (int) - the rolling window size (n=1 means a 3x3 rolling window)
+        fWin (xarray.Dataset): A moving-window view of the dataset.
+        n (int): Rolling window radius. The window size is ``(2*n+1) x (2*n+1)``.
 
     Returns:
-        xr.DataArray(Γ1) (xr.DataArray) - an xarray DataArray object with Γ1 caclculated for
-                                          for the given rolling window
+        xarray.DataArray: Γ1 value for the given rolling window.
     """
     # We must convert fWin to numpy, because when this function was originally implemented 
     # with fWin being an xr.Dataset, it was unbelievably slow! Conversion of fWin to numpy 
@@ -841,12 +840,11 @@ def Γ2_moving_window_function(
     This function works only for 2D velocity field.
 
     Args:
-        fWin (xarray.Dataset) - a moving window of the dataset (fWin = field rolling window)
-        n (int) - the rolling window size (n=1 means a 3x3 rolling window)
+        fWin (xarray.Dataset): A moving-window view of the dataset.
+        n (int): Rolling window radius. The window size is ``(2*n+1) x (2*n+1)``.
 
     Returns:
-        xr.DataArray(Γ2) (xr.DataArray) - an xarray DataArray object with Γ2 caclculated for
-                                          for the given rolling window
+        xarray.DataArray: Γ2 value for the given rolling window.
     """
     # We must convert fWin to numpy, because when this function was originally implemented 
     # with fWin being an xr.Dataset, it was unbelievably slow! Conversion of fWin to numpy 

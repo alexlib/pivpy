@@ -10,6 +10,9 @@ Important behavioral expectations (tests rely on these):
 - ``showscal()`` accepts ``flow_property=`` as an alias and can compute a scalar
     via the ``.piv.vec2scal()`` accessor when needed
 """
+
+from __future__ import annotations
+
 import warnings
 from typing import TYPE_CHECKING
 
@@ -19,6 +22,8 @@ import xarray as xr
 
 if TYPE_CHECKING:
     from matplotlib.quiver import Quiver
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 
 
 def quiver(
@@ -26,32 +31,32 @@ def quiver(
     quiverKey: str | float | int = "Q",
     scalingFactor: float = 1.0,
     widthFactor: float = 0.002,
-    ax: plt.Axes | None = None,
+    ax: Axes | None = None,
     arrowColor: str = "k",
     **kwargs,
-) -> tuple[plt.Figure, plt.Axes]:
+) -> tuple[Figure, Axes]:
     """
     Creates a quiver plot from the dataset
 
     Parameters
     ----------
-    data : xr.Dataset
+    data : xarray.Dataset
         dataset with u, v, x, y
-    quiverKey : str, optional
+    quiverKey : str
         key for the quiver plot, by default "Q"
-    scalingFactor : float, optional
+    scalingFactor : float
         scaling factor for the arrows, by default 1.0
-    widthFactor : float, optional
+    widthFactor : float
         width factor for the arrows, by default 0.002
-    ax : plt.Axes | None, optional
+    ax : matplotlib.axes.Axes | None
         matplotlib axes, by default None
-    arrowColor : str, optional
+    arrowColor : str
         color of the arrows, by default "k"
 
     Returns
     -------
-    Quiver
-        matplotlib quiver object
+    tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        The figure and axes used for plotting.
 
     Examples
     --------
@@ -171,25 +176,25 @@ def vectorplot(
     arrowColor: str = "k",
     arrowScale: float = 1.0,
     arrowWidth: float = 0.002,
-) -> "Quiver":
+) -> tuple[Figure, Axes]:
     """
     vectorplot plots the vector field
 
     Parameters
     ----------
-    data : xr.Dataset
+    data : xarray.Dataset
         dataset with u, v, x, y
-    arrowColor : str, optional
+    arrowColor : str
         color of the arrows, by default "k"
-    arrowScale : float, optional
+    arrowScale : float
         scaling factor for the arrows, by default 1.0
-    arrowWidth : float, optional
+    arrowWidth : float
         width factor for the arrows, by default 0.002
 
     Returns
     -------
-    Quiver
-        matplotlib quiver object
+    tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        The figure and axes used for plotting.
 
     Examples
     --------
@@ -215,9 +220,9 @@ def showscal(
 
     Parameters
     ----------
-    data : xr.Dataset
+    data : xarray.Dataset
         dataset with u, v, x, y
-    property : str, optional
+    property : str
         property to plot, by default "w"
     **kwargs
         additional keyword arguments for pcolormesh
@@ -257,22 +262,22 @@ def streamplot(
     arrowsize: float = 1.0,
     ax: plt.Axes | None = None,
     **kwargs,
-) -> None:
+) -> tuple["Figure", "Axes"]:
     """
     streamplot plots the streamlines of the vector field
 
     Parameters
     ----------
-    data : xr.Dataset
+    data : xarray.Dataset
         dataset with u, v, x, y
-    density : float, optional
+    density : float
         density of the streamlines, by default 1.0
-    linewidth : float, optional
+    linewidth : float
         linewidth of the streamlines, by default 1.0
-    arrowsize : float, optional
+    arrowsize : float
         size of the arrows, by default 1.0
-    ax : plt.Axes | None, optional
-        matplotlib axes, by default None
+    ax : matplotlib.axes.Axes
+        Matplotlib axes (or None), by default None
     **kwargs
         additional keyword arguments for streamplot
 
@@ -478,25 +483,25 @@ def display_vector_field(
     arrowColor: str = "k",
     arrowScale: float = 1.0,
     arrowWidth: float = 0.002,
-) -> "Quiver":
+) -> tuple["Figure", "Axes"]:
     """
     display_vector_field is a wrapper for quiver() for backwards compatibility
 
     Parameters
     ----------
-    data : xr.Dataset
+    data : xarray.Dataset
         dataset with u, v, x, y
-    arrowColor : str, optional
+    arrowColor : str
         color of the arrows, by default "k"
-    arrowScale : float, optional
+    arrowScale : float
         scaling factor for the arrows, by default 1.0
-    arrowWidth : float, optional
+    arrowWidth : float
         width factor for the arrows, by default 0.002
 
     Returns
     -------
-    Quiver
-        matplotlib quiver object
+    tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        The figure and axes used for plotting.
 
     Examples
     --------

@@ -111,6 +111,11 @@ Additional PIVMat-inspired utilities:
     ds_smooth = ds.piv.filterf(1.0, 'gauss', 'same')   # keep same size
     ds_smooth_valid = ds.piv.filterf(1.0, 'gauss')     # smaller (conv2(...,'valid') behavior)
 
+    # Flip field (similar to PIVMat flipf)
+    ds_lr = ds.piv.flipf('x')     # left-right mirror (negates u)
+    ds_tb = ds.piv.flipf('y')     # top-bottom mirror (negates v)
+    ds_xy = ds.piv.flipf('xy')    # both
+
     # 2D Butterworth filter (similar to PIVMat bwfilterf)
     ds_low = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='low', trunc=True)
     ds_high = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='high')

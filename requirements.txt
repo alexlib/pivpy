@@ -4,6 +4,10 @@ xarray
 netcdf4
 matplotlib
 pytest
-typing-extensions
 vortexfitting
 h5py
+nbformat>=5.8.0
+nbconvert>=7.6.0
+ipykernel>=6.16.2
+setuptools>=68.0.0
+openpiv>=0.25.1

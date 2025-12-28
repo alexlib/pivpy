@@ -27,9 +27,22 @@ Create a virtualenv and install:
     uv venv
     uv pip install pivpy
 
+Install this repository (editable / development install):
+
+    uv venv
+    uv pip install -e .
+
 Install with optional dependencies (including `lvpyio` for LaVision VC7):
 
     uv pip install 'pivpy[full]'
+
+Run in a sandbox (isolated) environment (no persistent venv required):
+
+    uv run --isolated --with pivpy python -c "import pivpy; print(pivpy.__version__)"
+
+Or run with optional dependencies in the sandbox:
+
+    uv run --isolated --with "pivpy[full]" python -c "from pivpy import io; print(io)"
 
 Alternative: use `pip`:
 

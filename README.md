@@ -68,6 +68,61 @@ Quick start (auto-detect file format):
     from pivpy import io
     ds = io.read_piv('your_file.vec')
 
+## Getting Started
+
+Load a built-in sample dataset, compute vorticity, and plot velocity vectors (quiver) over a vorticity heatmap:
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
+
+import pivpy.pivpy  # registers the .piv accessor
+from pivpy import io
+
+# Built-in sample data shipped with pivpy (OpenPIV vector file)
+ds = io.read_piv('pivpy/data/openpiv_vec/exp1_001_b.vec').isel(t=0)
+
+# Vorticity (stored as ds['w'])
+ds = ds.piv.vorticity(name='w')
+
+X, Y = np.meshgrid(ds['x'].values, ds['y'].values)
+
+fig, ax = plt.subplots(figsize=(8, 4.8))
+
+# Background: smoothed vorticity heatmap (robust symmetric color limits)
+w = ds['w'].values
+w_smooth = gaussian_filter(w, sigma=1.0)
+finite_w = w_smooth[np.isfinite(w_smooth)]
+vmax = np.nanpercentile(np.abs(finite_w), 98) if finite_w.size else 1.0
+vmax = max(vmax, 1e-9)
+pcm = ax.pcolormesh(X, Y, w_smooth, shading='auto', cmap='coolwarm', vmin=-vmax, vmax=vmax)
+fig.colorbar(pcm, ax=ax, pad=0.02, label='vorticity (smoothed, 1/Δt)')
+
+# Overlay: velocity vectors (make arrows longer by reducing `scale`)
+skip = 2
+ax.quiver(
+    X[::skip, ::skip],
+    Y[::skip, ::skip],
+    ds['u'].values[::skip, ::skip],
+    ds['v'].values[::skip, ::skip],
+    color='k',
+    angles='xy',
+    scale_units='xy',
+    scale=5.0,
+    width=0.004,
+)
+
+ax.set_title('PIVPy sample (OpenPIV vec): quiver over smoothed vorticity')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.set_aspect('equal')
+fig.tight_layout()
+plt.show()
+```
+
+![Quiver over vorticity heatmap](docs/source/_static/getting_started_quiver_vorticity.png)
+
 Legacy loaders (still supported):
 
     ds = io.load_vec('your_file.vec')

@@ -44,6 +44,15 @@ Or run with optional dependencies in the sandbox:
 
     uv run --isolated --with "pivpy[full]" python -c "from pivpy import io; print(io)"
 
+Run using a specific Python version (uv-managed) in the sandbox:
+
+    uv python install 3.14
+    uv run --isolated --managed-python -p python3.14 --with pivpy python -c "import sys, pivpy; print(sys.version.split()[0], pivpy.__version__)"
+
+Run this repository's tests on Python 3.14 (sandboxed):
+
+    uv run --isolated --managed-python -p python3.14 --with-editable . pytest -q
+
 Alternative: use `pip`:
 
     pip install pivpy

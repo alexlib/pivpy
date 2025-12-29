@@ -232,6 +232,25 @@ def test_Γ2():
     assert data["Γ2"].attrs["standard_name"] == "Gamma 2"
     assert data["Γ2"].attrs["units"] == "dimensionless"
 
+
+def test_gamma_no_empty_slice_warning():
+    """Γ1/Γ2 should not raise RuntimeWarning on fully-masked neighborhoods."""
+    import warnings
+
+    data = io.create_sample_Dataset(n_frames=2, rows=3, cols=3)
+    data["u"][:] = np.nan
+    data["v"][:] = np.nan
+
+    # Treat RuntimeWarnings as errors to ensure we don't emit
+    # "Mean of empty slice" from nanmean-like reductions.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        out = data.piv.Γ1(n=1)
+        out = out.piv.Γ2(n=1)
+
+    assert np.all(np.isfinite(out["Γ1"].to_numpy()))
+    assert np.all(np.isfinite(out["Γ2"].to_numpy()))
+
 def test_curl():
     """tests curl that is also vorticity"""
     _c = _a.copy()

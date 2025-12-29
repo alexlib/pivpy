@@ -12,6 +12,7 @@ docs/build/doctrees/*
 docs/build/html/*
 docs/source/.ipynb_checkpoints/*
 examples/notebooks/.ipynb_checkpoints/*
+examples/notebooks/_generated/*
 pivpy.egg-info/PKG-INFO
 pivpy/data/openpiv/.ipynb_checkpoints/*
 .ipynb_checkpoints/*

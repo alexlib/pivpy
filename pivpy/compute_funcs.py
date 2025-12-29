@@ -3412,15 +3412,25 @@ def Γ1_moving_window_function(
     cx = _center_scalar(xcoords)
     cy = _center_scalar(ycoords)
 
-    PMx = np.subtract(xcoords.to_numpy(), cx)
-    PMy = np.subtract(ycoords.to_numpy(), cy)    
-    u = fWin['u'].to_numpy()
-    v = fWin['v'].to_numpy()  
-    # Since for the case when point M coincides with point P we have a 0/0 situation, we'll
-    # recive a warning. To temporarily suspend that warning do the following (credit goes to
-    # https://stackoverflow.com/a/29950752/10073233):
+    PMx = np.subtract(np.asarray(xcoords.to_numpy(), dtype=float), cx)
+    PMy = np.subtract(np.asarray(ycoords.to_numpy(), dtype=float), cy)
+    u = np.asarray(fWin['u'].to_numpy(), dtype=float)
+    v = np.asarray(fWin['v'].to_numpy(), dtype=float)
+
+    # Avoid RuntimeWarning("Mean of empty slice") when a window has no valid vectors.
+    # This happens in masked/no-flow regions where the entire neighborhood becomes NaN.
+    num = PMx * v - PMy * u
+    denom = np.hypot(PMx, PMy) * np.hypot(u, v)
     with np.errstate(divide='ignore', invalid='ignore'):
-        Γ1 = np.nanmean(np.divide(np.subtract(np.multiply(PMx,v), np.multiply(PMy,u)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(u), np.square(v))))))
+        values = np.divide(
+            num,
+            denom,
+            out=np.full_like(num, np.nan, dtype=float),
+            where=(denom != 0),
+        )
+
+    valid = np.isfinite(values)
+    Γ1 = float(values[valid].mean()) if np.any(valid) else np.nan
 
     return xr.DataArray(Γ1).fillna(0.0) # fillna(0) is necessary for plotting
 
@@ -3498,16 +3508,30 @@ def Γ2_moving_window_function(
     cx = _center_scalar(xcoords)
     cy = _center_scalar(ycoords)
 
-    PMx = np.subtract(xcoords.to_numpy(), cx)
-    PMy = np.subtract(ycoords.to_numpy(), cy)    
-    u = fWin['u'].to_numpy()
-    v = fWin['v'].to_numpy()  
-    uDif = u - np.nanmean(u)
-    vDif = v - np.nanmean(v)
-    # Since for the case when point M coincides with point P, we have a 0/0 situation and we'll
-    # recive a warning. To temporarily suspend that warning do the following (credit goes to
-    # https://stackoverflow.com/a/29950752/10073233):
+    PMx = np.subtract(np.asarray(xcoords.to_numpy(), dtype=float), cx)
+    PMy = np.subtract(np.asarray(ycoords.to_numpy(), dtype=float), cy)
+    u = np.asarray(fWin['u'].to_numpy(), dtype=float)
+    v = np.asarray(fWin['v'].to_numpy(), dtype=float)
+
+    finite_u = np.isfinite(u)
+    finite_v = np.isfinite(v)
+    u_mean = float(u[finite_u].mean()) if np.any(finite_u) else np.nan
+    v_mean = float(v[finite_v].mean()) if np.any(finite_v) else np.nan
+    uDif = u - u_mean
+    vDif = v - v_mean
+
+    # Avoid RuntimeWarning("Mean of empty slice") when a window has no valid vectors.
+    num = PMx * vDif - PMy * uDif
+    denom = np.hypot(PMx, PMy) * np.hypot(uDif, vDif)
     with np.errstate(divide='ignore', invalid='ignore'):
-        Γ2 = np.nanmean(np.divide(np.subtract(np.multiply(PMx,vDif), np.multiply(PMy,uDif)), np.multiply(np.sqrt(np.add(np.square(PMx), np.square(PMy))), np.sqrt(np.add(np.square(uDif), np.square(vDif))))))
+        values = np.divide(
+            num,
+            denom,
+            out=np.full_like(num, np.nan, dtype=float),
+            where=(denom != 0),
+        )
+
+    valid = np.isfinite(values)
+    Γ2 = float(values[valid].mean()) if np.any(valid) else np.nan
 
     return xr.DataArray(Γ2).fillna(0.0) # fillna(0) is necessary for plotting

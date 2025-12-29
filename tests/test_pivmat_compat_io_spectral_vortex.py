@@ -192,15 +192,24 @@ def test_readvec_parses_header_and_shapes(tmp_path: pathlib.Path):
 def test_openim_requires_lvpyio_when_missing():
     import importlib.util
 
-    if importlib.util.find_spec("lvpyio") is not None:
-        pytest.skip("lvpyio installed; openim* needs real test fixtures")
+    has_lvpyio = importlib.util.find_spec("lvpyio") is not None
 
-    with pytest.raises(ImportError):
-        io.openim7("dummy.im7")
-    with pytest.raises(ImportError):
-        io.openimx("dummy.imx")
-    with pytest.raises(ImportError):
-        io.openimg("dummy.img")
+    if not has_lvpyio:
+        with pytest.raises(ImportError):
+            io.openim7("dummy.im7")
+        with pytest.raises(ImportError):
+            io.openimx("dummy.imx")
+        with pytest.raises(ImportError):
+            io.openimg("dummy.img")
+        return
+
+    # If lvpyio is installed, these functions should attempt to read the file.
+    # With a missing path, we expect an OS/file-related error (or another parsing
+    # error), but NOT an ImportError.
+    for func, name in [(io.openim7, "dummy.im7"), (io.openimx, "dummy.imx"), (io.openimg, "dummy.img")]:
+        with pytest.raises(Exception) as excinfo:
+            func(name)
+        assert not isinstance(excinfo.value, ImportError)
 
 
 def test_vortex_and_multivortex_basic_properties():

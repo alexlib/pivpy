@@ -3,7 +3,7 @@
 
 #  ![PIVPy](pivpy_logo.png) PIVPy 
 
-Python based post-processing PIV data analysis
+Python-based post-processing PIV data analysis in the repo: https://github.com/openpiv/pivpy
 
 
 [![PyPI version](https://badge.fury.io/py/pivpy.svg)](https://badge.fury.io/py/pivpy)

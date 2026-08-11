@@ -25,6 +25,25 @@ except Exception:  # pragma: no cover
     _signal_convolve2d = None
 
 
+def warn_if_overwriting_scalar(ds: xr.Dataset, name: str) -> None:
+    """Warn when a scalar-producing accessor method (vorticity, strain, ...)
+    is about to silently overwrite an existing variable of the same name.
+
+    All such methods default to name="w", so calling more than one without
+    an explicit name= silently discards the previous result -- this doesn't
+    change that default (kept for backward compatibility), it just makes the
+    footgun visible instead of silent.
+    """
+    if name in ds.data_vars:
+        warnings.warn(
+            f"piv accessor: '{name}' already exists in this dataset and will "
+            f"be overwritten. Pass a different name= to keep both fields "
+            f"(e.g. name='{name}2').",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def _kernel_flat(filtsize: float) -> np.ndarray:
     n = int(np.ceil(float(filtsize)))
     if n <= 0:

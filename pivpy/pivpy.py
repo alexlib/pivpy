@@ -10,6 +10,7 @@ try:
 except ImportError:
     from typing import Literal
 from typing import List, Optional
+import warnings
 
 import numpy as np
 import xarray as xr
@@ -42,6 +43,7 @@ from pivpy.compute_funcs import (
     probeaverf as cprobeaverf,
     spatiotempf as cspatiotempf,
     tempcorrf as ctempcorrf,
+    warn_if_overwriting_scalar,
 )
 
 # """ learn from this example
@@ -83,7 +85,18 @@ from pivpy.compute_funcs import (
 
 @xr.register_dataset_accessor("piv")
 class PIVAccessor(object):
-    """extends xarray Dataset with PIVPy properties"""
+    """extends xarray Dataset with PIVPy properties
+
+    Return-type contract, by method category (this is documentation of an
+    existing, deliberate split -- not something you need to guess at):
+      - Field-transform methods (crop, filterf, flipf, vorticity, averf, ...):
+        return an `xr.Dataset`.
+      - Plotting methods (quiver, streamplot, showf, showscal, to_movie):
+        return `(matplotlib.figure.Figure, matplotlib.axes.Axes)`.
+      - `azprofile`: returns a raw tuple of arrays (angle, ur, ut), not a
+        Dataset or a plot -- it's a numerical-profile method, grouped with
+        neither of the above.
+    """
 
     def __init__(self, xarray_obj):
         """
@@ -156,6 +169,15 @@ class PIVAccessor(object):
         # Note: We don't validate xmin < xmax or ymin < ymax because coordinates
         # might be in reverse order (e.g., negative y-axis pointing down)
 
+        warnings.warn(
+            "piv.crop() currently rebinds this accessor's internal dataset "
+            "reference as a side effect; a future release will make it a pure "
+            "function that only returns the cropped dataset. Always use the "
+            "return value (`ds = ds.piv.crop(...)`) rather than relying on "
+            "in-place state.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._obj = self._obj.sel(x=slice(xmin, xmax), y=slice(ymin, ymax))
 
         return self._obj
@@ -1899,6 +1921,7 @@ class PIVAccessor(object):
             >>> data.piv.vorticity(name="vort")  # Creates data["vort"] with vorticity
 
         """
+        warn_if_overwriting_scalar(self._obj, name)
 
         self._obj[name] = self._obj["v"].differentiate("x") - self._obj[
             "u"
@@ -1923,6 +1946,7 @@ class PIVAccessor(object):
             >>> data.piv.strain()  # Creates data["w"] with strain
             >>> data.piv.strain(name="strain_rate")  # Creates data["strain_rate"]
         """
+        warn_if_overwriting_scalar(self._obj, name)
         du_dx = self._obj["u"].differentiate("x")
         du_dy = self._obj["u"].differentiate("y")
         dv_dx = self._obj["v"].differentiate("x")
@@ -1948,6 +1972,7 @@ class PIVAccessor(object):
             >>> data.piv.divergence()  # Creates data["w"] with divergence
             >>> data.piv.divergence(name="div")  # Creates data["div"] with divergence
         """
+        warn_if_overwriting_scalar(self._obj, name)
         du_dx, _ = np.gradient(
             self._obj["u"], self._obj["x"], self._obj["y"], axis=(0, 1)
         )
@@ -1984,6 +2009,7 @@ class PIVAccessor(object):
             >>> data.piv.acceleration(name="accel")  # Creates data["accel"]
 
         """
+        warn_if_overwriting_scalar(self._obj, name)
         du_dx = self._obj["u"].differentiate("x")
         du_dy = self._obj["u"].differentiate("y")
         dv_dx = self._obj["v"].differentiate("x")
@@ -2015,6 +2041,7 @@ class PIVAccessor(object):
             >>> data.piv.kinetic_energy()  # Creates data["w"] with KE
             >>> data.piv.kinetic_energy(name="ke")  # Creates data["ke"]
         """
+        warn_if_overwriting_scalar(self._obj, name)
         self._obj[name] = self._obj["u"] ** 2 + self._obj["v"] ** 2
         self._obj[name].attrs["units"] = "(m/s)^2"
         self._obj[name].attrs["standard_name"] = "kinetic_energy"
@@ -2043,6 +2070,7 @@ class PIVAccessor(object):
                               use .piv.kinetic_energy()"
             )
 
+        warn_if_overwriting_scalar(self._obj, name)
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
         new_obj[name] = new_obj["u"] ** 2 + new_obj["v"] ** 2
@@ -2092,6 +2120,7 @@ class PIVAccessor(object):
                               single vector field, use .piv.ke()"
             )
 
+        warn_if_overwriting_scalar(self._obj, name)
         new_obj = self._obj.copy()
         new_obj -= new_obj.mean(dim="t")
 
@@ -2269,6 +2298,15 @@ class PIVAccessor(object):
                 f"Valid options are: {', '.join(valid_properties)}"
             )
 
+        warnings.warn(
+            "piv.vec2scal() currently rebinds this accessor's internal dataset "
+            "reference as a side effect; a future release will make it a pure "
+            "function that only returns the computed dataset. Always use the "
+            "return value (`ds = ds.piv.vec2scal(...)`) rather than relying on "
+            "in-place state.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         method = getattr(self, flow_property)
         self._obj = method(name=name)
 
@@ -2286,14 +2324,15 @@ class PIVAccessor(object):
         Example:
             >>> scaled_data = data.piv * 2.0  # Double all velocities
         """
-        self._obj["u"] *= scalar
-        self._obj["v"] *= scalar
-        if "w" in self._obj.var():
-            self._obj["w"] *= scalar  # Fixed: should be multiply, not add
+        out = self._obj.copy()
+        out["u"] = out["u"] * scalar
+        out["v"] = out["v"] * scalar
+        if "w" in out.data_vars:
+            out["w"] = out["w"] * scalar
 
-        return self._obj
+        return out
 
-    def __div__(self, scalar):
+    def __truediv__(self, scalar):
         """Divides velocity field by a scalar
         
         Args:
@@ -2310,11 +2349,12 @@ class PIVAccessor(object):
         """
         if scalar == 0:
             raise ValueError("Cannot divide by zero")
-            
-        self._obj["u"] /= scalar
-        self._obj["v"] /= scalar
 
-        return self._obj
+        out = self._obj.copy()
+        out["u"] = out["u"] / scalar
+        out["v"] = out["v"] / scalar
+
+        return out
 
     def set_delta_t(self, delta_t: float = 0.0):
         """Sets the time interval attribute for PIV measurements

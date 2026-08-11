@@ -953,7 +953,7 @@ def read_directory_lazy(directory: Any, chunks: Any = "auto") -> xr.Dataset:
 def save_piv(
     dataset: xr.Dataset,
     filepath: Any,
-    format: str = "netcdf",
+    format: str = "zarr",
     frame: int = 0,
     chunks: Optional[dict] = None,
     mode: str = "w",

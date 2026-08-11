@@ -69,8 +69,8 @@ but is minimal (just enables the numpy typing plugin); there's no CI-enforced my
     (`InsightVECReader`, `OpenPIVReader`, `Davis8Reader`, `LaVisionVC7Reader`, `PIVLabReader`, `NetCDFReader`,
     `ZarrReader`). Each reader has a canonical `.name` (e.g. `"insight"`, `"openpiv"`, `"vc7"`) used both by
     `format=` dispatch (`PIVReaderRegistry.get_by_name`) and auto-detection, so a custom reader registered
-    via `register_reader()` is selectable either way. Pair with `save_piv()` (supports `format="netcdf"`
-    (default), `"csv"`, `"zarr"`). For large/out-of-core directories, prefer `convert_directory_to_zarr()` +
+    via `register_reader()` is selectable either way. Pair with `save_piv()` (supports `format="zarr"`
+    (default), `"netcdf"`, `"csv"`). For large/out-of-core directories, prefer `convert_directory_to_zarr()` +
     `read_directory_lazy()` over the eager `read_directory()` (which loads every frame into memory before
     concatenating).
   - **Legacy**: `load_vec`, `load_openpiv_txt`, `load_vc7`, `loadvec`, `openvec`, `openim7`, etc. — kept for

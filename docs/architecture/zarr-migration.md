@@ -23,10 +23,12 @@
     behavior unchanged.
   - The return-type contract (Dataset vs `(fig, ax)` vs raw tuple for `azprofile`) is now
     documented in `PIVAccessor`'s class docstring.
-  - Still open: actually removing the `self._obj` reassignment in `crop`/`vec2scal`, and the
-    `save_piv` default-format flip to `"zarr"` (see dependency note below — with `netcdf4` no
-    longer a hard dependency, keeping `"netcdf"` as the default now requires `h5netcdf`, which is
-    installed by default, so this is no longer strictly forced but is still worth revisiting).
+  - `save_piv`'s default `format` flipped from `"netcdf"` to `"zarr"` — `zarr`/`dask` are always
+    available, `netcdf4` no longer is (see dependency note below). `save_piv(ds, path)` with no
+    `format=` now writes a Zarr store (a directory), not a `.nc` file.
+  - Still open: actually removing the `self._obj` reassignment in `crop`/`vec2scal` (kept as a
+    `DeprecationWarning` for now — deliberately not removed in the same pass the warning was
+    added; give it a release before changing behavior).
   - Also landed as part of this pass (dependency hygiene, prompted by wanting to validate the
     package installs cleanly on newer Python builds): `netcdf4` and `vortexfitting` moved from
     hard dependencies to optional extras (`pivpy[netcdf]`, `pivpy[vortexfitting]`); default NetCDF

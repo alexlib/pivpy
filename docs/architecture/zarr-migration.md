@@ -1,5 +1,17 @@
 # PIVPy: Zarr-first storage + intuitive API — architecture plan
 
+## Status
+
+- **Phase 1 (PoC)**: done — `ZarrReader`, `save_piv(format="zarr")`, round-trip/lazy tests.
+- **Phase 2**: done — `pivpy/schema.py` (`build_dataset`/`validate`/`is_valid`), all 6 readers
+  migrated to `build_dataset`, `OpenPIVReader` mask→chc fold, `LaVisionVC7Reader` raises
+  `ImportError` instead of silently fabricating data, registry/`read_piv` dispatch dedup
+  (`PIVReader.name` + `PIVReaderRegistry.get_by_name`), `convert_directory_to_zarr` +
+  `read_directory_lazy`, `pivpy_schema_version` attr, schema-conformance/out-of-core/attrs tests.
+  `zarr`/`dask` are hard dependencies.
+- **Phase 3**: not started — accessor API cleanup (`__mul__`/`__div__` mutation,
+  `crop`/`vec2scal` reassigning `self._obj`, `save_piv` default flip to zarr).
+
 ## Context
 
 PIVPy's current storage story is NetCDF/HDF5-based and fully eager (no lazy loading, no

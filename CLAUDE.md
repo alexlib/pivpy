@@ -50,11 +50,19 @@ but is minimal (just enables the numpy typing plugin); there's no CI-enforced my
   and PIVMat-named transforms (`shiftf`, `smoothf`, `truncf`, `subsbr`, `zeropadf`, etc). Most functions
   operate on `xr.Dataset | list[xr.Dataset]` and are designed to mirror the MATLAB PIVMat toolbox API/naming
   (see README's "PIVMat-inspired methods" section for the mapping).
+- `pivpy/schema.py` — the canonical dataset schema shared by every reader: `build_dataset()` (the one
+  constructor readers should call instead of hand-rolling `xr.Dataset(...)`), `validate()`/`is_valid()`,
+  and `set_default_attrs()`. See `docs/architecture/zarr-migration.md` for the design rationale.
 - `pivpy/io.py` — file I/O. Two layers coexist intentionally:
   - **Current**: `read_piv(filepath, format=None, **kwargs)` auto-detects format and dispatches through a
     `PIVReader` ABC registry (`PIVReaderRegistry`, `register_reader`) with concrete readers per format
-    (`InsightVECReader`, `OpenPIVReader`, `Davis8Reader`, `LaVisionVC7Reader`, `PIVLabReader`, `NetCDFReader`).
-    Pair with `save_piv()`.
+    (`InsightVECReader`, `OpenPIVReader`, `Davis8Reader`, `LaVisionVC7Reader`, `PIVLabReader`, `NetCDFReader`,
+    `ZarrReader`). Each reader has a canonical `.name` (e.g. `"insight"`, `"openpiv"`, `"vc7"`) used both by
+    `format=` dispatch (`PIVReaderRegistry.get_by_name`) and auto-detection, so a custom reader registered
+    via `register_reader()` is selectable either way. Pair with `save_piv()` (supports `format="netcdf"`
+    (default), `"csv"`, `"zarr"`). For large/out-of-core directories, prefer `convert_directory_to_zarr()` +
+    `read_directory_lazy()` over the eager `read_directory()` (which loads every frame into memory before
+    concatenating).
   - **Legacy**: `load_vec`, `load_openpiv_txt`, `load_vc7`, `loadvec`, `openvec`, `openim7`, etc. — kept for
     backward compatibility; new format support should go through the `PIVReader` registry, not this layer.
   - Also home to `batchf()` (PIVMat-style batch processing over filename glob patterns, accepting either a

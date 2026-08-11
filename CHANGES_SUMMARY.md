@@ -4,11 +4,13 @@
 This document summarizes notable maintenance and behavior changes made in PIVPy.
 
 ## Breaking/behavior changes (high level)
-- OpenPIV `mask` semantics: when present, `mask == 0` is treated as invalid; `u`/`v` are zeroed at invalid points.
+- OpenPIV `mask` semantics: when present, `mask == 0` is treated as invalid; `u`/`v` and `chc` are zeroed at invalid points. **(2026-08)** The 6th-column `mask` is now folded into `chc` at read time instead of being kept as a separate `mask` data variable — `OpenPIVReader`-produced datasets no longer contain `mask`; use `chc`.
 - OpenPIV NaNs: `u`/`v` NaNs are normalized to `0.0` for deterministic downstream behavior.
-- VC7 without `lvpyio`: loading `.vc7` falls back to a small synthetic dataset instead of raising an import error.
+- VC7 without `lvpyio`: **(2026-08)** loading `.vc7` now raises `ImportError` (`pip install pivpy[lvpyio]`) instead of silently falling back to a fabricated synthetic dataset.
 - Plotting API: `graphics.quiver()` and `graphics.streamplot()` return `(fig, ax)`.
 - Synthetic data: `io.create_sample_Dataset()` now defaults to `n_frames=2`.
+- **(2026-08)** Storage: added Zarr as a first-class format (`save_piv(..., format="zarr")`, `read_piv(path)` auto-detects `.zarr`, `read_directory_lazy()`/`convert_directory_to_zarr()` for out-of-core directories). Default `save_piv` format is still `"netcdf"`. See `docs/architecture/zarr-migration.md` for the full plan.
+- **(2026-08)** All readers now build their `xr.Dataset` through the shared `pivpy.schema.build_dataset()`/`set_default_attrs()` instead of hand-rolled construction; datasets gain a `pivpy_schema_version` attr. `read_piv(format=...)` now resolves through the same reader registry as auto-detection (`PIVReader.name` + `PIVReaderRegistry.get_by_name`), so custom readers registered via `register_reader()` are selectable by explicit format string too.
 
 ## Recent stabilization updates (Dec 2025)
 

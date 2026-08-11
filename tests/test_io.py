@@ -80,6 +80,10 @@ def test_loadopenpivtxt():
 
 def test_loadopenpivtxt_with_mask():
     """tests loading openpivtxt file with mask column (6 columns)
+
+    The mask column is folded into `chc` (the one canonical validity
+    variable in the pivpy schema) rather than kept as a separate `mask`
+    variable.
     """
     # Test with a file that has 6 columns
     openpiv_txt_file_with_mask = path / "openpiv_txt" / "Gamma1_Gamma2_tutorial_notebook" / "OpenPIVtxtFilePair0.txt"
@@ -87,35 +91,40 @@ def test_loadopenpivtxt_with_mask():
     assert "u" in data
     assert "v" in data
     assert "chc" in data
-    # New format should have mask
-    assert "mask" in data
-    # Check that mask has the right shape
-    assert data["mask"].shape == data["u"].shape
+    # No separate 'mask' variable -- it's folded into chc.
+    assert "mask" not in data
+    assert data["chc"].shape == data["u"].shape
 
 def test_load_directory():
-    """tests loading directory of Insight VEC, vc7, and Davis8 files
+    """tests loading directory of Insight and Davis8 files
     """
     data = io.load_directory(
-        path / "Insight", 
-        basename="Run*", 
+        path / "Insight",
+        basename="Run*",
         ext=".vec"
         )
     print(data.t)
     assert np.allclose(data["t"], [0, 1, 2, 3, 4])
 
     data = io.load_directory(
-        path / "urban_canopy", 
-        basename="B*", 
-        ext=".vc7"
-    )
-    assert np.allclose(data["t"], [0, 1, 2, 3, 4])
-
-    data = io.load_directory(
-        path / "PIV_Challenge", 
-        basename="B*", 
+        path / "PIV_Challenge",
+        basename="B*",
         ext=".txt"
     )
     assert np.allclose(data["t"], [0, 1])
+
+
+def test_load_directory_vc7():
+    """VC7 requires the optional lvpyio package (no silent synthetic fallback)."""
+    import pytest
+
+    pytest.importorskip("lvpyio")
+    data = io.load_directory(
+        path / "urban_canopy",
+        basename="B*",
+        ext=".vc7"
+    )
+    assert np.allclose(data["t"], [0, 1, 2, 3, 4])
 
 def test_check_units():
     """ reads units and checks their validitty 
@@ -378,17 +387,20 @@ def test_vc7_read_metadata():
 
 def test_vc7_read_with_lvpyio_installed():
     """Test LaVisionVC7Reader data loading"""
+    import importlib.util
+    import pytest
+
     reader = io.LaVisionVC7Reader()
     vc7_file = path / "urban_canopy" / "B00001.vc7"
-    
-    # This will work if lvpyio is installed
-    try:
+
+    if importlib.util.find_spec("lvpyio") is None:
+        # No optional dependency: reading must raise, not silently fabricate data.
+        with pytest.raises(ImportError):
+            reader.read(vc7_file)
+    else:
         dataset = reader.read(vc7_file)
         assert 'u' in dataset
         assert 'v' in dataset
-    except NameError:
-        # lvpyio not installed, expected
-        pass
 
 
 # Tests for PIVLabReader
@@ -856,12 +868,12 @@ def test_openpiv_nan_and_mask_zeroing():
         assert isinstance(reader, io.OpenPIVReader)
 
         ds = io.read_piv(fp)
-        assert "mask" in ds
+        assert "mask" not in ds
         # NaNs in u/v become 0.0
         assert float(ds["u"].values[0, 0, 0]) == 0.0
         assert float(ds["v"].values[0, 1, 0]) == 0.0
-        # mask==0 forces u/v to 0.0 at that location
-        assert float(ds["mask"].values[0, 1, 0]) == 0.0
+        # mask==0 (folded into chc) forces u/v/chc to 0.0 at that location
+        assert float(ds["chc"].values[0, 1, 0]) == 0.0
         assert float(ds["u"].values[0, 1, 0]) == 0.0
         assert float(ds["v"].values[0, 1, 0]) == 0.0
 

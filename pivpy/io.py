@@ -34,15 +34,16 @@ except Exception:  # pragma: no cover
     _sp_savemat = None
 from numpy.typing import ArrayLike
 
-
-# -----------------------------------------------------------------------------
-# Defaults
-# -----------------------------------------------------------------------------
-
-POS_UNITS: str = "pix"  # or mm, m, after scaling
-TIME_UNITS: str = "frame"  # can become 'sec' / 'msec' / 'usec'
-VEL_UNITS: str = POS_UNITS  # default is displacement in pix
-DELTA_T: float = 0.0  # default is 0.0 (unknown)
+from pivpy.schema import (
+    DELTA_T,
+    POS_UNITS,
+    TIME_UNITS,
+    VEL_UNITS,
+    build_dataset,
+    is_valid,
+    set_default_attrs,
+    validate,
+)
 
 
 def _to_path(filepath: Any) -> pathlib.Path:
@@ -66,25 +67,6 @@ def _extract_frame_number(filepath: pathlib.Path) -> int:
             return int(m.group(1))
     nums = re.findall(r"(\d+)", name)
     return int(nums[-1]) if nums else 0
-
-
-def set_default_attrs(dataset: xr.Dataset) -> xr.Dataset:
-    """Apply default units and common attributes (sets missing only)."""
-    ds = dataset
-
-    if "x" in ds:
-        ds["x"].attrs.setdefault("units", POS_UNITS)
-    if "y" in ds:
-        ds["y"].attrs.setdefault("units", POS_UNITS)
-    if "t" in ds:
-        ds["t"].attrs.setdefault("units", TIME_UNITS)
-    for var in ("u", "v"):
-        if var in ds:
-            ds[var].attrs.setdefault("units", VEL_UNITS)
-
-    ds.attrs.setdefault("delta_t", float(DELTA_T))
-    ds.attrs.setdefault("files", [])
-    return ds
 
 
 def vec2mat(
@@ -174,20 +156,7 @@ def from_arrays(
         raise ValueError("mask must have same shape as u/v")
 
     x1d, y1d = _coords_from_mesh(x, y)
-    ds = xr.Dataset(
-        data_vars={
-            "u": (("y", "x", "t"), u[:, :, None]),
-            "v": (("y", "x", "t"), v[:, :, None]),
-            "chc": (("y", "x", "t"), mask[:, :, None]),
-        },
-        coords={
-            "x": ("x", x1d),
-            "y": ("y", y1d),
-            "t": ("t", np.asarray([frame], dtype=float)),
-        },
-        attrs={"delta_t": float(DELTA_T), "files": []},
-    )
-    return set_default_attrs(ds)
+    return build_dataset(x1d, y1d, u, v, chc=mask, frame=frame)
 
 
 def im2pivmat(
@@ -400,6 +369,10 @@ class PIVMetadata:
 
 
 class PIVReader(ABC):
+    #: Canonical format name used for explicit `read_piv(path, format=...)`
+    #: dispatch and registry lookup. Subclasses should override this.
+    name: str = ""
+
     @abstractmethod
     def can_read(self, filepath: Any) -> bool:
         raise NotImplementedError
@@ -414,6 +387,8 @@ class PIVReader(ABC):
 
 
 class InsightVECReader(PIVReader):
+    name = "insight"
+
     def can_read(self, filepath: Any) -> bool:
         path = _to_path(filepath)
         if not path.exists() or path.suffix.lower() != ".vec":
@@ -453,18 +428,9 @@ class InsightVECReader(PIVReader):
         u = arr[:, 2].reshape((rows, cols))
         v = arr[:, 3].reshape((rows, cols))
         chc = arr[:, 4].reshape((rows, cols)) if arr.shape[1] >= 5 else np.ones((rows, cols))
-        ds = xr.Dataset(
-            data_vars={
-                "u": (("y", "x", "t"), u[:, :, None]),
-                "v": (("y", "x", "t"), v[:, :, None]),
-                "chc": (("y", "x", "t"), chc[:, :, None]),
-            },
-            coords={
-                "x": ("x", x[0, :]),
-                "y": ("y", y[:, 0]),
-                "t": ("t", np.asarray([frame], dtype=float)),
-            },
-            attrs={"delta_t": float(md.delta_t), "files": [str(path)]},
+        ds = build_dataset(
+            x[0, :], y[:, 0], u, v, chc=chc, t=[frame],
+            delta_t=md.delta_t, files=[str(path)],
         )
         ds["x"].attrs["units"] = md.pos_units
         ds["y"].attrs["units"] = md.pos_units
@@ -475,6 +441,8 @@ class InsightVECReader(PIVReader):
 
 
 class OpenPIVReader(PIVReader):
+    name = "openpiv"
+
     def can_read(self, filepath: Any) -> bool:
         path = _to_path(filepath)
         if not path.exists() or path.suffix.lower() not in {".txt", ".vec"}:
@@ -536,31 +504,27 @@ class OpenPIVReader(PIVReader):
         # consumers (and tests) behave deterministically.
         u2 = np.nan_to_num(u2, nan=0.0)
         v2 = np.nan_to_num(v2, nan=0.0)
-        ds = xr.Dataset(
-            data_vars={
-                "u": (("y", "x", "t"), u2[:, :, None]),
-                "v": (("y", "x", "t"), v2[:, :, None]),
-                "chc": (("y", "x", "t"), chc2[:, :, None]),
-            },
-            coords={
-                "x": ("x", x2[0, :]),
-                "y": ("y", y2[:, 0]),
-                "t": ("t", np.asarray([frame], dtype=float)),
-            },
-            attrs={"delta_t": float(DELTA_T), "files": [str(path)]},
-        )
+
+        # A 6th-column mask (when present) is folded into chc rather than
+        # kept as a separate variable -- chc is the one canonical validity
+        # flag in the pivpy schema. mask==0 is invalid: it zeros chc and the
+        # velocities at that point, same as the pre-fold behavior.
         if mask is not None:
             mask2 = mask.reshape((rows, cols))
-            ds["mask"] = (("y", "x", "t"), mask2[:, :, None])
-            # Treat mask==0 as invalid and zero out velocities.
             invalid = mask2 == 0
-            if np.any(invalid):
-                ds["u"].values[invalid, 0] = 0.0
-                ds["v"].values[invalid, 0] = 0.0
-        return set_default_attrs(ds)
+            chc2 = np.where(invalid, 0.0, chc2)
+            u2[invalid] = 0.0
+            v2[invalid] = 0.0
+
+        return build_dataset(
+            x2[0, :], y2[:, 0], u2, v2, chc=chc2, t=[frame],
+            delta_t=DELTA_T, files=[str(path)],
+        )
 
 
 class Davis8Reader(PIVReader):
+    name = "davis8"
+
     def can_read(self, filepath: Any) -> bool:
         path = _to_path(filepath)
         if not path.exists() or path.suffix.lower() != ".txt":
@@ -610,23 +574,15 @@ class Davis8Reader(PIVReader):
         y = arr[:, 1].reshape((rows, cols))
         u = arr[:, 2].reshape((rows, cols))
         v = arr[:, 3].reshape((rows, cols))
-        ds = xr.Dataset(
-            data_vars={
-                "u": (("y", "x", "t"), u[:, :, None]),
-                "v": (("y", "x", "t"), v[:, :, None]),
-                "chc": (("y", "x", "t"), np.ones_like(u)[:, :, None]),
-            },
-            coords={
-                "x": ("x", x[0, :]),
-                "y": ("y", y[:, 0]),
-                "t": ("t", np.asarray([frame], dtype=float)),
-            },
-            attrs={"delta_t": float(md.delta_t), "files": [str(path)]},
+        return build_dataset(
+            x[0, :], y[:, 0], u, v, t=[frame],
+            delta_t=md.delta_t, files=[str(path)],
         )
-        return set_default_attrs(ds)
 
 
 class LaVisionVC7Reader(PIVReader):
+    name = "vc7"
+
     def can_read(self, filepath: Any) -> bool:
         path = _to_path(filepath)
         return path.exists() and path.suffix.lower() == ".vc7"
@@ -642,12 +598,11 @@ class LaVisionVC7Reader(PIVReader):
             frame = md.frame
         try:
             from lvpyio import read_buffer  # type: ignore
-        except Exception as e:
-            # Test suite runs without lvpyio; fall back to a small synthetic field.
-            # This keeps higher-level APIs (load_directory/read_directory) usable.
-            ds = create_sample_field(frame=int(frame))
-            ds.attrs["files"] = [str(path)]
-            return ds
+        except ImportError as e:
+            raise ImportError(
+                "LaVision VC7 support requires the optional 'lvpyio' package: "
+                "pip install pivpy[lvpyio]"
+            ) from e
         buffer = read_buffer(str(path))
         data = buffer[0]
         plane = 0
@@ -668,6 +623,8 @@ class LaVisionVC7Reader(PIVReader):
 
 
 class PIVLabReader(PIVReader):
+    name = "pivlab"
+
     def can_read(self, filepath: Any) -> bool:
         path = _to_path(filepath)
         if not path.exists() or path.suffix.lower() != ".mat":
@@ -719,15 +676,16 @@ class PIVLabReader(PIVReader):
             if x2d is None or y2d is None:
                 x2d, y2d = np.meshgrid(np.arange(u.shape[1]), np.arange(u.shape[0]))
             x1d, y1d = _coords_from_mesh(x2d, y2d)
-            ds = xr.Dataset(
-                data_vars={"u": (("y", "x", "t"), u), "v": (("y", "x", "t"), v), "chc": (("y", "x", "t"), chc)},
-                coords={"x": ("x", x1d), "y": ("y", y1d), "t": ("t", np.asarray(indices, dtype=float))},
-                attrs={"delta_t": float(DELTA_T), "files": [str(path)]},
+            ds = build_dataset(
+                x1d, y1d, u, v, chc=chc, t=indices,
+                delta_t=DELTA_T, files=[str(path)],
             )
-        return set_default_attrs(ds)
+        return ds
 
 
 class NetCDFReader(PIVReader):
+    name = "netcdf"
+
     def can_read(self, filepath: Any) -> bool:
         path = _to_path(filepath)
         return path.exists() and path.suffix.lower() in {".nc", ".netcdf"}
@@ -814,22 +772,17 @@ class NetCDFReader(PIVReader):
         v = _ensure_yxt(v0)
         chc = _ensure_yxt(chc0)
 
-        ds = xr.Dataset(
-            data_vars={"u": u, "v": v, "chc": chc},
-            coords={
-                "x": ("x", xcoord if xcoord is not None else np.arange(u.sizes["x"])),
-                "y": ("y", ycoord if ycoord is not None else np.arange(u.sizes["y"])),
-                "t": ("t", tcoord),
-            },
-            attrs={
-                "delta_t": float(ds0.attrs.get("delta_t", DELTA_T)),
-                "files": [str(path)],
-            },
+        return build_dataset(
+            xcoord if xcoord is not None else np.arange(u.sizes["x"]),
+            ycoord if ycoord is not None else np.arange(u.sizes["y"]),
+            u.values, v.values, chc=chc.values, t=tcoord,
+            delta_t=float(ds0.attrs.get("delta_t", DELTA_T)), files=[str(path)],
         )
-        return set_default_attrs(ds)
 
 
 class ZarrReader(PIVReader):
+    name = "zarr"
+
     def can_read(self, filepath: Any) -> bool:
         path = _to_path(filepath)
         if path.suffix.lower() == ".zarr":
@@ -859,6 +812,17 @@ class ZarrReader(PIVReader):
         return set_default_attrs(ds)
 
 
+# Legacy/convenience aliases accepted by read_piv(format=...) and
+# PIVReaderRegistry.get_by_name, mapped to a reader's canonical `name`.
+_FORMAT_ALIASES = {
+    "vec": "insight",
+    "openpiv_txt": "openpiv",
+    "davis": "davis8",
+    "mat": "pivlab",
+    "nc": "netcdf",
+}
+
+
 class PIVReaderRegistry:
     def __init__(self):
         self._readers: list[PIVReader] = []
@@ -885,6 +849,16 @@ class PIVReaderRegistry:
                 continue
         return None
 
+    def get_by_name(self, fmt: str) -> Optional[PIVReader]:
+        """Look up a registered reader (builtin or custom) by its `name`,
+        so `register_reader()` covers explicit `format=` dispatch too, not
+        just auto-detection."""
+        name = _FORMAT_ALIASES.get(fmt.lower(), fmt.lower())
+        for reader in self._readers:
+            if reader.name == name:
+                return reader
+        return None
+
 
 _REGISTRY = PIVReaderRegistry()
 
@@ -899,30 +873,14 @@ def read_piv(filepath: Any, format: Optional[str] = None, **kwargs) -> xr.Datase
         raise FileNotFoundError(str(path))
     frame_override = kwargs.pop("frame", None)
     delta_t_override = kwargs.pop("delta_t", None)
+    chunks = kwargs.pop("chunks", None)
     reader: Optional[PIVReader]
     if format is not None:
-        fmt = format.lower()
-        if fmt in {"insight", "vec"}:
-            reader = InsightVECReader()
-        elif fmt in {"openpiv", "openpiv_txt"}:
-            reader = OpenPIVReader()
-        elif fmt in {"davis8", "davis"}:
-            reader = Davis8Reader()
-        elif fmt in {"vc7"}:
-            reader = LaVisionVC7Reader()
-        elif fmt in {"pivlab", "mat"}:
-            reader = PIVLabReader()
-        elif fmt in {"netcdf", "nc"}:
-            reader = NetCDFReader()
-        elif fmt == "zarr":
-            reader = ZarrReader()
-        else:
-            raise ValueError("Unsupported format")
+        reader = _REGISTRY.get_by_name(format)
     else:
         reader = _REGISTRY.find_reader(path)
     if reader is None:
         raise ValueError("Unsupported format")
-    chunks = kwargs.pop("chunks", None)
     if isinstance(reader, ZarrReader):
         ds = reader.read(path, chunks=chunks)
     elif frame_override is not None:
@@ -951,6 +909,45 @@ def read_directory(directory: Any, pattern: str = "*", ext: Optional[str] = None
     combined.attrs["delta_t"] = float(datasets[0].attrs.get("delta_t", DELTA_T))
     combined.attrs["files"] = [str(f) for f in files]
     return set_default_attrs(combined)
+
+
+def convert_directory_to_zarr(
+    directory: Any,
+    zarr_path: Any,
+    pattern: str = "*",
+    ext: Optional[str] = None,
+    chunks: Optional[dict] = None,
+) -> None:
+    """Stream a directory of per-frame PIV files into one chunked Zarr store.
+
+    Unlike read_directory(), this never holds more than one frame in memory:
+    each frame is read, appended to the Zarr store on disk, and discarded.
+    This is the out-of-core path for directories with thousands of frames
+    (e.g. Davis VC7 exports) -- convert once with this function, then use
+    read_directory_lazy()/read_piv(..., format="zarr") to open the result
+    without materializing every frame.
+    """
+    dirpath = _to_path(directory)
+    if not dirpath.exists() or not dirpath.is_dir():
+        raise FileNotFoundError(str(dirpath))
+    glob_pattern = pattern
+    if ext is not None and not glob_pattern.endswith(ext):
+        glob_pattern = f"{pattern}{ext}"
+    files = sorted(dirpath.glob(glob_pattern))
+    if not files:
+        raise IOError("No files")
+
+    zpath = _to_path(zarr_path)
+    chunk_spec = chunks or {"t": 1}
+    for i, fp in enumerate(files):
+        frame_ds = read_piv(fp, frame=i).chunk(chunk_spec)
+        frame_ds.to_zarr(zpath, mode="w" if i == 0 else "a", append_dim=None if i == 0 else "t")
+
+
+def read_directory_lazy(directory: Any, chunks: Any = "auto") -> xr.Dataset:
+    """Open a Zarr store (as written by convert_directory_to_zarr) as one
+    dask-backed, lazily-loaded Dataset."""
+    return read_piv(directory, format="zarr", chunks=chunks)
 
 
 def save_piv(

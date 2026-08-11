@@ -22,12 +22,9 @@ dependencies = [
         "matplotlib",
         "pytest",
         "h5py",
-        "nbformat>=5.8.0",
-        "nbconvert>=7.6.0",
-        "ipykernel>=6.16.2",
         "setuptools>=68.0.0",
         "openpiv>=0.25.1",
-        "jupyterlab>=4.5.1",
+        "marimo",
         "zarr",
         "dask",
 ]

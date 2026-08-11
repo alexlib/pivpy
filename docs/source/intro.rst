@@ -58,7 +58,7 @@ Core (no optional deps):
 Tutorials
 ----------------------
 
-- :doc:`tutorial` (Jupyter notebook)
+- :doc:`tutorial` (marimo notebook)
 - :doc:`pivpy_tutorial` (written tutorial)
 
 

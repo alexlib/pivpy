@@ -117,7 +117,7 @@ Notes
 =====
 
 - Interactive “live” movie key bindings like MATLAB’s figure callbacks are not a PIVPy goal.
-  For interactive exploration, consider using Jupyter notebooks and Matplotlib widgets.
+  For interactive exploration, consider using marimo notebooks and Matplotlib widgets.
 - If your y-axis appears flipped, check the ordering of the `y` coordinate. PIVPy’s plotting
   utilities attempt to respect coordinate ordering.
 

@@ -46,7 +46,6 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
-    "nbsphinx", 
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "myst_parser"
@@ -125,15 +124,41 @@ source_suffix = {
     ".md": "markdown",
 }
 
-# Add a small cross-link on the rendered tutorial notebook page without
-# modifying the notebook file itself.
-nbsphinx_prolog = r"""
-{% if env.docname == 'tutorial' %}
-.. note::
 
-   Looking for a written, copy/paste friendly version? See :doc:`pivpy_tutorial`.
-{% endif %}
-"""
+def _export_marimo_notebooks(app):
+    """Render notebook.py/tutorial.py (marimo) to static HTML in _static/
+    before the build, so notebook.rst/tutorial.rst can embed them. Runs
+    `marimo export html` via the same interpreter Sphinx is running under
+    (marimo is a hard dependency of the pivpy package itself)."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from sphinx.util import logging
+
+    logger = logging.getLogger(__name__)
+
+    src_dir = Path(app.srcdir)
+    static_dir = src_dir / "_static"
+    static_dir.mkdir(exist_ok=True)
+
+    for name in ("notebook", "tutorial"):
+        source = src_dir / f"{name}.py"
+        if not source.exists():
+            continue
+        target = static_dir / f"{name}.html"
+        result = subprocess.run(
+            [sys.executable, "-m", "marimo", "export", "html",
+             "--no-sandbox", "--no-include-code", str(source),
+             "-o", str(target), "-f"],
+            capture_output=True, text=True,
+        )
+        if not target.exists():
+            logger.warning(f"marimo export of {source.name} produced no output: {result.stderr}")
+
+
+def setup(app):
+    app.connect("builder-inited", _export_marimo_notebooks)
 
 # The docs are often built with Sphinx's nitpicky mode (-n), which turns all
 # unresolved cross-references into warnings. Many of our docstrings include

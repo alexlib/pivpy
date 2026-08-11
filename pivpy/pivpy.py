@@ -87,15 +87,16 @@ from pivpy.compute_funcs import (
 class PIVAccessor(object):
     """extends xarray Dataset with PIVPy properties
 
-    Return-type contract, by method category (this is documentation of an
-    existing, deliberate split -- not something you need to guess at):
-      - Field-transform methods (crop, filterf, flipf, vorticity, averf, ...):
-        return an `xr.Dataset`.
-      - Plotting methods (quiver, streamplot, showf, showscal, to_movie):
-        return `(matplotlib.figure.Figure, matplotlib.axes.Axes)`.
-      - `azprofile`: returns a raw tuple of arrays (angle, ur, ut), not a
-        Dataset or a plot -- it's a numerical-profile method, grouped with
-        neither of the above.
+    Return-type contract, by method category (documentation of an existing,
+    deliberate split -- not something you need to guess at):
+
+    - Field-transform methods (crop, filterf, flipf, vorticity, averf, ...)
+      return an ``xr.Dataset``.
+    - Plotting methods (quiver, streamplot, showf, showscal, to_movie)
+      return ``(matplotlib.figure.Figure, matplotlib.axes.Axes)``.
+    - ``azprofile`` returns a raw tuple of arrays (angle, ur, ut), not a
+      Dataset or a plot -- it's a numerical-profile method, grouped with
+      neither of the above.
     """
 
     def __init__(self, xarray_obj):

@@ -1,5 +1,4 @@
 *.pyc
-examples/data/.ipynb_checkpoints/*
 .pytest_cache/*
 .pytest_cache/*
 build/*
@@ -10,12 +9,8 @@ tests/PIVPy.egg-info/*
 docs/build/*
 docs/build/doctrees/*
 docs/build/html/*
-docs/source/.ipynb_checkpoints/*
-examples/notebooks/.ipynb_checkpoints/*
 examples/notebooks/_generated/*
 pivpy.egg-info/PKG-INFO
-pivpy/data/openpiv/.ipynb_checkpoints/*
-.ipynb_checkpoints/*
 pivpy.egg-info/dependency_links.txt
 pivpy.egg-info/requires.txt
 pivpy.egg-info/SOURCES.txt
@@ -23,3 +18,7 @@ pivpy.egg-info/top_level.txt
 tmp.nc
 /README_files
 /docs/_build
+__marimo__/
+# Generated at Sphinx build time by docs/source/conf.py's marimo export hook.
+/docs/source/_static/notebook.html
+/docs/source/_static/tutorial.html

@@ -8,7 +8,7 @@ Python-based post-processing PIV data analysis in the repo: https://github.com/o
 
 [![PyPI version](https://badge.fury.io/py/pivpy.svg)](https://badge.fury.io/py/pivpy)
 [![Documentation Status](https://readthedocs.org/projects/pivpy/badge/?version=latest)](https://pivpy.readthedocs.io/en/latest/?badge=latest)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/alexlib/pivpy/master?filepath=examples%2Fnotebooks%2FGetting_Started.ipynb)
+[![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.py)
 
 
 
@@ -247,7 +247,9 @@ Alternative (conda):
     
 ## How to get started?
 
-Look into the [getting started Jupyter notebook](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.ipynb)
+Look into the [getting started marimo notebook](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.py)
+(open it with `uv run marimo edit examples/notebooks/Getting_Started.py`, or click the
+"Open in molab" badge above to run it in your browser)
 
 and additional notebooks:
 [Notebooks](https://github.com/alexlib/pivpy/blob/master/examples/notebooks/)
@@ -273,8 +275,9 @@ contribute
 
 ## How to write tutorials and add those to the documentation
 
-Using great tutorial http://sphinx-ipynb.readthedocs.org/en/latest/howto.html we now can 
-prepare IPython notebooks (see in /docs/source) and convert those to .rst files, then 
+Tutorials live as marimo notebooks (`.py` files) in `docs/source/`. The Sphinx build
+(`docs/source/conf.py`) exports them to static HTML via `marimo export html` and embeds them
+in the generated docs automatically -- no separate conversion step needed:
 
     uv pip install -r docs/requirements.txt
     uv run sphinx-build -b html docs/source/ docs/build/html

@@ -29,6 +29,8 @@ dependencies = [
         "setuptools>=68.0.0",
         "openpiv>=0.25.1",
         "jupyterlab>=4.5.1",
+        "zarr",
+        "dask",
 ]
 
 keywords=["example documentation tutorial"]

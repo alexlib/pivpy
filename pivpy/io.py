@@ -829,13 +829,43 @@ class NetCDFReader(PIVReader):
         return set_default_attrs(ds)
 
 
+class ZarrReader(PIVReader):
+    def can_read(self, filepath: Any) -> bool:
+        path = _to_path(filepath)
+        if path.suffix.lower() == ".zarr":
+            return True
+        return path.is_dir() and ((path / "zarr.json").exists() or (path / ".zattrs").exists())
+
+    def read_metadata(self, filepath: Any) -> PIVMetadata:
+        path = _to_path(filepath)
+        try:
+            ds = xr.open_zarr(path)
+        except Exception:
+            return PIVMetadata(frame=0)
+        return PIVMetadata(
+            pos_units=POS_UNITS,
+            vel_units=VEL_UNITS,
+            time_units=TIME_UNITS,
+            delta_t=float(ds.attrs.get("delta_t", DELTA_T)),
+            variables=list(ds.data_vars),
+            rows=int(ds.sizes.get("y", 0)) or None,
+            cols=int(ds.sizes.get("x", 0)) or None,
+            frame=0,
+        )
+
+    def read(self, filepath: Any, chunks: Optional[dict] = None, **kwargs) -> xr.Dataset:
+        path = _to_path(filepath)
+        ds = xr.open_zarr(path, chunks=chunks)
+        return set_default_attrs(ds)
+
+
 class PIVReaderRegistry:
     def __init__(self):
         self._readers: list[PIVReader] = []
         self._register_builtin_readers()
 
     def _register_builtin_readers(self) -> None:
-        self._readers = [InsightVECReader(), OpenPIVReader(), Davis8Reader(), LaVisionVC7Reader(), PIVLabReader(), NetCDFReader()]
+        self._readers = [InsightVECReader(), OpenPIVReader(), Davis8Reader(), LaVisionVC7Reader(), PIVLabReader(), NetCDFReader(), ZarrReader()]
 
     def register(self, reader: PIVReader) -> None:
         self._readers.insert(0, reader)
@@ -884,13 +914,21 @@ def read_piv(filepath: Any, format: Optional[str] = None, **kwargs) -> xr.Datase
             reader = PIVLabReader()
         elif fmt in {"netcdf", "nc"}:
             reader = NetCDFReader()
+        elif fmt == "zarr":
+            reader = ZarrReader()
         else:
             raise ValueError("Unsupported format")
     else:
         reader = _REGISTRY.find_reader(path)
     if reader is None:
         raise ValueError("Unsupported format")
-    ds = reader.read(path, frame=frame_override) if frame_override is not None else reader.read(path)
+    chunks = kwargs.pop("chunks", None)
+    if isinstance(reader, ZarrReader):
+        ds = reader.read(path, chunks=chunks)
+    elif frame_override is not None:
+        ds = reader.read(path, frame=frame_override)
+    else:
+        ds = reader.read(path)
     if delta_t_override is not None:
         ds.attrs["delta_t"] = float(delta_t_override)
     if frame_override is not None:
@@ -915,11 +953,23 @@ def read_directory(directory: Any, pattern: str = "*", ext: Optional[str] = None
     return set_default_attrs(combined)
 
 
-def save_piv(dataset: xr.Dataset, filepath: Any, format: str = "netcdf", frame: int = 0, **kwargs) -> None:
+def save_piv(
+    dataset: xr.Dataset,
+    filepath: Any,
+    format: str = "netcdf",
+    frame: int = 0,
+    chunks: Optional[dict] = None,
+    mode: str = "w",
+    **kwargs,
+) -> None:
     path = _to_path(filepath)
     fmt = format.lower()
     if fmt in {"netcdf", "nc"}:
         dataset.to_netcdf(path)
+        return
+    if fmt == "zarr":
+        to_write = dataset.chunk(chunks or {"t": 1}) if "t" in dataset.dims else dataset
+        to_write.to_zarr(path, mode=mode)
         return
     if fmt == "csv":
         ds = dataset.isel(t=int(frame)) if "t" in dataset.dims else dataset

@@ -47,12 +47,12 @@ embedded via a `conf.py` build hook, no manual conversion step):
 
 Edit a notebook interactively:
 
-    uv run marimo edit examples/notebooks/Getting_Started.py
+    uv run python -m marimo edit examples/notebooks/Getting_Started.py
 
-On Windows, `uv run marimo export ...`/`run ...` has been observed failing to find the editable
-`pivpy` install from inside marimo's kernel subprocess (`No module named 'pivpy'`), even though
-`uv run python -c "import pivpy"` works fine. If you hit that, invoke marimo via the venv's
-interpreter directly instead: `.venv/Scripts/python.exe -m marimo export html ...`.
+On Windows, invoking marimo via its console-script shim (`uv run marimo ...`) fails to find the
+editable `pivpy` install from inside marimo's kernel subprocess (`No module named 'pivpy'`), even
+though `uv run python -c "import pivpy"` works fine. Module invocation (`uv run python -m marimo
+...`) doesn't have this problem — use that form, not `uv run marimo ...`.
 
 There is no configured lint/format command in this repo (no ruff/black config present) — `mypy.ini` exists
 but is minimal (just enables the numpy typing plugin); there's no CI-enforced mypy run to match.

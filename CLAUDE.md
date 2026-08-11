@@ -16,6 +16,16 @@ Install (uv is the primary workflow; pip also works):
     uv venv
     uv pip install -e '.[full]'   # full pulls in lvpyio, readim, netcdf4, vortexfitting, h5py
 
+Core install no longer requires the `netcdf4` or `vortexfitting` C-extension packages: NetCDF I/O
+goes through `h5netcdf` (built on `h5py`, already a hard dep) by default, and `vortexfitting`
+(only used by `pivpy.interfacing.pivpyTOvf`) is optional and fails with a clear `ImportError` if
+missing. This keeps the base install installable on Python builds where those packages don't yet
+ship wheels (e.g. free-threaded/no-GIL CPython) — verified working end-to-end, `zarr`'s
+`numcodecs` codec re-enables the GIL at import time (it hasn't declared free-threading safety
+yet), so this isn't a true GIL-free run, but nothing crashes and the full test suite passes.
+Install the classic netCDF4 C library engine explicitly with `pip install pivpy[netcdf]` if you
+need it.
+
 Run all tests:
 
     uv run pytest -q

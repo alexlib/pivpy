@@ -9,8 +9,32 @@
   (`PIVReader.name` + `PIVReaderRegistry.get_by_name`), `convert_directory_to_zarr` +
   `read_directory_lazy`, `pivpy_schema_version` attr, schema-conformance/out-of-core/attrs tests.
   `zarr`/`dask` are hard dependencies.
-- **Phase 3**: not started — accessor API cleanup (`__mul__`/`__div__` mutation,
-  `crop`/`vec2scal` reassigning `self._obj`, `save_piv` default flip to zarr).
+- **Phase 3**: partly done —
+  - `__mul__`/`__div__` no longer mutate the caller's Dataset in place (return a new Dataset);
+    `__div__` was also renamed to `__truediv__` since Python 3 never calls `__div__` for `/` (it
+    was dead code).
+  - Scalar-producing methods (`vorticity`, `strain`, `divergence`, `acceleration`,
+    `kinetic_energy`, `tke`, `reynolds_stress`, `rms`) now warn (`UserWarning`, via
+    `compute_funcs.warn_if_overwriting_scalar`) when their default `name="w"` is about to silently
+    overwrite an existing variable — the collision itself is still allowed (non-breaking default),
+    it's just visible now.
+  - `crop()`/`vec2scal()` now emit a `DeprecationWarning` documenting that reassigning
+    `self._obj` internally will go away in a future release — first step of the deprecation cycle,
+    behavior unchanged.
+  - The return-type contract (Dataset vs `(fig, ax)` vs raw tuple for `azprofile`) is now
+    documented in `PIVAccessor`'s class docstring.
+  - Still open: actually removing the `self._obj` reassignment in `crop`/`vec2scal`, and the
+    `save_piv` default-format flip to `"zarr"` (see dependency note below — with `netcdf4` no
+    longer a hard dependency, keeping `"netcdf"` as the default now requires `h5netcdf`, which is
+    installed by default, so this is no longer strictly forced but is still worth revisiting).
+  - Also landed as part of this pass (dependency hygiene, prompted by wanting to validate the
+    package installs cleanly on newer Python builds): `netcdf4` and `vortexfitting` moved from
+    hard dependencies to optional extras (`pivpy[netcdf]`, `pivpy[vortexfitting]`); default NetCDF
+    I/O now goes through `h5netcdf` (built on the already-required `h5py`) instead of the
+    `netcdf4` C-extension package. Verified the package installs and the full test suite passes
+    on a free-threaded (no-GIL) CPython 3.14 build — `zarr`'s `numcodecs` codec re-enables the GIL
+    at import time (undeclared free-threading safety), so it's not a GIL-free run in practice yet,
+    but nothing breaks.
 
 ## Context
 

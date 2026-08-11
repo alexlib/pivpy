@@ -6,13 +6,12 @@ Here is the link to the VortexFitting article:
 https://www.sciencedirect.com/science/article/pii/S2352711020303174?via%3Dihub .
 """
 
-import warnings
 import numpy as np
 
 try:
     import vortexfitting.classes as vf
 except ImportError:
-    warnings.warn("VortexFitting is not installed, use pip install vortexfitting")
+    vf = None
 
 
 def pivpyTOvf(field, ncFilePath):
@@ -36,8 +35,11 @@ def pivpyTOvf(field, ncFilePath):
     vortexfitting.VelocityField
         The VortexFitting velocity field loaded from the written NetCDF file.
     """
-
- 
+    if vf is None:
+        raise ImportError(
+            "pivpyTOvf requires the optional 'vortexfitting' package: "
+            "pip install pivpy[vortexfitting]"
+        )
 
     # VortexFitting expects the physical system of corrdinates, but field - being obtained
     # from an OpenPIV .txt file is in the image system of coordinates. So, we have to invert

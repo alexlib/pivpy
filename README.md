@@ -70,65 +70,42 @@ Quick start (auto-detect file format):
 
 ## Getting Started
 
-Generate an analytical multi-vortex turbulent flow field, compute vorticity, and visualize with smooth filled contours, streamlines, and velocity vectors:
+Load experimental PIV data or generate analytical flow fields, and visualize publication-quality flow fields with **zero effort**:
 
 ```python
 import matplotlib.pyplot as plt
-import numpy as np
-from scipy.ndimage import gaussian_filter
-
 import pivpy.pivpy  # registers the .piv accessor
 from pivpy import synthetic
 
-# 1. Generate an analytical multi-vortex 2D turbulence field (or load experimental PIV data)
+# 1. Generate an analytical multi-vortex 2D turbulence field (or use io.read_piv)
 ds = synthetic.multivortex(n_frames=1, n=128, n_vortices=8, two_d=True, seed=42)
 
-# 2. Compute out-of-plane vorticity: w = dv/dx - du/dy
-ds = ds.piv.vorticity(name="w")
-
-x, y = ds["x"].values, ds["y"].values
-X, Y = np.meshgrid(x, y)
-u, v, w = ds["u"].isel(t=0).values, ds["v"].isel(t=0).values, ds["w"].isel(t=0).values
-
-# Smooth vorticity for soft fluid gradient
-w_smooth = gaussian_filter(w, sigma=2.0)
-
-# 3. Create publication-quality visualization
-fig, ax = plt.subplots(figsize=(8.5, 6.8), dpi=150)
-
-# Smooth filled vorticity contour background
-vmax = np.percentile(np.abs(w_smooth), 99)
-cf = ax.contourf(X, Y, w_smooth, levels=100, cmap="RdBu_r", vmin=-vmax, vmax=vmax, extend="both")
-cbar = fig.colorbar(cf, ax=ax, pad=0.03, shrink=0.92)
-cbar.set_label(r"Vorticity $\omega_z = \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y}\; [\mathrm{s}^{-1}]$", fontsize=11, labelpad=10)
-
-# Streamlines
-strm = ax.streamplot(x, y, u, v, color="white", linewidth=0.75, density=1.1, arrowsize=0.8, arrowstyle="->")
-strm.lines.set_alpha(0.55)
-for patch in ax.patches:
-    patch.set_alpha(0.55)
-
-# Clean, well-proportioned velocity vector quiver overlay
-skip = 4
-q = ax.quiver(
-    X[::skip, ::skip], Y[::skip, ::skip],
-    u[::skip, ::skip], v[::skip, ::skip],
-    color="#0a0a0a", angles="xy", scale_units="xy", scale=0.75,
-    width=0.005, headwidth=4.0, headlength=5.0, headaxislength=4.5,
-    minshaft=1.5, pivot="mid", alpha=0.9,
-)
-ax.quiverkey(q, X=0.82, Y=1.04, U=2.0, label=r"$2.0\,\mathrm{m/s}$", labelpos="E", coordinates="axes", fontproperties={"size": 10, "weight": "bold"})
-
-
-ax.set_title("PIVPy: Synthetic Multi-Vortex Field (Vorticity, Streamlines & Vectors)", fontsize=12, fontweight="bold", pad=14)
-ax.set_xlabel("x [mm]", fontsize=11)
-ax.set_ylabel("y [mm]", fontsize=11)
-ax.set_aspect("equal")
-fig.tight_layout()
+# 2. Zero-effort, publication-quality plot (vorticity background, streamlines & auto-scaled vectors)
+fig, ax = ds.piv.plot()
 plt.show()
 ```
 
 ![PIVPy Multi-Vortex Flow Visualization](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_quiver_vorticity.png)
+
+### Customizing Your Plots
+
+Every visual layer can be easily tailored or toggled:
+
+```python
+# Velocity magnitude background with vectors only (no streamlines)
+fig, ax = ds.piv.plot(
+    background="mag",       # 'vorticity' (default), 'mag', 'ke', 'divergence', or None
+    streamlines=False,      # toggle flow streamlines
+    quiver=True,            # toggle velocity vectors
+    blur=1.5,               # smooth fluid color gradient
+    arrow_scale=0.75,       # custom vector arrow scale
+    title="Velocity Magnitude & Vectors",
+)
+
+# Clean vector quiver only (no background)
+fig, ax = ds.piv.plot(background=None)
+```
+
 
 
 

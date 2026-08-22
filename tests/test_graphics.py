@@ -32,6 +32,29 @@ def test_showscal():
     graphics.showscal(_d, flow_property="curl")
 
 
+def test_plot():
+    """tests high-level plot function and accessor"""
+    # 1. Zero effort call
+    fig, ax = graphics.plot(_d)
+    assert fig is not None
+    assert ax is not None
+
+    # 2. Accessor call
+    fig2, ax2 = _d.piv.plot(background="mag", streamlines=False)
+    assert fig2 is not None
+    assert ax2 is not None
+
+    # 3. Vector-only call (no background)
+    fig3, ax3 = _d.piv.plot(background=None, title="Custom Title")
+    assert fig3 is not None
+    assert ax3.get_title() == "Custom Title"
+
+    # 4. Scalar dataset call
+    d_scalar = _d.piv.vorticity()
+    fig4, ax4 = graphics.plot(d_scalar[["w"]])
+    assert fig4 is not None
+
+
 def test_quiver():
     """ tests quiver
     """

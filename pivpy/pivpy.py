@@ -17,6 +17,7 @@ import xarray as xr
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 
+from pivpy.graphics import plot as gplot
 from pivpy.graphics import quiver as gquiver
 from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
@@ -2443,6 +2444,24 @@ class PIVAccessor(object):
         if self._delta_t is None:
             self._delta_t = self._obj.attrs["delta_t"]
         return self._delta_t
+
+    def plot(self, **kwargs):
+        """High-level, publication-quality plotting method.
+        
+        Renders a publication-quality flow field visualization with zero effort:
+        - Smooth background contour (vorticity by default, or magnitude, KE, divergence, etc.)
+        - Flow streamlines
+        - Clean, auto-scaled velocity vector quiver arrows
+        - LaTeX math labels, colorbar, equal aspect ratio, and quiver key.
+
+        Examples
+        --------
+        >>> ds = synthetic.multivortex()
+        >>> ds.piv.plot()
+        >>> ds.piv.plot(background='mag', streamlines=False)
+        >>> ds.piv.plot(background=None)
+        """
+        return gplot(self._obj, **kwargs)
 
     def quiver(self, **kwargs):
         """graphics.quiver() as a flow_property"""

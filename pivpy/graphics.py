@@ -21,12 +21,346 @@ from typing import TYPE_CHECKING
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from scipy.ndimage import gaussian_filter
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from matplotlib.quiver import Quiver
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+
+
+def plot(
+    data: xr.Dataset,
+    *,
+    background: str | bool | None = "vorticity",
+    quiver: bool = True,
+    streamlines: bool = True,
+    blur: float = 1.5,
+    cmap: str | None = None,
+    clim: tuple[float, float] | None = None,
+    levels: int = 80,
+    skip: int | None = None,
+    arrow_scale: float | None = None,
+    arrow_width: float = 0.005,
+    arrow_color: str = "#0a0a0a",
+    arrow_alpha: float = 0.9,
+    streamline_density: float = 1.1,
+    streamline_color: str | None = None,
+    streamline_alpha: float = 0.55,
+    streamline_linewidth: float = 0.75,
+    streamline_arrowsize: float = 0.8,
+    quiver_key: bool | str | float = True,
+    colorbar: bool = True,
+    cbar_label: str | None = None,
+    title: str | None = None,
+    ax: Axes | None = None,
+    aspect: str | float = "equal",
+    t_idx: int = 0,
+    **kwargs,
+) -> tuple[Figure, Axes]:
+    """High-level, publication-quality plotting function for PIV datasets.
+
+    Zero-effort out-of-the-box defaults:
+    - Automatically calculates and renders smooth vorticity background with perceptual colormap.
+    - Adds subtle streamlines tracing flow trajectories.
+    - Overlays clean, auto-scaled, perfectly proportioned velocity vector arrows.
+    - Adds colorbar, coordinate labels, and reference arrow key.
+
+    All visual elements can be customized, overridden, or toggled on/off.
+
+    Parameters
+    ----------
+    data : xr.Dataset
+        PIV Dataset containing spatial coords ('x', 'y') and variables ('u', 'v') or scalars.
+    background : str, bool, or None, default "vorticity"
+        Scalar background to display behind vectors.
+        - "vorticity" / "curl" / "w": vorticity field with RdBu_r diverging colormap.
+        - "mag" / "speed": velocity magnitude ||u|| with viridis colormap.
+        - "ke": kinetic energy with plasma colormap.
+        - "divergence" / "div": 2D divergence field with RdBu_r.
+        - Variable name in data (e.g. "chc", "tke"): plots that variable.
+        - None / False / 'off': no scalar background (quiver/streamlines only).
+    quiver : bool, default True
+        Whether to draw velocity vector arrows.
+    streamlines : bool, default True
+        Whether to draw flow streamlines.
+    blur : float, default 1.5
+        Gaussian filter sigma applied to background scalar field for smooth fluid appearance.
+        Set to 0 to disable smoothing.
+    cmap : str or Colormap, optional
+        Matplotlib colormap. If None, chosen automatically based on background type.
+    clim : tuple[float, float], optional
+        Color limits (vmin, vmax). If None, computed robustly via 99th percentile.
+    levels : int, default 80
+        Number of contour levels for background contourf.
+    skip : int, optional
+        Vector arrow subsampling step (e.g. skip=4 plots every 4th arrow).
+        If None, auto-calculated based on grid dimensions (~25-35 arrows per axis).
+    arrow_scale : float, optional
+        Scaling factor for vector arrows in matplotlib quiver.
+        If None, auto-calculated based on grid spacing and median velocity magnitude.
+    arrow_width : float, default 0.005
+        Shaft width factor for vector arrows.
+    arrow_color : str, default "#0a0a0a"
+        Color for vector arrows.
+    arrow_alpha : float, default 0.9
+        Transparency for vector arrows.
+    streamline_density : float, default 1.1
+        Density of streamlines.
+    streamline_color : str, optional
+        Color of streamlines (defaults to "white" when background is active, "#333333" otherwise).
+    streamline_alpha : float, default 0.55
+        Transparency of streamlines.
+    streamline_linewidth : float, default 0.75
+        Line width of streamlines.
+    streamline_arrowsize : float, default 0.8
+        Arrow size of streamlines.
+    quiver_key : bool, str, or float, default True
+        Whether to display a reference quiver key in the top right.
+    colorbar : bool, default True
+        Whether to display a colorbar when a background scalar is plotted.
+    cbar_label : str, optional
+        Custom colorbar label. If None, a LaTeX math label is generated automatically.
+    title : str, optional
+        Custom plot title.
+    ax : matplotlib.axes.Axes, optional
+        Existing axes to draw on. If None, creates a new figure and axes.
+    aspect : str or float, default "equal"
+        Aspect ratio of the axes.
+    t_idx : int, default 0
+        Time index to plot if dataset has a time dimension 't'.
+    **kwargs : dict
+        Additional keyword arguments passed to matplotlib contourf/quiver.
+
+    Returns
+    -------
+    tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Figure and axes objects containing the plot.
+    """
+    data_slice = data.isel(t=t_idx) if ("t" in data.dims and data.sizes.get("t", 1) > 1) else (data.isel(t=0) if "t" in data.dims else data)
+
+    x_arr = np.asarray(data_slice["x"].values, dtype=float)
+    y_arr = np.asarray(data_slice["y"].values, dtype=float)
+    X, Y = np.meshgrid(x_arr, y_arr)
+    xUnits = str(getattr(data_slice.get("x", None), "attrs", {}).get("units", "mm") or "mm")
+    yUnits = str(getattr(data_slice.get("y", None), "attrs", {}).get("units", "mm") or "mm")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8.5, 6.8))
+    else:
+        fig = ax.figure
+
+    is_vector = "u" in data_slice and "v" in data_slice
+
+    if is_vector:
+        u_arr = np.asarray(data_slice["u"].values, dtype=float)
+        v_arr = np.asarray(data_slice["v"].values, dtype=float)
+
+        bg_drawn = False
+        # Background Layer
+        if background is not None and background is not False and str(background).lower() not in ("off", "none", ""):
+            bg_str = str(background).lower() if isinstance(background, str) else "vorticity"
+            bg_val = None
+            default_cmap = "RdBu_r"
+            default_cbar_label = ""
+            symmetric_clim = True
+
+            if bg_str in ("vorticity", "vort", "curl", "w"):
+                if "w" in data_slice:
+                    bg_val = np.asarray(data_slice["w"].values, dtype=float)
+                elif "vorticity" in data_slice:
+                    bg_val = np.asarray(data_slice["vorticity"].values, dtype=float)
+                else:
+                    import pivpy.pivpy
+                    ds_temp = data_slice.piv.vorticity(name="__bg_w")
+                    bg_val = np.asarray(ds_temp["__bg_w"].values, dtype=float)
+                default_cmap = "RdBu_r"
+                default_cbar_label = r"Vorticity $\omega_z = \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y}\; [\mathrm{s}^{-1}]$"
+                symmetric_clim = True
+
+            elif bg_str in ("mag", "magnitude", "speed"):
+                bg_val = np.sqrt(u_arr**2 + v_arr**2)
+                default_cmap = "viridis"
+                default_cbar_label = r"Velocity Magnitude $||\mathbf{u}||\; [\mathrm{m/s}]$"
+                symmetric_clim = False
+
+            elif bg_str in ("ke", "ken", "kinetic_energy"):
+                bg_val = 0.5 * (u_arr**2 + v_arr**2)
+                default_cmap = "plasma"
+                default_cbar_label = r"Kinetic Energy $k = \frac{1}{2}(u^2 + v^2)$"
+                symmetric_clim = False
+
+            elif bg_str in ("divergence", "div"):
+                import pivpy.pivpy
+                ds_temp = data_slice.piv.divergence(name="__bg_div")
+                bg_val = np.asarray(ds_temp["__bg_div"].values, dtype=float)
+                default_cmap = "RdBu_r"
+                default_cbar_label = r"Divergence $\nabla \cdot \mathbf{u}\; [\mathrm{s}^{-1}]$"
+                symmetric_clim = True
+
+            elif str(background) in data_slice:
+                bg_val = np.asarray(data_slice[str(background)].values, dtype=float)
+                default_cmap = "viridis"
+                default_cbar_label = str(background)
+                symmetric_clim = False
+
+            if bg_val is not None:
+                # Apply Gaussian filter smoothing if requested
+                if blur and float(blur) > 0.0:
+                    if np.any(np.isnan(bg_val)):
+                        bg_val_clean = np.nan_to_num(bg_val, nan=float(np.nanmedian(bg_val)))
+                        bg_val = gaussian_filter(bg_val_clean, sigma=float(blur))
+                    else:
+                        bg_val = gaussian_filter(bg_val, sigma=float(blur))
+
+                use_cmap = cmap if cmap is not None else default_cmap
+                if clim is not None:
+                    vmin, vmax = float(clim[0]), float(clim[1])
+                elif symmetric_clim:
+                    finite_vals = bg_val[np.isfinite(bg_val)]
+                    val_max = float(np.nanpercentile(np.abs(finite_vals), 99)) if finite_vals.size else 1.0
+                    val_max = max(val_max, 1e-9)
+                    vmin, vmax = -val_max, val_max
+                else:
+                    finite_vals = bg_val[np.isfinite(bg_val)]
+                    vmin = float(np.nanmin(finite_vals)) if finite_vals.size else 0.0
+                    vmax = float(np.nanpercentile(finite_vals, 99)) if finite_vals.size else 1.0
+                    if vmin == vmax:
+                        vmax = vmin + 1.0
+
+                cf = ax.contourf(X, Y, bg_val, levels=int(levels), cmap=use_cmap, vmin=vmin, vmax=vmax, extend="both")
+                if colorbar:
+                    cbar = fig.colorbar(cf, ax=ax, pad=0.03, shrink=0.92)
+                    cbar_lbl = cbar_label if cbar_label is not None else default_cbar_label
+                    if cbar_lbl:
+                        cbar.set_label(cbar_lbl, fontsize=11, labelpad=10)
+                    cbar.ax.tick_params(labelsize=9)
+                bg_drawn = True
+
+        # Streamlines Layer
+        if streamlines:
+            strm_color = streamline_color if streamline_color is not None else ("white" if bg_drawn else "#333333")
+            try:
+                x_s = x_arr.copy()
+                y_s = y_arr.copy()
+                u_s = u_arr.copy()
+                v_s = v_arr.copy()
+                if y_s.size >= 2 and y_s[0] > y_s[-1]:
+                    y_s = y_s[::-1]
+                    u_s = u_s[::-1, :]
+                    v_s = v_s[::-1, :]
+                if x_s.size >= 2 and x_s[0] > x_s[-1]:
+                    x_s = x_s[::-1]
+                    u_s = u_s[:, ::-1]
+                    v_s = v_s[:, ::-1]
+
+                strm = ax.streamplot(
+                    x_s,
+                    y_s,
+                    u_s,
+                    v_s,
+                    color=strm_color,
+                    linewidth=float(streamline_linewidth),
+                    density=float(streamline_density),
+                    arrowsize=float(streamline_arrowsize),
+                    arrowstyle="->",
+                )
+                strm.lines.set_alpha(float(streamline_alpha))
+                for patch in ax.patches:
+                    patch.set_alpha(float(streamline_alpha))
+            except Exception:
+                pass
+
+        # Quiver Vector Layer
+        if quiver:
+            ny, nx = u_arr.shape
+            if skip is None:
+                step = max(1, int(round(max(nx, ny) / 32)))
+            else:
+                step = max(1, int(skip))
+
+            dx = abs(float(x_arr[1] - x_arr[0])) if len(x_arr) > 1 else 1.0
+            speed_arr = np.sqrt(u_arr**2 + v_arr**2)
+            finite_speed = speed_arr[np.isfinite(speed_arr)]
+            med_speed = float(np.nanmedian(finite_speed)) if finite_speed.size else 1.0
+            if med_speed == 0.0:
+                med_speed = float(np.nanmax(finite_speed)) if finite_speed.size else 1.0
+            if med_speed == 0.0:
+                med_speed = 1.0
+
+            if arrow_scale is None:
+                target_len = 1.8 * step * dx
+                auto_scale = (med_speed / target_len) if target_len > 0 else 1.0
+            else:
+                auto_scale = float(arrow_scale)
+
+            Q = ax.quiver(
+                X[::step, ::step],
+                Y[::step, ::step],
+                u_arr[::step, ::step],
+                v_arr[::step, ::step],
+                color=arrow_color,
+                angles="xy",
+                scale_units="xy",
+                scale=auto_scale,
+                width=float(arrow_width),
+                headwidth=4.0,
+                headlength=5.0,
+                headaxislength=4.5,
+                minshaft=1.5,
+                pivot="mid",
+                alpha=float(arrow_alpha),
+            )
+
+            if quiver_key:
+                key_val = round(med_speed, 1) if med_speed >= 1.0 else round(med_speed, 2)
+                if key_val == 0.0:
+                    key_val = 1.0
+                if isinstance(quiver_key, (int, float)):
+                    key_val = float(quiver_key)
+                key_label = f"${key_val}\\,\\mathrm{{m/s}}$" if quiver_key is True else str(quiver_key)
+                ax.quiverkey(
+                    Q,
+                    X=0.82,
+                    Y=1.04,
+                    U=key_val,
+                    label=key_label,
+                    labelpos="E",
+                    coordinates="axes",
+                    fontproperties={"size": 10, "weight": "bold"},
+                )
+
+    else:
+        # Scalar Dataset
+        scalar_name = str(background) if (background and str(background) in data_slice) else ("w" if "w" in data_slice else list(data_slice.data_vars.keys())[0])
+        sc_val = np.asarray(data_slice[scalar_name].values, dtype=float)
+        if blur and float(blur) > 0.0:
+            sc_val = gaussian_filter(sc_val, sigma=float(blur))
+        use_cmap = cmap if cmap is not None else ("RdBu_r" if scalar_name in ("w", "vorticity", "curl", "div", "divergence") else "viridis")
+        finite_vals = sc_val[np.isfinite(sc_val)]
+        if clim is not None:
+            vmin, vmax = float(clim[0]), float(clim[1])
+        elif use_cmap == "RdBu_r":
+            val_max = float(np.nanpercentile(np.abs(finite_vals), 99)) if finite_vals.size else 1.0
+            val_max = max(val_max, 1e-9)
+            vmin, vmax = -val_max, val_max
+        else:
+            vmin = float(np.nanmin(finite_vals)) if finite_vals.size else 0.0
+            vmax = float(np.nanpercentile(finite_vals, 99)) if finite_vals.size else 1.0
+
+        cf = ax.contourf(X, Y, sc_val, levels=int(levels), cmap=use_cmap, vmin=vmin, vmax=vmax, extend="both")
+        if colorbar:
+            cbar = fig.colorbar(cf, ax=ax, pad=0.03, shrink=0.92)
+            cbar.set_label(cbar_label if cbar_label is not None else scalar_name, fontsize=11, labelpad=10)
+
+    ax.set_aspect(aspect)
+    ax.set_xlabel(f"x [{xUnits}]", fontsize=11)
+    ax.set_ylabel(f"y [{yUnits}]", fontsize=11)
+    if title is not None:
+        ax.set_title(title, fontsize=12, fontweight="bold", pad=14)
+
+    return fig, ax
 
 
 def quiver(

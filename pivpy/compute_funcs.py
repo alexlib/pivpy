@@ -3742,4 +3742,473 @@ def Γ2_moving_window_function(
 
     valid = np.isfinite(values)
     val = float(values[valid].mean()) if np.any(valid) else 0.0
-    return xr.DataArray(val).fillna(0.0)
+    return xr.DataArray(val).fillna(0.0)
+
+
+# ==============================================================================
+# Work Package 3: Gradient Calculus, Spatial Filtering & Masking
+# ==============================================================================
+
+def _normalized_median_test_2d(
+    u: np.ndarray,
+    v: np.ndarray,
+    radius: int = 1,
+    threshold: float = 2.0,
+    epsilon: float = 0.1,
+    valid_mask: np.ndarray | None = None,
+) -> np.ndarray:
+    """Vectorized Westerweel & Scarano (2005) Normalized Median Test for 2D fields.
+
+    Parameters
+    ----------
+    u, v : np.ndarray
+        2D velocity component arrays of shape (ny, nx).
+    radius : int
+        Neighborhood radius in grid cells (default 1 for 3x3 window).
+    threshold : float
+        Outlier detection threshold for normalized residual (default 2.0).
+    epsilon : float
+        Minimum noise level in velocity units (default 0.1).
+    valid_mask : np.ndarray, optional
+        Boolean mask of existing valid vectors (True=valid, False=masked/invalid).
+
+    Returns
+    -------
+    np.ndarray
+        Boolean outlier mask of shape (ny, nx) where True indicates detected outlier.
+    """
+    from numpy.lib.stride_tricks import sliding_window_view
+
+    ny, nx = u.shape
+    r = int(radius)
+    if r < 1:
+        raise ValueError("radius must be at least 1")
+
+    u_work = u.astype(float, copy=True)
+    v_work = v.astype(float, copy=True)
+
+    if valid_mask is not None:
+        u_work[~valid_mask] = np.nan
+        v_work[~valid_mask] = np.nan
+
+    u_pad = np.pad(u_work, r, mode="edge")
+    v_pad = np.pad(v_work, r, mode="edge")
+
+    win_u = sliding_window_view(u_pad, (2 * r + 1, 2 * r + 1))
+    win_v = sliding_window_view(v_pad, (2 * r + 1, 2 * r + 1))
+
+    k_size = (2 * r + 1) ** 2
+    win_u_flat = win_u.reshape(ny, nx, k_size).copy()
+    win_v_flat = win_v.reshape(ny, nx, k_size).copy()
+
+    center_idx = (2 * r + 1) * r + r
+    mask_neigh = np.ones(k_size, dtype=bool)
+    mask_neigh[center_idx] = False
+
+    neigh_u = win_u_flat[:, :, mask_neigh]
+    neigh_v = win_v_flat[:, :, mask_neigh]
+
+    with np.errstate(all="ignore"):
+        u_med = np.nanmedian(neigh_u, axis=-1)
+        v_med = np.nanmedian(neigh_v, axis=-1)
+
+        res_neigh_u = np.abs(neigh_u - u_med[:, :, None])
+        res_neigh_v = np.abs(neigh_v - v_med[:, :, None])
+
+        r_u_med = np.nanmedian(res_neigh_u, axis=-1)
+        r_v_med = np.nanmedian(res_neigh_v, axis=-1)
+
+        r_u_star = np.abs(u_work - u_med) / (r_u_med + epsilon)
+        r_v_star = np.abs(v_work - v_med) / (r_v_med + epsilon)
+
+        r_star = np.sqrt(r_u_star**2 + r_v_star**2)
+        outlier_mask = np.nan_to_num(r_star, nan=np.inf) > threshold
+
+    return outlier_mask
+
+
+def normalized_median_test(
+    ds: xr.Dataset,
+    radius: int = 1,
+    threshold: float = 2.0,
+    epsilon: float = 0.1,
+    name_mask: str | None = None,
+) -> xr.Dataset:
+    """Applies the Westerweel & Scarano (2005) Normalized Median Test to detect outliers.
+
+    Flags detected spurious vectors by setting `chc = 0` (or updating `name_mask`).
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Canonical velocity field containing 'u', 'v', 'x', 'y' (and optional 't', 'chc').
+    radius : int
+        Neighborhood radius in grid units (default 1 for 3x3 neighborhood).
+    threshold : float
+        Outlier threshold (default 2.0).
+    epsilon : float
+        Noise floor parameter in velocity units (default 0.1).
+    name_mask : str, optional
+        Optional variable name to store boolean outlier mask in the dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Updated dataset with flagged vectors in 'chc' (and optional mask variable).
+    """
+    out = ds.copy(deep=True)
+    has_t = "t" in out.dims
+
+    def _process_2d(u_2d: np.ndarray, v_2d: np.ndarray, chc_2d: np.ndarray | None) -> tuple[np.ndarray, np.ndarray]:
+        valid_mask = (chc_2d > 0) if chc_2d is not None else np.isfinite(u_2d) & np.isfinite(v_2d)
+        is_outlier = _normalized_median_test_2d(
+            u_2d, v_2d, radius=radius, threshold=threshold, epsilon=epsilon, valid_mask=valid_mask
+        )
+        new_chc = (chc_2d.copy() if chc_2d is not None else np.ones_like(u_2d, dtype=float))
+        new_chc[is_outlier] = 0.0
+        return is_outlier, new_chc
+
+    if has_t:
+        n_frames = out.sizes["t"]
+        outlier_arr = np.zeros(out["u"].shape, dtype=bool)
+        chc_arr = np.ones(out["u"].shape, dtype=float)
+        has_chc = "chc" in out.data_vars
+        for i in range(n_frames):
+            u_i = out["u"].isel(t=i).to_numpy()
+            v_i = out["v"].isel(t=i).to_numpy()
+            chc_i = out["chc"].isel(t=i).to_numpy() if has_chc else None
+            outl_i, chc_i_new = _process_2d(u_i, v_i, chc_i)
+            outlier_arr[:, :, i] = outl_i
+            chc_arr[:, :, i] = chc_i_new
+        dims = ("y", "x", "t")
+    else:
+        u_2d = out["u"].to_numpy()
+        v_2d = out["v"].to_numpy()
+        chc_2d = out["chc"].to_numpy() if "chc" in out.data_vars else None
+        outlier_arr, chc_arr = _process_2d(u_2d, v_2d, chc_2d)
+        dims = ("y", "x")
+
+    out["chc"] = xr.DataArray(chc_arr, dims=dims, coords=out.coords)
+    out["chc"].attrs["standard_name"] = "confidence_flag"
+    if name_mask:
+        out[name_mask] = xr.DataArray(outlier_arr, dims=dims, coords=out.coords)
+        out[name_mask].attrs["standard_name"] = "outlier_mask"
+    return out
+
+
+def clean(
+    ds: xr.Dataset,
+    method: str = "normalized_median",
+    threshold: float = 2.0,
+    epsilon: float = 0.1,
+    inpaint_method: int | str = 0,
+    radius: int = 1,
+) -> xr.Dataset:
+    """Detects spurious velocity outliers and inpaints missing/flagged vectors.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset.
+    method : str
+        Outlier detection method: 'normalized_median' (default) or 'mask' (existing chc <= 0 or NaNs).
+    threshold : float
+        Outlier threshold for normalized median test (default 2.0).
+    epsilon : float
+        Noise floor parameter for normalized median test (default 0.1).
+    inpaint_method : int or str
+        Inpainting scheme passed to `inpaint_missing_2d` (0=harmonic/Laplacian, 1=nearest, 2=linear).
+    radius : int
+        Stencil radius for median test (default 1).
+
+    Returns
+    -------
+    xr.Dataset
+        Cleaned dataset with outliers replaced by smooth interpolation.
+    """
+    m_str = str(method).lower()
+    if m_str in ("normalized_median", "nmt", "median"):
+        flagged_ds = normalized_median_test(ds, radius=radius, threshold=threshold, epsilon=epsilon)
+    else:
+        flagged_ds = ds.copy(deep=True)
+
+    method_int = 0
+    if isinstance(inpaint_method, str):
+        inpaint_s = inpaint_method.lower()
+        if inpaint_s.startswith("near"):
+            method_int = 1
+        elif inpaint_s.startswith("lin"):
+            method_int = 2
+        else:
+            method_int = 0
+    else:
+        method_int = int(inpaint_method)
+
+    out = flagged_ds.copy(deep=True)
+    has_t = "t" in out.dims
+
+    def _inpaint_slice(u_2d: np.ndarray, v_2d: np.ndarray, chc_2d: np.ndarray | None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        u_corrupt = u_2d.astype(float, copy=True)
+        v_corrupt = v_2d.astype(float, copy=True)
+        if chc_2d is not None:
+            bad = (chc_2d <= 0) | ~np.isfinite(u_corrupt) | ~np.isfinite(v_corrupt)
+        else:
+            bad = ~np.isfinite(u_corrupt) | ~np.isfinite(v_corrupt)
+
+        u_corrupt[bad] = np.nan
+        v_corrupt[bad] = np.nan
+
+        u_clean = inpaint_missing_2d(u_corrupt, method=method_int, missing="nan")
+        v_clean = inpaint_missing_2d(v_corrupt, method=method_int, missing="nan")
+
+        chc_clean = np.ones_like(u_2d, dtype=float)
+        return u_clean, v_clean, chc_clean
+
+    if has_t:
+        n_frames = out.sizes["t"]
+        for i in range(n_frames):
+            u_i = out["u"].isel(t=i).to_numpy()
+            v_i = out["v"].isel(t=i).to_numpy()
+            chc_i = out["chc"].isel(t=i).to_numpy() if "chc" in out.data_vars else None
+            u_c, v_c, chc_c = _inpaint_slice(u_i, v_i, chc_i)
+            out["u"].values[:, :, i] = u_c
+            out["v"].values[:, :, i] = v_c
+            if "chc" in out.data_vars:
+                out["chc"].values[:, :, i] = chc_c
+    else:
+        u_2d = out["u"].to_numpy()
+        v_2d = out["v"].to_numpy()
+        chc_2d = out["chc"].to_numpy() if "chc" in out.data_vars else None
+        u_c, v_c, chc_c = _inpaint_slice(u_2d, v_2d, chc_2d)
+        out["u"].values = u_c
+        out["v"].values = v_c
+        if "chc" in out.data_vars:
+            out["chc"].values = chc_c
+
+    return out
+
+
+def smooth(
+    ds: xr.Dataset,
+    sigma: float | Sequence[float] = 1.0,
+    method: str = "gaussian",
+    **kwargs,
+) -> xr.Dataset:
+    """Applies spatial smoothing to velocity vector fields.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset.
+    sigma : float or sequence of floats
+        Filter kernel size (sigma for Gaussian, window size for median/boxcar, cutoff size for Butterworth).
+    method : {'gaussian', 'median', 'boxcar', 'butterworth'}
+        Smoothing algorithm (default 'gaussian').
+    **kwargs : dict
+        Additional arguments passed to filtering backend (e.g., order=2 for Butterworth).
+
+    Returns
+    -------
+    xr.Dataset
+        Smoothed dataset.
+    """
+    try:
+        from scipy.ndimage import gaussian_filter, median_filter, uniform_filter
+    except ImportError as exc:
+        raise ImportError("smooth requires scipy.ndimage") from exc
+
+    m = str(method).lower()
+    out = ds.copy(deep=True)
+    has_t = "t" in out.dims
+
+    def _filter_2d(arr2: np.ndarray) -> np.ndarray:
+        if m.startswith("gauss"):
+            fs = float(sigma) if not isinstance(sigma, (list, tuple)) else float(sigma[0])
+            return gaussian_filter(arr2, sigma=fs, **kwargs)
+        elif m.startswith("med"):
+            size = int(np.round(float(sigma))) if not isinstance(sigma, (list, tuple)) else int(sigma[0])
+            if size % 2 == 0:
+                size += 1
+            return median_filter(arr2, size=max(1, size))
+        elif m.startswith("box") or m.startswith("uni") or m.startswith("flat"):
+            size = int(np.round(float(sigma))) if not isinstance(sigma, (list, tuple)) else int(sigma[0])
+            return uniform_filter(arr2, size=max(1, size))
+        elif m.startswith("butter"):
+            fs = float(sigma) if not isinstance(sigma, (list, tuple)) else float(sigma[0])
+            order = float(kwargs.get("order", 2.0))
+            ny, nx = arr2.shape
+            pad_y = 1 if ny % 2 != 0 else 0
+            pad_x = 1 if nx % 2 != 0 else 0
+            if pad_y or pad_x:
+                arr_pad = np.pad(arr2, ((0, pad_y), (0, pad_x)), mode="edge")
+                res = bwfilter2d(arr_pad, filtsize=fs, order=order)
+                return res[:ny, :nx]
+            return bwfilter2d(arr2, filtsize=fs, order=order)
+        else:
+            raise ValueError(f"Unknown smoothing method: {method!r}")
+
+    for var in ["u", "v"]:
+        if var not in out.data_vars:
+            continue
+        if has_t:
+            n_frames = out.sizes["t"]
+            for i in range(n_frames):
+                slice_arr = out[var].isel(t=i).to_numpy()
+                out[var].values[:, :, i] = _filter_2d(slice_arr)
+        else:
+            slice_arr = out[var].to_numpy()
+            out[var].values = _filter_2d(slice_arr)
+
+    return out
+
+
+def gradient_tensor(ds: xr.Dataset, return_components: bool = False) -> xr.Dataset:
+    """Calculates velocity gradient tensor J, strain-rate tensor S, and principal strains.
+
+    Computes:
+    - Normal strain rates: s_xx = du/dx, s_yy = dv/dy
+    - Shear strain rate: s_xy = 0.5 * (du/dy + dv/dx)
+    - Principal strain rates: lambda_1, lambda_2
+    - Maximum shear strain rate: max_shear = 0.5 * (lambda_1 - lambda_2)
+    - Principal strain angle: strain_angle = 0.5 * atan2(2*s_xy, s_xx - s_yy)
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset.
+    return_components : bool
+        If True, returns a new dataset containing only tensor components.
+        If False (default), augments `ds` with tensor quantities.
+
+    Returns
+    -------
+    xr.Dataset
+    """
+    dx = float(ds["x"][1] - ds["x"][0]) if len(ds["x"]) > 1 else 1.0
+    dy = float(ds["y"][1] - ds["y"][0]) if len(ds["y"]) > 1 else 1.0
+
+    has_t = "t" in ds.dims
+
+    def _calc_2d(u_2d: np.ndarray, v_2d: np.ndarray) -> dict[str, np.ndarray]:
+        dudx = np.gradient(u_2d, dx, axis=1)
+        dudy = np.gradient(u_2d, dy, axis=0)
+        dvdx = np.gradient(v_2d, dx, axis=1)
+        dvdy = np.gradient(v_2d, dy, axis=0)
+
+        s_xx = dudx
+        s_yy = dvdy
+        s_xy = 0.5 * (dudy + dvdx)
+
+        diff = 0.5 * (s_xx - s_yy)
+        rad = np.sqrt(diff**2 + s_xy**2)
+        mean_s = 0.5 * (s_xx + s_yy)
+
+        lambda_1 = mean_s + rad
+        lambda_2 = mean_s - rad
+        max_shear = rad
+        strain_angle = 0.5 * np.arctan2(2.0 * s_xy, s_xx - s_yy)
+
+        return {
+            "s_xx": s_xx,
+            "s_yy": s_yy,
+            "s_xy": s_xy,
+            "lambda_1": lambda_1,
+            "lambda_2": lambda_2,
+            "max_shear": max_shear,
+            "strain_angle": strain_angle,
+        }
+
+    dims = ("y", "x", "t") if has_t else ("y", "x")
+
+    if has_t:
+        n_frames = ds.sizes["t"]
+        ny, nx = ds.sizes["y"], ds.sizes["x"]
+        comp_dict = {
+            k: np.zeros((ny, nx, n_frames), dtype=float)
+            for k in ["s_xx", "s_yy", "s_xy", "lambda_1", "lambda_2", "max_shear", "strain_angle"]
+        }
+        for i in range(n_frames):
+            u_i = ds["u"].isel(t=i).to_numpy()
+            v_i = ds["v"].isel(t=i).to_numpy()
+            res_i = _calc_2d(u_i, v_i)
+            for k, val in res_i.items():
+                comp_dict[k][:, :, i] = val
+    else:
+        u_2d = ds["u"].to_numpy()
+        v_2d = ds["v"].to_numpy()
+        comp_dict = _calc_2d(u_2d, v_2d)
+
+    out = xr.Dataset(coords=ds.coords) if return_components else ds.copy(deep=False)
+    for k, val in comp_dict.items():
+        out[k] = xr.DataArray(val, dims=dims, coords=ds.coords)
+        out[k].attrs["units"] = "1/delta_t" if k != "strain_angle" else "rad"
+        out[k].attrs["standard_name"] = k
+
+    return out
+
+
+def material_acceleration(
+    ds: xr.Dataset,
+    name: str = "accel",
+    unsteady: bool = True,
+    return_vector: bool = False,
+) -> xr.Dataset:
+    """Calculates material acceleration D(u)/Dt = d(u)/dt + (u . grad)u.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset.
+    name : str
+        Output variable name for acceleration magnitude (default 'accel').
+    unsteady : bool
+        If True and time dimension 't' is present with multiple frames, includes local acceleration d(u)/dt.
+    return_vector : bool
+        If True, returns vector components 'ax' and 'ay' instead of magnitude.
+
+    Returns
+    -------
+    xr.Dataset
+    """
+    dx = float(ds["x"][1] - ds["x"][0]) if len(ds["x"]) > 1 else 1.0
+    dy = float(ds["y"][1] - ds["y"][0]) if len(ds["y"]) > 1 else 1.0
+
+    u = ds["u"]
+    v = ds["v"]
+
+    # Spatial convective derivatives
+    du_dx = u.differentiate("x")
+    du_dy = u.differentiate("y")
+    dv_dx = v.differentiate("x")
+    dv_dy = v.differentiate("y")
+
+    ax_conv = u * du_dx + v * du_dy
+    ay_conv = u * dv_dx + v * dv_dy
+
+    if unsteady and "t" in ds.dims and ds.sizes["t"] > 1:
+        dt = float(ds["t"][1] - ds["t"][0]) if len(ds["t"]) > 1 else 1.0
+        ax_local = u.differentiate("t")
+        ay_local = v.differentiate("t")
+        ax = ax_local + ax_conv
+        ay = ay_local + ay_conv
+    else:
+        ax = ax_conv
+        ay = ay_conv
+
+    out = ds.copy(deep=False)
+    if return_vector:
+        out["ax"] = ax
+        out["ay"] = ay
+        out["ax"].attrs["units"] = "1/delta_t^2"
+        out["ay"].attrs["units"] = "1/delta_t^2"
+        out["ax"].attrs["standard_name"] = "material_acceleration_x"
+        out["ay"].attrs["standard_name"] = "material_acceleration_y"
+    else:
+        warn_if_overwriting_scalar(out, name)
+        mag = np.sqrt(ax**2 + ay**2)
+        out[name] = mag
+        out[name].attrs["units"] = "1/delta_t^2"
+        out[name].attrs["standard_name"] = "material_acceleration"
+
+    return out
+

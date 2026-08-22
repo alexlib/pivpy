@@ -37,6 +37,11 @@ from pivpy.compute_funcs import (
     q_criterion as cq_criterion,
     okubo_weiss as cokubo_weiss,
     subsbr as csubsbr,
+    clean as cclean,
+    smooth as csmooth,
+    normalized_median_test as cnormalized_median_test,
+    gradient_tensor as cgradient_tensor,
+    material_acceleration as cmaterial_acceleration,
     bwfilter2d,
     corrf,
     corrm,
@@ -2003,41 +2008,28 @@ class PIVAccessor(object):
 
         return self._obj
 
-    def acceleration(self, name: str = "w"):
-        """Calculates material derivative or acceleration of the
-        data array (single frame)
+    def acceleration(self, name: str = "w", unsteady: bool = True, return_vector: bool = False):
+        """Calculates material derivative or acceleration of the data array.
         
         Args:
             name (str): Name for the output scalar field. Defaults to "w".
-                Use different names to store multiple scalar fields in one dataset.
+            unsteady (bool): If True and time dimension 't' has multiple frames,
+                includes local acceleration d(u)/dt. Defaults to True.
+            return_vector (bool): If True, returns vector components 'ax' and 'ay'. Defaults to False.
 
         Input:
-            xarray with the variables u,v and dimensions x,y
+            xarray with variables u, v and dimensions y, x (and optional t)
 
         Output:
-            xarray with the estimated acceleration as a scalar field data[name]
+            xarray with the estimated acceleration as a scalar field data[name] (or ax, ay)
             
         Example:
-            >>> data.piv.acceleration()  # Creates data["w"] with acceleration
-            >>> data.piv.acceleration(name="accel")  # Creates data["accel"]
-
+            >>> data = data.piv.acceleration()  # Creates data["w"] with acceleration
+            >>> data = data.piv.acceleration(name="accel")  # Creates data["accel"]
         """
-        warn_if_overwriting_scalar(self._obj, name)
-        du_dx = self._obj["u"].differentiate("x")
-        du_dy = self._obj["u"].differentiate("y")
-        dv_dx = self._obj["v"].differentiate("x")
-        dv_dy = self._obj["v"].differentiate("y")
-
-        accel_x = self._obj["u"] * du_dx + self._obj["v"] * du_dy
-        accel_y = self._obj["u"] * dv_dx + self._obj["v"] * dv_dy
-
-        self._obj[name] = xr.DataArray(
-            np.sqrt(accel_x**2 + accel_y**2), dims=["x", "y", "t"]
+        self._obj = cmaterial_acceleration(
+            self._obj, name=name, unsteady=unsteady, return_vector=return_vector
         )
-
-        self._obj[name].attrs["units"] = "1/delta_t"
-        self._obj[name].attrs["standard_name"] = "acceleration"
-
         return self._obj
 
     def kinetic_energy(self, name: str = "w"):
@@ -2241,14 +2233,127 @@ class PIVAccessor(object):
         self._obj = csubsbr(self._obj, r0=r0)
         return self._obj
 
+    def normalized_median_test(
+        self,
+        radius: int = 1,
+        threshold: float = 2.0,
+        epsilon: float = 0.1,
+        name_mask: str | None = None,
+    ):
+        """Applies Westerweel & Scarano (2005) Normalized Median Test to detect outliers.
+        
+        Args:
+            radius (int): Stencil radius in grid units. Defaults to 1.
+            threshold (float): Outlier detection threshold. Defaults to 2.0.
+            epsilon (float): Noise floor in velocity units. Defaults to 0.1.
+            name_mask (str, optional): Optional variable name to store outlier boolean mask.
+            
+        Returns:
+            xarray.Dataset: Dataset with outliers flagged in 'chc' (and optional mask).
+        """
+        return cnormalized_median_test(
+            self._obj, radius=radius, threshold=threshold, epsilon=epsilon, name_mask=name_mask
+        )
+
+    def clean(
+        self,
+        method: str = "normalized_median",
+        threshold: float = 2.0,
+        epsilon: float = 0.1,
+        inpaint_method: int | str = 0,
+        radius: int = 1,
+    ):
+        """Detects velocity outliers and inpaints missing/flagged vectors.
+        
+        Args:
+            method (str): Outlier detection method ('normalized_median' or 'mask').
+            threshold (float): Outlier threshold for normalized median test. Defaults to 2.0.
+            epsilon (float): Noise floor parameter. Defaults to 0.1.
+            inpaint_method (int or str): Inpainting scheme (0=harmonic, 1=nearest, 2=linear).
+            radius (int): Neighborhood radius for median test. Defaults to 1.
+            
+        Returns:
+            xarray.Dataset: Cleaned dataset.
+        """
+        return cclean(
+            self._obj,
+            method=method,
+            threshold=threshold,
+            epsilon=epsilon,
+            inpaint_method=inpaint_method,
+            radius=radius,
+        )
+
+    def filter_outliers(self, threshold: float = 2.0, replace: bool = True, **kwargs):
+        """Convenience method to detect and optionally replace spurious vector outliers.
+        
+        Args:
+            threshold (float): Outlier threshold for normalized median test. Defaults to 2.0.
+            replace (bool): If True, replaces outliers via harmonic inpainting. If False, flags in 'chc'.
+            **kwargs: Additional parameters passed to `clean` or `normalized_median_test`.
+            
+        Returns:
+            xarray.Dataset: Filtered/cleaned dataset.
+        """
+        if replace:
+            return self.clean(threshold=threshold, **kwargs)
+        return self.normalized_median_test(threshold=threshold, **kwargs)
+
+    def smooth(
+        self,
+        sigma: float | Sequence[float] = 1.0,
+        method: str = "gaussian",
+        **kwargs,
+    ):
+        """Applies spatial smoothing to velocity vector fields.
+        
+        Args:
+            sigma (float or sequence): Smoothing scale / window size / cutoff size.
+            method (str): Filtering method ('gaussian', 'median', 'boxcar', 'butterworth'). Defaults to 'gaussian'.
+            **kwargs: Additional parameters passed to filtering backend (e.g. order=2 for Butterworth).
+            
+        Returns:
+            xarray.Dataset: Smoothed dataset.
+        """
+        return csmooth(self._obj, sigma=sigma, method=method, **kwargs)
+
+    def filter(
+        self,
+        sigma: float | Sequence[float] = 1.0,
+        method: str = "gaussian",
+        **kwargs,
+    ):
+        """Alias for smooth()."""
+        return self.smooth(sigma=sigma, method=method, **kwargs)
+
+    def gradient_tensor(self, return_components: bool = False):
+        """Calculates velocity gradient tensor, strain rate tensor, and principal strains.
+        
+        Args:
+            return_components (bool): If True, returns new dataset with tensor fields. Defaults to False.
+            
+        Returns:
+            xarray.Dataset: Dataset with computed tensor variables.
+        """
+        return cgradient_tensor(self._obj, return_components=return_components)
+
+    def max_shear(self, name: str = "w"):
+        """Calculates maximum shear strain rate."""
+        warn_if_overwriting_scalar(self._obj, name)
+        res = cgradient_tensor(self._obj, return_components=True)
+        self._obj[name] = res["max_shear"]
+        self._obj[name].attrs["units"] = "1/delta_t"
+        self._obj[name].attrs["standard_name"] = "max_shear_strain_rate"
+        return self._obj
+
     def vec2scal(self, flow_property: str = "curl", name: str = "w"):
         """Creates a scalar flow property field from velocity data
         
         Args:
             flow_property (str): Name of the flow property to compute.
                 Valid options: 'curl'/'vorticity'/'vort', 'ke'/'ken'/'kinetic_energy',
-                'strain', 'divergence', 'acceleration', 'tke', 'reynolds_stress', 'rms',
-                'gamma1', 'gamma2', 'q_criterion'/'q', 'okubo_weiss'/'q_ow'.
+                'strain', 'divergence', 'acceleration'/'accel', 'tke', 'reynolds_stress', 'rms',
+                'gamma1', 'gamma2', 'q_criterion'/'q', 'okubo_weiss'/'q_ow', 'max_shear'.
                 Defaults to "curl".
             name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
@@ -2274,6 +2379,9 @@ class PIVAccessor(object):
             "q": "q_criterion",
             "q_ow": "okubo_weiss",
             "ow": "okubo_weiss",
+            "accel": "acceleration",
+            "principal_strain": "strain",
+            "shear_strain": "strain",
         }
         flow_property = alias_map.get(str(flow_property).lower(), flow_property)
         
@@ -2282,7 +2390,7 @@ class PIVAccessor(object):
             valid_properties = [
                 'vorticity', 'kinetic_energy', 'strain', 'divergence', 
                 'acceleration', 'tke', 'reynolds_stress', 'rms',
-                'gamma1', 'gamma2', 'q_criterion', 'okubo_weiss'
+                'gamma1', 'gamma2', 'q_criterion', 'okubo_weiss', 'max_shear'
             ]
             raise AttributeError(
                 f"Unknown flow property '{flow_property}'. "

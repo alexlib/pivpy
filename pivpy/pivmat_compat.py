@@ -120,3 +120,13 @@ def expandstr(pattern: str) -> list[str]:
         return expanded
 
     return out
+
+
+# Re-export synthetic flow generators for PIVMat compatibility
+from pivpy.synthetic import (
+    vortex,
+    multivortex,
+    randvec,
+)
+
+__all__ = ["expandstr", "vortex", "multivortex", "randvec"]

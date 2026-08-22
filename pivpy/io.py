@@ -281,6 +281,18 @@ def create_sample_Dataset(
     return set_default_attrs(ds)
 
 
+def create_vortex_dataset(
+    n: int = 128,
+    r0: float = 10.0,
+    vorticity: float = 1.0,
+    mode: str = "burgers",
+    diver: float = 0.0,
+) -> xr.Dataset:
+    """Create a synthetic vortex dataset (convenience wrapper around pivpy.synthetic.vortex)."""
+    from pivpy.synthetic import vortex
+    return vortex(n=n, r0=r0, vorticity=vorticity, mode=mode, diver=diver)
+
+
 def parse_header(filepath: Any):
     """Parse basic metadata.
 

@@ -75,6 +75,7 @@ Generate an analytical multi-vortex turbulent flow field, compute vorticity, and
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.ndimage import gaussian_filter
 
 import pivpy.pivpy  # registers the .piv accessor
 from pivpy import synthetic
@@ -89,28 +90,32 @@ x, y = ds["x"].values, ds["y"].values
 X, Y = np.meshgrid(x, y)
 u, v, w = ds["u"].isel(t=0).values, ds["v"].isel(t=0).values, ds["w"].isel(t=0).values
 
+# Smooth vorticity for soft fluid gradient
+w_smooth = gaussian_filter(w, sigma=2.0)
+
 # 3. Create publication-quality visualization
 fig, ax = plt.subplots(figsize=(8.5, 6.8), dpi=150)
 
-# Filled vorticity contour background
-vmax = np.percentile(np.abs(w), 99)
-cf = ax.contourf(X, Y, w, levels=80, cmap="RdBu_r", vmin=-vmax, vmax=vmax, extend="both")
+# Smooth filled vorticity contour background
+vmax = np.percentile(np.abs(w_smooth), 99)
+cf = ax.contourf(X, Y, w_smooth, levels=100, cmap="RdBu_r", vmin=-vmax, vmax=vmax, extend="both")
 cbar = fig.colorbar(cf, ax=ax, pad=0.03, shrink=0.92)
 cbar.set_label(r"Vorticity $\omega_z = \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y}\; [\mathrm{s}^{-1}]$", fontsize=11, labelpad=10)
 
 # Streamlines
-strm = ax.streamplot(x, y, u, v, color="white", linewidth=0.85, density=1.25, arrowsize=0.85, arrowstyle="->")
-strm.lines.set_alpha(0.65)
+strm = ax.streamplot(x, y, u, v, color="white", linewidth=0.75, density=1.1, arrowsize=0.8, arrowstyle="->")
+strm.lines.set_alpha(0.55)
 for patch in ax.patches:
-    patch.set_alpha(0.65)
+    patch.set_alpha(0.55)
 
-# Velocity vector quiver overlay
+# Prominent velocity vector quiver overlay
 skip = 4
 q = ax.quiver(
     X[::skip, ::skip], Y[::skip, ::skip],
     u[::skip, ::skip], v[::skip, ::skip],
-    color="#111111", angles="xy", scale_units="xy", scale=0.85,
-    width=0.0035, headwidth=3.5, headlength=4.5, alpha=0.85,
+    color="#0a0a0a", angles="xy", scale_units="xy", scale=0.48,
+    width=0.0055, headwidth=4.2, headlength=5.2, headaxislength=4.5,
+    minshaft=1.5, pivot="mid", alpha=0.9,
 )
 ax.quiverkey(q, X=0.82, Y=1.04, U=2.0, label=r"$2.0\,\mathrm{m/s}$", labelpos="E", coordinates="axes", fontproperties={"size": 10, "weight": "bold"})
 
@@ -123,6 +128,7 @@ plt.show()
 ```
 
 ![PIVPy Multi-Vortex Flow Visualization](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_quiver_vorticity.png)
+
 
 
 Legacy loaders (still supported):

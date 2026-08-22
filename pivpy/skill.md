@@ -126,7 +126,39 @@ ds_accel = ds_smooth.piv.acceleration(name="accel", unsteady=True)
 
 ---
 
-## 4. Publication-Ready Visualizations
+## 4. Advanced Turbulence Statistics & Spectral Analysis
+
+```python
+# 1. Reynolds Decomposition & Reynolds Stress Tensor
+# Splits velocity into mean and fluctuations: u = u_mean + u_prime
+turb = ds.piv.reynolds_decomposition()
+# Yields: u_mean, v_mean, u_prime, v_prime, uu_prime, vv_prime, uv_prime, tke, intensity_u, intensity_v
+
+# 2. Kinetic Energy Spectra (2D & 1D Radial with Hann Windowing)
+spec = ds.piv.energy_spectrum(window="hann", detrend=True, radial=True)
+# Yields: E2D(ky, kx), E_kx(kx), E_ky(ky), E_radial(k)
+# Satisfies Parseval relation: integral(E(k) dk) == TKE
+
+# 3. Two-Point Spatial Autocorrelation Function
+corr_u = ds.piv.spatial_correlation(component="u", dim="x", normalize=True)
+# Yields: R(r) with R(0) = 1.0
+
+# 4. Integral Length Scale (L11)
+L11 = ds.piv.integral_length_scale(component="u", dim="x")  # Physical length units
+
+# 5. Taylor Microscale (lambda_T)
+lambda_curv = ds.piv.taylor_microscale(component="u", dim="x", method="curvature")
+lambda_grad = ds.piv.taylor_microscale(component="u", dim="x", method="gradient")
+
+# 6. Turbulent Dissipation Rate (epsilon)
+ds_eps_dir = ds.piv.dissipation(method="direct", nu=1.5e-5, name="eps_dir")
+ds_eps_iso = ds.piv.dissipation(method="isotropic", nu=1.5e-5, name="eps_iso")
+ds_eps_sgs = ds.piv.dissipation(method="smagorinsky", name="eps_sgs")
+```
+
+---
+
+## 5. Publication-Ready Visualizations
 
 ### Beautiful Single-Frame Quiver & Contour Plots
 
@@ -176,7 +208,7 @@ anim = ds.piv.animate(
 
 ---
 
-## 5. Automated Deep PIV Analysis Reports
+## 6. Automated Deep PIV Analysis Reports
 
 When generating comprehensive analysis reports for experiments:
 1. **Quality Audit Table**: Report total vectors, percentage of valid vs inpainted vectors, mean velocity magnitude, peak Reynolds stresses, and vortex core circulation $\Gamma$.
@@ -185,4 +217,8 @@ When generating comprehensive analysis reports for experiments:
    - Panel B: Circulation vorticity & $\Gamma_2$ vortex boundary contours.
    - Panel C: $Q$-criterion & Okubo-Weiss topology partitioning.
    - Panel D: Maximum shear strain rate & material acceleration.
-3. **Artifact Generation**: Save high-resolution PNG/PDF figures and export analysis summary markdown artifacts.
+   - Panel E: Turbulent kinetic energy & Reynolds shear stress $-\overline{u'v'}$.
+   - Panel F: Radial energy spectrum $E(k)$ with Kolmogorov $-5/3$ reference slope.
+3. **Integral Quantities Table**: Report integral length scale $L_{11}$, Taylor microscale $\lambda_T$, turbulent Reynolds number $\text{Re}_\lambda = u_{\text{rms}} \lambda_T / \nu$, and dissipation rate $\varepsilon$.
+4. **Artifact Generation**: Save high-resolution PNG/PDF figures and export analysis summary markdown artifacts.
+

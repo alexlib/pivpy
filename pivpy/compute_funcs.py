@@ -4211,4 +4211,509 @@ def material_acceleration(
         out[name].attrs["standard_name"] = "material_acceleration"
 
     return out
+
+
+def reynolds_decomposition(
+    ds: xr.Dataset,
+    name_mean: str = "mean",
+    name_prime: str = "prime",
+) -> xr.Dataset:
+    r"""Performs Reynolds decomposition on a time-series velocity dataset.
+
+    Splits velocity vectors into temporal mean and turbulent fluctuations:
+
+    .. math::
+
+        \mathbf{u}(\mathbf{x}, t) = \overline{\mathbf{u}}(\mathbf{x}) + \mathbf{u}'(\mathbf{x}, t)
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Multi-frame velocity dataset with time dimension 't'.
+    name_mean : str
+        Prefix for mean variables (default 'mean').
+    name_prime : str
+        Suffix for fluctuation variables (default 'prime').
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset containing:
+        - ``u_mean``, ``v_mean``: Temporal mean velocity components.
+        - ``u_prime``, ``v_prime``: Fluctuating velocity components along 't'.
+        - ``uu_prime``: Normal Reynolds stress <u'^2>.
+        - ``vv_prime``: Normal Reynolds stress <v'^2>.
+        - ``uv_prime``: Shear Reynolds stress -<u' v'>.
+        - ``tke``: Turbulent kinetic energy 0.5*(<u'^2> + <v'^2>).
+        - ``intensity_u``, ``intensity_v``: Turbulence intensities.
+
+    Raises
+    ------
+    ValueError
+        If dataset has no 't' dimension or fewer than 2 frames.
+    """
+    if "t" not in ds.dims or ds.sizes["t"] < 2:
+        raise ValueError("Reynolds decomposition requires a multi-frame dataset with at least 2 time steps along 't'.")
+
+    u_mean = ds["u"].mean(dim="t")
+    v_mean = ds["v"].mean(dim="t")
+
+    u_prime = ds["u"] - u_mean
+    v_prime = ds["v"] - v_mean
+
+    uu_prime = (u_prime**2).mean(dim="t")
+    vv_prime = (v_prime**2).mean(dim="t")
+    uv_prime = -(u_prime * v_prime).mean(dim="t")
+    tke = 0.5 * (uu_prime + vv_prime)
+
+    u_mag_mean = np.sqrt(u_mean**2 + v_mean**2)
+    eps_denom = 1e-12
+    intensity_u = np.sqrt(uu_prime) / np.maximum(u_mag_mean, eps_denom)
+    intensity_v = np.sqrt(vv_prime) / np.maximum(u_mag_mean, eps_denom)
+
+    out = xr.Dataset(
+        data_vars={
+            f"u_{name_mean}": u_mean,
+            f"v_{name_mean}": v_mean,
+            f"u_{name_prime}": u_prime,
+            f"v_{name_prime}": v_prime,
+            "uu_prime": uu_prime,
+            "vv_prime": vv_prime,
+            "uv_prime": uv_prime,
+            "tke": tke,
+            "intensity_u": intensity_u,
+            "intensity_v": intensity_v,
+        },
+        coords=ds.coords,
+        attrs=ds.attrs.copy(),
+    )
+
+    out[f"u_{name_mean}"].attrs["units"] = ds["u"].attrs.get("units", "m/s")
+    out[f"v_{name_mean}"].attrs["units"] = ds["v"].attrs.get("units", "m/s")
+    out[f"u_{name_prime}"].attrs["units"] = ds["u"].attrs.get("units", "m/s")
+    out[f"v_{name_prime}"].attrs["units"] = ds["v"].attrs.get("units", "m/s")
+    out["uu_prime"].attrs["units"] = "(m/s)^2"
+    out["vv_prime"].attrs["units"] = "(m/s)^2"
+    out["uv_prime"].attrs["units"] = "(m/s)^2"
+    out["tke"].attrs["units"] = "(m/s)^2"
+    out["intensity_u"].attrs["units"] = "1"
+    out["intensity_v"].attrs["units"] = "1"
+
+    return out
+
+
+def energy_spectrum(
+    ds: xr.Dataset,
+    window: str = "hann",
+    detrend: bool = True,
+    radial: bool = True,
+) -> xr.Dataset:
+    r"""Computes 2D and radial wavenumber energy spectra from velocity fields.
+
+    Calculates the 2D energy spectrum:
+
+    .. math::
+
+        E_{2D}(k_x, k_y) = \frac{1}{2} \left( |\hat{u}(k_x, k_y)|^2 + |\hat{v}(k_x, k_y)|^2 \right)
+
+    and the azimuthally integrated radial energy spectrum :math:`E(k)` such that:
+
+    .. math::
+
+        \int E(k)\,dk = \text{TKE}
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset.
+    window : {'hann', 'hamming', 'boxcar', 'none'}
+        Windowing apodization function (default 'hann').
+    detrend : bool
+        If True, removes the spatial mean velocity before Fourier transform.
+    radial : bool
+        If True, includes azimuthally integrated 1D radial spectrum E(k).
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 2D spectrum ``E2D(ky, kx)``, 1D spectra ``E_kx(kx)``, ``E_ky(ky)``,
+        and optionally radial spectrum ``E_radial(k)``.
+    """
+    x = np.asarray(ds["x"].values, dtype=float)
+    y = np.asarray(ds["y"].values, dtype=float)
+    nx = len(x)
+    ny = len(y)
+
+    dx = float(np.mean(np.diff(x))) if nx > 1 else 1.0
+    dy = float(np.mean(np.diff(y))) if ny > 1 else 1.0
+
+    # Build window
+    w_name = str(window).lower()
+    if w_name.startswith("hann"):
+        wx = np.hanning(nx)
+        wy = np.hanning(ny)
+        W = np.outer(wy, wx)
+        w_norm = np.mean(W**2)
+    elif w_name.startswith("hamm"):
+        wx = np.hamming(nx)
+        wy = np.hamming(ny)
+        W = np.outer(wy, wx)
+        w_norm = np.mean(W**2)
+    else:
+        W = np.ones((ny, nx))
+        w_norm = 1.0
+
+    has_t = "t" in ds.dims and ds.sizes["t"] > 1
+    n_frames = ds.sizes["t"] if has_t else 1
+
+    kx = np.fft.fftfreq(nx, d=dx) * 2.0 * np.pi
+    ky = np.fft.fftfreq(ny, d=dy) * 2.0 * np.pi
+
+    kx_shift = np.fft.fftshift(kx)
+    ky_shift = np.fft.fftshift(ky)
+
+    KX, KY = np.meshgrid(kx_shift, ky_shift)
+    K = np.sqrt(KX**2 + KY**2)
+
+    E2d_sum = np.zeros((ny, nx), dtype=float)
+
+    for i in range(n_frames):
+        u_slice = ds["u"].isel(t=i).to_numpy().squeeze() if has_t else ds["u"].to_numpy().squeeze()
+        v_slice = ds["v"].isel(t=i).to_numpy().squeeze() if has_t else ds["v"].to_numpy().squeeze()
+
+        if detrend:
+            u_slice = u_slice - np.nanmean(u_slice)
+            v_slice = v_slice - np.nanmean(v_slice)
+
+        u_win = np.nan_to_num(u_slice) * W
+        v_win = np.nan_to_num(v_slice) * W
+
+        u_hat = np.fft.fft2(u_win) / (nx * ny)
+        v_hat = np.fft.fft2(v_win) / (nx * ny)
+
+        E2d = 0.5 * (np.abs(u_hat)**2 + np.abs(v_hat)**2) / w_norm
+        E2d_shift = np.fft.fftshift(E2d)
+        E2d_sum += E2d_shift
+
+    E2D_mean = E2d_sum / n_frames
+
+    # 1D slice spectra
+    E_kx = np.sum(E2D_mean, axis=0)
+    E_ky = np.sum(E2D_mean, axis=1)
+
+    data_vars = {
+        "E2D": (("ky", "kx"), E2D_mean),
+        "E_kx": (("kx",), E_kx),
+        "E_ky": (("ky",), E_ky),
+    }
+    coords = {"kx": kx_shift, "ky": ky_shift}
+
+    if radial:
+        dk = min(2.0 * np.pi / (nx * dx), 2.0 * np.pi / (ny * dy))
+        k_max = np.max(K)
+        k_bins = np.arange(0, k_max + dk, dk)
+        k_centers = 0.5 * (k_bins[:-1] + k_bins[1:])
+        E_rad = np.zeros(len(k_centers), dtype=float)
+
+        for b in range(len(k_centers)):
+            mask = (K >= k_bins[b]) & (K < k_bins[b + 1])
+            if np.any(mask):
+                E_rad[b] = np.sum(E2D_mean[mask]) / dk
+
+        data_vars["E_radial"] = (("k",), E_rad)
+        coords["k"] = k_centers
+
+    out = xr.Dataset(data_vars=data_vars, coords=coords)
+    out["E2D"].attrs["units"] = "(m/s)^2 / (rad/m)^2"
+    out["E_kx"].attrs["units"] = "(m/s)^2 / (rad/m)"
+    out["E_ky"].attrs["units"] = "(m/s)^2 / (rad/m)"
+    if radial:
+        out["E_radial"].attrs["units"] = "(m/s)^2 / (rad/m)"
+        out["E_radial"].attrs["standard_name"] = "radial_energy_spectrum"
+
+    return out
+
+
+def spatial_correlation(
+    ds: xr.Dataset,
+    component: str = "u",
+    dim: str = "x",
+    normalize: bool = True,
+) -> xr.Dataset:
+    r"""Calculates spatial two-point autocorrelation function R_ij(r).
+
+    Computes:
+
+    .. math::
+
+        R(r) = \frac{\langle u'(\mathbf{x}) u'(\mathbf{x} + r\hat{\mathbf{e}}) \rangle}{\sqrt{\langle u'(\mathbf{x})^2 \rangle \langle u'(\mathbf{x} + r\hat{\mathbf{e}})^2 \rangle}}
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset (single-frame or multi-frame ensemble).
+    component : {'u', 'v'}
+        Velocity component to correlate (default 'u').
+    dim : {'x', 'y'}
+        Spatial dimension along which separation lag r is evaluated (default 'x').
+    normalize : bool
+        If True, normalizes such that R(0) = 1.0 (default True).
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with coordinate ``r`` (separation distance) and correlation variable ``R``.
+    """
+    comp = str(component).lower()
+    if comp not in ds.data_vars:
+        raise ValueError(f"Component {component!r} not found in dataset data variables.")
+
+    val = ds[comp].to_numpy()
+    has_t = "t" in ds.dims and ds.sizes["t"] > 1
+
+    # Subtract mean
+    if has_t:
+        mean_field = np.nanmean(val, axis=-1, keepdims=True)
+        fluc = val - mean_field
+    else:
+        fluc = val - np.nanmean(val)
+
+    if dim.lower() == "x":
+        # Correlate along axis 1 (x)
+        nx = ds.sizes["x"]
+        dx = float(np.mean(np.diff(ds["x"].values))) if nx > 1 else 1.0
+        r_coords = np.arange(nx, dtype=float) * dx
+        auto = np.zeros(nx, dtype=float)
+
+        for r_idx in range(nx):
+            if has_t:
+                s1 = fluc[:, : nx - r_idx, :]
+                s2 = fluc[:, r_idx:, :]
+            else:
+                s1 = fluc[:, : nx - r_idx]
+                s2 = fluc[:, r_idx:]
+            cov = np.nanmean(s1 * s2)
+            if normalize:
+                denom = np.sqrt(np.nanmean(s1**2) * np.nanmean(s2**2))
+                auto[r_idx] = cov / max(1e-12, denom)
+            else:
+                auto[r_idx] = cov
+
+    elif dim.lower() == "y":
+        # Correlate along axis 0 (y)
+        ny = ds.sizes["y"]
+        dy = float(np.mean(np.diff(ds["y"].values))) if ny > 1 else 1.0
+        r_coords = np.arange(ny, dtype=float) * dy
+        auto = np.zeros(ny, dtype=float)
+
+        for r_idx in range(ny):
+            if has_t:
+                s1 = fluc[: ny - r_idx, :, :]
+                s2 = fluc[r_idx:, :, :]
+            else:
+                s1 = fluc[: ny - r_idx, :]
+                s2 = fluc[r_idx:, :]
+            cov = np.nanmean(s1 * s2)
+            if normalize:
+                denom = np.sqrt(np.nanmean(s1**2) * np.nanmean(s2**2))
+                auto[r_idx] = cov / max(1e-12, denom)
+            else:
+                auto[r_idx] = cov
+    else:
+        raise ValueError(f"dim must be 'x' or 'y', got {dim!r}")
+
+    R = auto
+
+    out = xr.Dataset(
+        data_vars={"R": (("r",), R)},
+        coords={"r": r_coords},
+    )
+    out["R"].attrs["units"] = "1" if normalize else "(m/s)^2"
+    out["R"].attrs["standard_name"] = f"spatial_autocorrelation_{comp}_{dim}"
+    out["r"].attrs["units"] = ds[dim].attrs.get("units", "m")
+    return out
+
+
+def integral_length_scale(
+    ds: xr.Dataset,
+    component: str = "u",
+    dim: str = "x",
+) -> float:
+    r"""Calculates integral length scale L by integrating spatial autocorrelation R(r).
+
+    .. math::
+
+        L = \int_0^{r_0} R(r)\,dr
+
+    where :math:`r_0` is the location of the first zero-crossing (:math:`R(r_0) \le 0`).
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset.
+    component : {'u', 'v'}
+        Velocity component (default 'u').
+    dim : {'x', 'y'}
+        Spatial dimension (default 'x').
+
+    Returns
+    -------
+    float
+        Integral length scale in physical length units.
+    """
+    corr_ds = spatial_correlation(ds, component=component, dim=dim, normalize=True)
+    r = corr_ds["r"].values
+    R = corr_ds["R"].values
+
+    zero_crossings = np.where(R <= 0.0)[0]
+    idx_zero = int(zero_crossings[0]) if len(zero_crossings) > 0 else len(R)
+
+    if idx_zero <= 1:
+        return float(r[1] if len(r) > 1 else 0.0)
+
+    # Trapezoidal integration up to first zero crossing
+    from scipy.integrate import trapezoid
+    L = float(trapezoid(R[:idx_zero], r[:idx_zero]))
+    return max(0.0, L)
+
+
+def taylor_microscale(
+    ds: xr.Dataset,
+    component: str = "u",
+    dim: str = "x",
+    method: str = "curvature",
+) -> float:
+    r"""Estimates the Taylor microscale lambda_T from velocity fluctuations.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset.
+    component : {'u', 'v'}
+        Velocity component (default 'u').
+    dim : {'x', 'y'}
+        Spatial dimension (default 'x').
+    method : {'curvature', 'parabolic', 'gradient'}
+        - ``'curvature'`` / ``'parabolic'``: Fits osculating parabola :math:`R(r) \approx 1 - (r/\lambda_T)^2` at :math:`r \to 0`.
+        - ``'gradient'``: Uses definition :math:`\lambda_T = \sqrt{\langle u'^2 \rangle / \langle (\partial u'/\partial x)^2 \rangle}`.
+
+    Returns
+    -------
+    float
+        Taylor microscale lambda_T in physical length units.
+    """
+    m = str(method).lower()
+    comp = str(component).lower()
+
+    if m.startswith("grad"):
+        val = ds[comp]
+        has_t = "t" in ds.dims and ds.sizes["t"] > 1
+        u_prime = val - val.mean(dim="t") if has_t else val - val.mean()
+        grad = u_prime.differentiate(dim)
+        var_fluc = float((u_prime**2).mean().values)
+        var_grad = float((grad**2).mean().values)
+        return float(np.sqrt(var_fluc / max(1e-12, var_grad)))
+
+    # Default: Curvature at origin via spatial correlation
+    corr_ds = spatial_correlation(ds, component=component, dim=dim, normalize=True)
+    r = corr_ds["r"].values
+    R = corr_ds["R"].values
+
+    if len(r) < 2:
+        return 0.0
+
+    # Fit R(r) = 1 - a * r^2 using first points
+    r1 = float(r[1])
+    R1 = float(R[1])
+    diff = max(1e-12, 1.0 - R1)
+    lambda_T = r1 / np.sqrt(diff)
+    return float(lambda_T)
+
+
+def dissipation(
+    ds: xr.Dataset,
+    method: str = "direct",
+    nu: float = 1.5e-5,
+    name: str = "w",
+) -> xr.Dataset:
+    r"""Estimates turbulent kinetic energy dissipation rate epsilon.
+
+    Surrogate estimation methods:
+
+    - ``'direct'``: In-plane 2D surrogate with continuity substitution for out-of-plane gradients:
+
+      .. math::
+
+          \varepsilon = \nu \left[ 2 \overline{\left(\frac{\partial u'}{\partial x}\right)^2} + 2 \overline{\left(\frac{\partial v'}{\partial y}\right)^2} + 2 \overline{\left(\frac{\partial u'}{\partial x} + \frac{\partial v'}{\partial y}\right)^2} + \overline{\left(\frac{\partial u'}{\partial y} + \frac{\partial v'}{\partial x}\right)^2} \right]
+
+    - ``'isotropic'``: Homogeneous isotropic turbulence surrogate:
+
+      .. math::
+
+          \varepsilon = 15 \nu \overline{\left(\frac{\partial u'}{\partial x}\right)^2}
+
+    - ``'smagorinsky'``: Subgrid-scale eddy viscosity model for coarse PIV grids:
+
+      .. math::
+
+          \varepsilon_{\text{sgs}} = (C_s \Delta)^2 \left(2 \bar{S}_{ij} \bar{S}_{ij}\right)^{3/2}
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset.
+    method : {'direct', 'isotropic', 'smagorinsky'}
+        Dissipation rate estimation model (default 'direct').
+    nu : float
+        Kinematic viscosity in m^2/s (default 1.5e-5 for air).
+    name : str
+        Name for output scalar variable (default 'w').
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with computed dissipation rate field.
+    """
+    m = str(method).lower()
+    has_t = "t" in ds.dims and ds.sizes["t"] > 1
+
+    u = ds["u"] - ds["u"].mean(dim="t") if has_t else ds["u"] - ds["u"].mean()
+    v = ds["v"] - ds["v"].mean(dim="t") if has_t else ds["v"] - ds["v"].mean()
+
+    du_dx = u.differentiate("x")
+    du_dy = u.differentiate("y")
+    dv_dx = v.differentiate("x")
+    dv_dy = v.differentiate("y")
+
+    if m.startswith("iso"):
+        eps = 15.0 * nu * (du_dx**2)
+    elif m.startswith("smag"):
+        dx = float(np.mean(np.diff(ds["x"].values))) if ds.sizes["x"] > 1 else 1.0
+        dy = float(np.mean(np.diff(ds["y"].values))) if ds.sizes["y"] > 1 else 1.0
+        delta = np.sqrt(dx * dy)
+        Cs = 0.17
+        s_xx = du_dx
+        s_yy = dv_dy
+        s_xy = 0.5 * (du_dy + dv_dx)
+        S_mag = np.sqrt(2.0 * (s_xx**2 + s_yy**2 + 2.0 * s_xy**2))
+        eps = (Cs * delta) ** 2 * (S_mag**3)
+    else:  # 'direct' 2D surrogate
+        term_xx = 2.0 * (du_dx**2)
+        term_yy = 2.0 * (dv_dy**2)
+        term_cont = 2.0 * ((du_dx + dv_dy)**2)
+        term_cross = (du_dy + dv_dx)**2
+        eps = nu * (term_xx + term_yy + term_cont + term_cross)
+
+    if has_t:
+        eps_field = eps.mean(dim="t")
+    else:
+        eps_field = eps
+
+    out = ds.copy(deep=False)
+    warn_if_overwriting_scalar(out, name)
+    out[name] = eps_field
+    out[name].attrs["units"] = "m^2/s^3"
+    out[name].attrs["standard_name"] = f"turbulent_dissipation_rate_{method}"
+
+    return out
 

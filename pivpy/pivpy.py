@@ -42,6 +42,12 @@ from pivpy.compute_funcs import (
     normalized_median_test as cnormalized_median_test,
     gradient_tensor as cgradient_tensor,
     material_acceleration as cmaterial_acceleration,
+    reynolds_decomposition as creynolds_decomposition,
+    energy_spectrum as cenergy_spectrum,
+    spatial_correlation as cspatial_correlation,
+    integral_length_scale as cintegral_length_scale,
+    taylor_microscale as ctaylor_microscale,
+    dissipation as cdissipation,
     bwfilter2d,
     corrf,
     corrm,
@@ -2346,6 +2352,58 @@ class PIVAccessor(object):
         self._obj[name].attrs["standard_name"] = "max_shear_strain_rate"
         return self._obj
 
+    def reynolds_decomposition(
+        self,
+        name_mean: str = "mean",
+        name_prime: str = "prime",
+    ):
+        """Performs Reynolds decomposition on time series velocity dataset."""
+        return creynolds_decomposition(self._obj, name_mean=name_mean, name_prime=name_prime)
+
+    def energy_spectrum(
+        self,
+        window: str = "hann",
+        detrend: bool = True,
+        radial: bool = True,
+    ):
+        """Computes 2D and radial wavenumber energy spectra."""
+        return cenergy_spectrum(self._obj, window=window, detrend=detrend, radial=radial)
+
+    def spatial_correlation(
+        self,
+        component: str = "u",
+        dim: str = "x",
+        normalize: bool = True,
+    ):
+        """Calculates spatial two-point autocorrelation function R_ij(r)."""
+        return cspatial_correlation(self._obj, component=component, dim=dim, normalize=normalize)
+
+    def integral_length_scale(
+        self,
+        component: str = "u",
+        dim: str = "x",
+    ) -> float:
+        """Calculates integral length scale by integrating autocorrelation to zero-crossing."""
+        return cintegral_length_scale(self._obj, component=component, dim=dim)
+
+    def taylor_microscale(
+        self,
+        component: str = "u",
+        dim: str = "x",
+        method: str = "curvature",
+    ) -> float:
+        """Estimates the Taylor microscale lambda_T from velocity fluctuations."""
+        return ctaylor_microscale(self._obj, component=component, dim=dim, method=method)
+
+    def dissipation(
+        self,
+        method: str = "direct",
+        nu: float = 1.5e-5,
+        name: str = "w",
+    ):
+        """Estimates turbulent kinetic energy dissipation rate epsilon."""
+        return cdissipation(self._obj, method=method, nu=nu, name=name)
+
     def vec2scal(self, flow_property: str = "curl", name: str = "w"):
         """Creates a scalar flow property field from velocity data
         
@@ -2353,7 +2411,8 @@ class PIVAccessor(object):
             flow_property (str): Name of the flow property to compute.
                 Valid options: 'curl'/'vorticity'/'vort', 'ke'/'ken'/'kinetic_energy',
                 'strain', 'divergence', 'acceleration'/'accel', 'tke', 'reynolds_stress', 'rms',
-                'gamma1', 'gamma2', 'q_criterion'/'q', 'okubo_weiss'/'q_ow', 'max_shear'.
+                'gamma1', 'gamma2', 'q_criterion'/'q', 'okubo_weiss'/'q_ow', 'max_shear',
+                'dissipation'/'dissip'.
                 Defaults to "curl".
             name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
@@ -2382,6 +2441,7 @@ class PIVAccessor(object):
             "accel": "acceleration",
             "principal_strain": "strain",
             "shear_strain": "strain",
+            "dissip": "dissipation",
         }
         flow_property = alias_map.get(str(flow_property).lower(), flow_property)
         
@@ -2390,7 +2450,8 @@ class PIVAccessor(object):
             valid_properties = [
                 'vorticity', 'kinetic_energy', 'strain', 'divergence', 
                 'acceleration', 'tke', 'reynolds_stress', 'rms',
-                'gamma1', 'gamma2', 'q_criterion', 'okubo_weiss', 'max_shear'
+                'gamma1', 'gamma2', 'q_criterion', 'okubo_weiss', 'max_shear',
+                'dissipation'
             ]
             raise AttributeError(
                 f"Unknown flow property '{flow_property}'. "

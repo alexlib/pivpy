@@ -1,10 +1,8 @@
-=====================
-PIVPy visualization
-=====================
+================================
+PIVPy Visualization & Animations
+================================
 
-This page summarizes PIVPy’s visualization helpers.
-It is centered around PIVPy’s PIVMat-inspired entry point `showf` (“show field”),
-which can display either a still frame or a time-series.
+PIVPy provides an intuitive, publication-ready visualization and animation suite for particle image velocimetry (PIV) vector fields and derived flow diagnostics.
 
 .. contents::
    :local:
@@ -14,86 +12,165 @@ which can display either a still frame or a time-series.
 Overview
 ========
 
-The main entry points are:
+The primary visualization entry points are:
 
-- :func:`pivpy.graphics.showf` (and :meth:`xarray.Dataset.piv.showf`)
-  - vector fields: draws arrows, optional scalar background
-  - scalar fields: draws a color-mapped scalar field
-- :func:`pivpy.graphics.quiver` / :meth:`xarray.Dataset.piv.quiver`
-  - vector-only quiver plot with helpful options like subsampling (`nthArr`)
-- :func:`pivpy.graphics.streamplot` / :meth:`xarray.Dataset.piv.streamplot`
-  - streamlines for vector fields
-- :meth:`xarray.Dataset.piv.to_movie`
-  - render a time-series into a movie (mp4/gif) or return frames
+- :func:`pivpy.graphics.plot` (and :meth:`xarray.Dataset.piv.plot`):
+  High-level zero-effort publication-quality figure combining smooth scalar fluid contours (vorticity, speed, KE), streamlines, auto-scaled vector arrows, colorbar, and reference arrow key.
+- :func:`pivpy.graphics.animate` (and :meth:`xarray.Dataset.piv.animate`):
+  High-performance interactive and exportable flow animations using in-place vector artist updates (``quiver.set_UVC``) and dynamic fluid gradient tracking.
+- :func:`pivpy.graphics.quiver` / :meth:`xarray.Dataset.piv.quiver`:
+  Clean vector quiver plots with subsampling, scaling, and custom arrow colors.
+- :func:`pivpy.graphics.streamplot` / :meth:`xarray.Dataset.piv.streamplot`:
+  Flow streamlines tracing instantaneous flow trajectories.
+- :func:`pivpy.graphics.showf` / :meth:`xarray.Dataset.piv.showf`:
+  PIVMat-compatible multi-purpose field viewer.
+- :func:`pivpy.graphics.to_movie` / :meth:`xarray.Dataset.piv.to_movie`:
+  Direct batch movie file exporter for time-series datasets.
 
-Most plots accept Matplotlib-style keyword arguments (colormap, limits, etc.).
 
+High-Level Plotting (`ds.piv.plot`)
+===================================
 
-Still images
-============
-
-Vector field (arrows)
----------------------
-
-.. code-block:: python
-
-   import pivpy.pivpy  # registers Dataset.piv
-   from pivpy import io
-
-   ds = io.create_sample_Dataset(n_frames=1)
-   ds.isel(t=0).piv.showf()
-
-Subsample arrows (like “spacing” in other toolboxes)
-----------------------------------------------------
-
-Dense grids can be hard to read. Use `nthArr` to display every Nth vector:
+Zero-effort publication-grade visualization out-of-the-box:
 
 .. code-block:: python
 
-   ds.isel(t=0).piv.showf(nthArr=2)
+   import matplotlib.pyplot as plt
+   import pivpy.pivpy  # registers Dataset.piv accessor
+   from pivpy import synthetic
 
+   # Load data or generate a synthetic 2D turbulence field
+   ds = synthetic.multivortex(n_frames=1, n=128, n_vortices=8, two_d=True, seed=42)
 
-Vector field with a scalar background
--------------------------------------
+   # Render with one call
+   fig, ax = ds.piv.plot()
+   plt.show()
 
-If you pass a background name, PIVPy will either:
+.. image:: _static/getting_started_quiver_vorticity.png
+   :alt: PIVPy Flow Visualization
+   :align: center
+   :width: 80%
 
-- show an existing variable with that name, or
-- compute it via `ds.piv.vec2scal(background, name='w')`.
+Customizing Visual Layers
+-------------------------
 
-Example (vorticity background):
-
-.. code-block:: python
-
-   ds.isel(t=0).piv.showf(background="vorticity")
-
-
-Scalar fields
--------------
-
-Scalar datasets (variable `w`) can be displayed directly:
+All layers (background contour, quiver arrows, streamlines, color limits, Gaussian smoothing) can be tailored or toggled:
 
 .. code-block:: python
 
-   vort = ds.isel(t=0).piv.vec2scal("vorticity", name="w")
-   vort.piv.showf(scalar="w", cmap="viridis")
+   # Velocity magnitude background with vectors only (no streamlines)
+   fig, ax = ds.piv.plot(
+       background="mag",       # 'vorticity' (default), 'mag', 'ke', 'divergence', or None
+       streamlines=False,      # toggle flow streamlines
+       quiver=True,            # toggle velocity vectors
+       blur=1.5,               # Gaussian smoothing sigma for smooth fluid contours
+       arrow_scale=0.75,       # custom vector arrow scale
+       arrow_color="#1a1a1a",  # custom arrow color
+       arrow_alpha=0.8,        # arrow transparency
+       title="Velocity Magnitude & Vectors",
+   )
 
 
-Movies
-======
+Flow Animations (`ds.piv.animate`)
+==================================
 
-If you have multiple frames along `t`, you can render a movie:
+How PIVPy Animations Work
+-------------------------
+
+Traditional Matplotlib animations that redraw the axes on every frame can be slow and cause visual flickering. PIVPy implements high-performance artist updating techniques:
+
+1. **In-place Vector Updates**: The velocity quiver artist is initialized once on frame 0. For subsequent time steps, vector components are updated directly in-place via ``quiver.set_UVC(U, V)`` without recreating artists.
+2. **Dynamic Smooth Scalar Fields**: Background fluid scalar fields (such as evolving vorticity or kinetic energy) are rendered as Gouraud-shaded meshes and updated via ``mesh.set_array(...)`` across frames.
+3. **Consistent Global Scaling**: Color limits (``clim``) and arrow scaling are calculated robustly across the entire dataset duration, preventing colorbar jumps and flickering between frames.
+
+Quickstart Animation Example
+----------------------------
 
 .. code-block:: python
 
-   ds = io.create_sample_Dataset(n_frames=10)
-   ds.piv.to_movie("movie.mp4", background="vorticity", nthArr=2)
+   import pivpy.pivpy
+   from pivpy import synthetic
+
+   # 1. Generate or load time-series flow data (e.g. interacting vortex pair)
+   ds = synthetic.vortex_pair(n_frames=24, n=128)
+
+   # 2. Create the animation object
+   anim = ds.piv.animate(interval=80)
+
+   # 3. Save as GIF or MP4
+   anim.save("vortex_pair.gif", writer="pillow")
+
+.. image:: _static/getting_started_animation.gif
+   :alt: Interacting Vortex Pair Animation
+   :align: center
+   :width: 80%
+
+Displaying in Jupyter and Marimo Notebooks
+------------------------------------------
+
+In interactive environments, display the animation inline as HTML5 video or interactive JS player:
+
+.. code-block:: python
+
+   from IPython.display import HTML
+
+   anim = ds.piv.animate(interval=80)
+   HTML(anim.to_jshtml())
+
+Tuning Animation Parameters
+---------------------------
+
+The :func:`pivpy.graphics.animate` function exposes fine-grained control:
+
+.. code-block:: python
+
+   anim = ds.piv.animate(
+       background="vorticity",          # 'vorticity', 'mag', 'ke', 'divergence', or variable name
+       quiver=True,                     # overlay velocity vectors
+       blur=1.5,                        # Gaussian smoothing sigma
+       skip=8,                          # arrow subsampling step (e.g. every 8th vector)
+       arrow_width=0.007,               # shaft width of vector arrows
+       arrow_color="#1a1a1a",           # arrow color
+       arrow_alpha=0.75,                # arrow opacity
+       cmap="RdBu_r",                   # colormap for background
+       interval=60,                     # delay between frames in milliseconds (~16 fps)
+       repeat=True,                     # loop animation
+       title_fmt="Vortex Interaction (t = {t:.2f} s)", # custom dynamic title
+   )
+
+Saving High-Quality Videos (MP4 / GIF)
+--------------------------------------
+
+You can export animations using Pillow (GIF) or FFmpeg (MP4 / WebM):
+
+.. code-block:: python
+
+   from matplotlib.animation import FFMpegWriter, PillowWriter
+
+   # High-quality GIF
+   anim.save("flow.gif", writer=PillowWriter(fps=15))
+
+   # High-definition MP4 (requires ffmpeg installed)
+   anim.save("flow.mp4", writer=FFMpegWriter(fps=24, metadata=dict(artist="PIVPy"), bitrate=2000))
 
 
-Gallery
-=======
+Batch Video Export (`ds.piv.to_movie`)
+======================================
 
-The images below are generated using PIVPy plotting functions.
+For very large datasets or out-of-core file sequences on disk where holding full animations in memory is undesirable, use :func:`pivpy.graphics.to_movie` or :func:`pivpy.graphics.imvectomovie`:
+
+.. code-block:: python
+
+   # In-memory time series
+   ds.piv.to_movie("output.mp4", background="vorticity", fps=15)
+
+   # Out-of-core disk file sequences
+   from pivpy.graphics import imvectomovie
+   imvectomovie("data_run_*.vec", output="run_movie.mp4", background="mag", fps=20)
+
+
+Gallery of Static Visualizations
+================================
 
 .. list-table::
    :widths: 50 50
@@ -111,13 +188,4 @@ The images below are generated using PIVPy plotting functions.
      - .. image:: _static/gallery/streamplot.png
          :alt: Streamplot
          :width: 95%
-
-
-Notes
-=====
-
-- Interactive “live” movie key bindings like MATLAB’s figure callbacks are not a PIVPy goal.
-  For interactive exploration, consider using marimo notebooks and Matplotlib widgets.
-- If your y-axis appears flipped, check the ordering of the `y` coordinate. PIVPy’s plotting
-  utilities attempt to respect coordinate ordering.
 

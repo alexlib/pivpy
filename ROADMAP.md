@@ -14,7 +14,7 @@ PIVPy's development roadmap synthesizes key capabilities from MATLAB's **PIVMat 
    - Analytical vortices (Burgers, Lamb-Oseen, Rankine, Vatistas)
    - Multi-vortex synthetic turbulence fields
    - Random divergence-free vector fields
-   - Synthetic speckle pattern generation
+   - Canonical analytical flow profiles (channel, shear layer)
 
 2. **Phase 2: Vortex Identification Criteria & Flow Topology**
    - Normalized Angular Momentum ($\Gamma_1$ & $\Gamma_2$)

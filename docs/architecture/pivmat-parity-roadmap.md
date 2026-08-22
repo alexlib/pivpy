@@ -49,8 +49,9 @@ graph TD
 * **`randvec` ([`pivmat/randvec.m`](file:///C:/Users/alex/Github/pivmat/pivmat/randvec.m))**:
   * Synthetic random velocity fields with prescribed power spectrum $E(k) \propto k^{-\alpha}$ or correlation length, optionally enforcing divergence-free ($\nabla \cdot \mathbf{u} = 0$) conditions.
   * Target: `pivpy.synthetic.randvec(...)`.
-* **`makebospattern` ([`pivmat/makebospattern.m`](file:///C:/Users/alex/Github/pivmat/pivmat/makebospattern.m))**:
-  * High-density random speckle/dot pattern generator for synthetic PIV and optical calibration.
+* **Canonical Analytical Flows**:
+  * Canonical analytical vector velocity fields (Poiseuille channel, Kelvin-Helmholtz shear layer) for unit testing calculus and turbulence accessors.
+  * Target: `pivpy.synthetic.channel(...)`, `pivpy.synthetic.shear_layer(...)`.
 
 ---
 

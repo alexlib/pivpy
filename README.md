@@ -70,58 +70,60 @@ Quick start (auto-detect file format):
 
 ## Getting Started
 
-Load a built-in sample dataset, compute vorticity, and plot velocity vectors (quiver) over a vorticity heatmap:
+Generate an analytical multi-vortex turbulent flow field, compute vorticity, and visualize with smooth filled contours, streamlines, and velocity vectors:
 
 ```python
-import numpy as np
 import matplotlib.pyplot as plt
-from scipy.ndimage import gaussian_filter
+import numpy as np
 
 import pivpy.pivpy  # registers the .piv accessor
-from pivpy import io
+from pivpy import synthetic
 
-# Built-in sample data shipped with pivpy (OpenPIV vector file)
-ds = io.read_piv('pivpy/data/openpiv_vec/exp1_001_b.vec').isel(t=0)
+# 1. Generate an analytical multi-vortex 2D turbulence field (or load experimental PIV data)
+ds = synthetic.multivortex(n_frames=1, n=128, n_vortices=8, two_d=True, seed=42)
 
-# Vorticity (stored as ds['w'])
-ds = ds.piv.vorticity(name='w')
+# 2. Compute out-of-plane vorticity: w = dv/dx - du/dy
+ds = ds.piv.vorticity(name="w")
 
-X, Y = np.meshgrid(ds['x'].values, ds['y'].values)
+x, y = ds["x"].values, ds["y"].values
+X, Y = np.meshgrid(x, y)
+u, v, w = ds["u"].isel(t=0).values, ds["v"].isel(t=0).values, ds["w"].isel(t=0).values
 
-fig, ax = plt.subplots(figsize=(8, 4.8))
+# 3. Create publication-quality visualization
+fig, ax = plt.subplots(figsize=(8.5, 6.8), dpi=150)
 
-# Background: smoothed vorticity heatmap (robust symmetric color limits)
-w = ds['w'].values
-w_smooth = gaussian_filter(w, sigma=1.0)
-finite_w = w_smooth[np.isfinite(w_smooth)]
-vmax = np.nanpercentile(np.abs(finite_w), 98) if finite_w.size else 1.0
-vmax = max(vmax, 1e-9)
-pcm = ax.pcolormesh(X, Y, w_smooth, shading='auto', cmap='coolwarm', vmin=-vmax, vmax=vmax)
-fig.colorbar(pcm, ax=ax, pad=0.02, label='vorticity (smoothed, 1/Δt)')
+# Filled vorticity contour background
+vmax = np.percentile(np.abs(w), 99)
+cf = ax.contourf(X, Y, w, levels=80, cmap="RdBu_r", vmin=-vmax, vmax=vmax, extend="both")
+cbar = fig.colorbar(cf, ax=ax, pad=0.03, shrink=0.92)
+cbar.set_label(r"Vorticity $\omega_z = \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y}\; [\mathrm{s}^{-1}]$", fontsize=11, labelpad=10)
 
-# Overlay: velocity vectors (make arrows longer by reducing `scale`)
-skip = 2
-ax.quiver(
-    X[::skip, ::skip],
-    Y[::skip, ::skip],
-    ds['u'].values[::skip, ::skip],
-    ds['v'].values[::skip, ::skip],
-    color='k',
-    angles='xy',
-    scale_units='xy',
-    scale=5.0,
-    width=0.004,
+# Streamlines
+strm = ax.streamplot(x, y, u, v, color="white", linewidth=0.85, density=1.25, arrowsize=0.85, arrowstyle="->")
+strm.lines.set_alpha(0.65)
+for patch in ax.patches:
+    patch.set_alpha(0.65)
+
+# Velocity vector quiver overlay
+skip = 4
+q = ax.quiver(
+    X[::skip, ::skip], Y[::skip, ::skip],
+    u[::skip, ::skip], v[::skip, ::skip],
+    color="#111111", angles="xy", scale_units="xy", scale=0.85,
+    width=0.0035, headwidth=3.5, headlength=4.5, alpha=0.85,
 )
+ax.quiverkey(q, X=0.82, Y=1.04, U=2.0, label=r"$2.0\,\mathrm{m/s}$", labelpos="E", coordinates="axes", fontproperties={"size": 10, "weight": "bold"})
 
-ax.set_title('PIVPy sample (OpenPIV vec): quiver over smoothed vorticity')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-ax.set_aspect('equal')
+ax.set_title("PIVPy: Synthetic Multi-Vortex Field (Vorticity, Streamlines & Vectors)", fontsize=12, fontweight="bold", pad=14)
+ax.set_xlabel("x [mm]", fontsize=11)
+ax.set_ylabel("y [mm]", fontsize=11)
+ax.set_aspect("equal")
 fig.tight_layout()
 plt.show()
 ```
 
-![Quiver over vorticity heatmap](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_quiver_vorticity.png)
+![PIVPy Multi-Vortex Flow Visualization](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_quiver_vorticity.png)
+
 
 Legacy loaders (still supported):
 

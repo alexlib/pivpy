@@ -42,9 +42,9 @@ def plot(
     levels: int = 80,
     skip: int | None = None,
     arrow_scale: float | None = None,
-    arrow_width: float = 0.005,
-    arrow_color: str = "#0a0a0a",
-    arrow_alpha: float = 0.9,
+    arrow_width: float = 0.0038,
+    arrow_color: str = "#252525",
+    arrow_alpha: float = 0.65,
     streamline_density: float = 1.1,
     streamline_color: str | None = None,
     streamline_alpha: float = 0.55,
@@ -290,7 +290,7 @@ def plot(
                 med_speed = 1.0
 
             if arrow_scale is None:
-                target_len = 1.8 * step * dx
+                target_len = 0.85 * step * dx
                 auto_scale = (med_speed / target_len) if target_len > 0 else 1.0
             else:
                 auto_scale = float(arrow_scale)
@@ -1321,6 +1321,106 @@ def to_movie(
         ax=ax,
         **kwargs,
     )
+
+
+def animate(
+    data: xr.Dataset,
+    *,
+    background: str | bool | None = "vorticity",
+    quiver: bool = True,
+    blur: float = 1.5,
+    skip: int | None = None,
+    arrow_scale: float | None = None,
+    arrow_width: float = 0.0038,
+    arrow_color: str = "#252525",
+    arrow_alpha: float = 0.65,
+    interval: int = 100,
+    repeat: bool = True,
+    blit: bool = False,
+    ax: Axes | None = None,
+    **kwargs,
+):
+    """Create a high-performance, beautiful Matplotlib FuncAnimation for time-series flow fields.
+
+    Uses in-place artist vector updates (``quiver.set_UVC``) for smooth animation.
+
+    Parameters
+    ----------
+    data : xr.Dataset
+        Dataset with time dimension 't' and velocity components ('u', 'v').
+    background : str, bool, or None, default "vorticity"
+        Background scalar field.
+    quiver : bool, default True
+        Whether to draw velocity vectors.
+    blur : float, default 1.5
+        Gaussian filter smoothing for background.
+    interval : int, default 100
+        Delay between frames in milliseconds.
+    repeat : bool, default True
+        Whether the animation repeats when finished.
+    blit : bool, default False
+        Whether blitting is used to optimize drawing.
+    ax : Axes, optional
+        Target matplotlib axes.
+
+    Returns
+    -------
+    matplotlib.animation.FuncAnimation
+        The animation object (can be viewed in Jupyter/Marimo or saved via ``anim.save()``).
+    """
+    from matplotlib.animation import FuncAnimation
+    from matplotlib.quiver import Quiver
+
+    n_frames = int(data.sizes.get("t", 1))
+
+    # Initialize frame 0 using publication-quality plot()
+    fig, target_ax = plot(
+        data,
+        background=background,
+        quiver=quiver,
+        streamlines=False,  # streamlines recreate per frame; disabled in fast animation
+        blur=blur,
+        skip=skip,
+        arrow_scale=arrow_scale,
+        arrow_width=arrow_width,
+        arrow_color=arrow_color,
+        arrow_alpha=arrow_alpha,
+        t_idx=0,
+        ax=ax,
+        **kwargs,
+    )
+
+    # Find quiver artist
+    q_artist = None
+    for child in target_ax.get_children():
+        if isinstance(child, Quiver):
+            q_artist = child
+            break
+
+    # Subsampling step used
+    u_0 = data["u"].isel(t=0) if "t" in data["u"].dims else data["u"]
+    ny, nx = u_0.shape
+    step = max(1, int(skip)) if skip is not None else max(1, int(round(max(nx, ny) / 32)))
+
+    def update_frame(frame_i):
+        ds_t = data.isel(t=frame_i) if "t" in data.dims else data
+        u_t = np.asarray(ds_t["u"].values)
+        v_t = np.asarray(ds_t["v"].values)
+        if q_artist is not None:
+            q_artist.set_UVC(u_t[::step, ::step], v_t[::step, ::step])
+        t_coord = float(ds_t["t"].values) if "t" in ds_t.coords and ds_t["t"].size else frame_i
+        target_ax.set_title(f"Flow Field (t = {t_coord:.2f})", fontsize=11)
+        return [q_artist] if (blit and q_artist is not None) else []
+
+    anim = FuncAnimation(
+        fig,
+        update_frame,
+        frames=n_frames,
+        interval=interval,
+        repeat=repeat,
+        blit=blit,
+    )
+    return anim
 
 
 def imvectomovie(

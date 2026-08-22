@@ -55,6 +55,15 @@ def test_plot():
     assert fig4 is not None
 
 
+def test_animate():
+    """tests fast FuncAnimation flow field generation"""
+    anim = graphics.animate(_d, interval=50)
+    assert anim is not None
+
+    anim2 = _d.piv.animate(interval=50)
+    assert anim2 is not None
+
+
 def test_quiver():
     """ tests quiver
     """

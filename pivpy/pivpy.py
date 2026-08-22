@@ -18,6 +18,7 @@ from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 
 from pivpy.graphics import plot as gplot
+from pivpy.graphics import animate as ganimate
 from pivpy.graphics import quiver as gquiver
 from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
@@ -2462,6 +2463,10 @@ class PIVAccessor(object):
         >>> ds.piv.plot(background=None)
         """
         return gplot(self._obj, **kwargs)
+
+    def animate(self, **kwargs):
+        """High-performance FuncAnimation for time-series flow fields (graphics.animate)."""
+        return ganimate(self._obj, **kwargs)
 
     def quiver(self, **kwargs):
         """graphics.quiver() as a flow_property"""

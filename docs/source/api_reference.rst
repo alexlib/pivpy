@@ -5,6 +5,11 @@ API reference
 
 This is a complete api reference to the PIVPy package.
 
+The ``pivpy.synthetic`` module
+-------------------------------
+.. automodule:: pivpy.synthetic
+    :members:
+
 The ``pivpy.io`` module
 ----------------------------------
 .. automodule:: pivpy.io

@@ -108,16 +108,17 @@ strm.lines.set_alpha(0.55)
 for patch in ax.patches:
     patch.set_alpha(0.55)
 
-# Prominent velocity vector quiver overlay
+# Clean, well-proportioned velocity vector quiver overlay
 skip = 4
 q = ax.quiver(
     X[::skip, ::skip], Y[::skip, ::skip],
     u[::skip, ::skip], v[::skip, ::skip],
-    color="#0a0a0a", angles="xy", scale_units="xy", scale=0.48,
-    width=0.0055, headwidth=4.2, headlength=5.2, headaxislength=4.5,
+    color="#0a0a0a", angles="xy", scale_units="xy", scale=0.75,
+    width=0.005, headwidth=4.0, headlength=5.0, headaxislength=4.5,
     minshaft=1.5, pivot="mid", alpha=0.9,
 )
 ax.quiverkey(q, X=0.82, Y=1.04, U=2.0, label=r"$2.0\,\mathrm{m/s}$", labelpos="E", coordinates="axes", fontproperties={"size": 10, "weight": "bold"})
+
 
 ax.set_title("PIVPy: Synthetic Multi-Vortex Field (Vorticity, Streamlines & Vectors)", fontsize=12, fontweight="bold", pad=14)
 ax.set_xlabel("x [mm]", fontsize=11)

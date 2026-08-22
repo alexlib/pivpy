@@ -25,7 +25,6 @@ graph TD
     P2 --> P3[Phase 3: Spatial Transformations & Geometry Masking]
     P3 --> P4[Phase 4: Temporal Signal Processing & Mode Filtering]
     P4 --> P5[Phase 5: Turbulence Statistics & Structure Functions]
-    P5 --> P6[Phase 6: Optical Metrology & Free-Surface Schlieren]
 ```
 
 ---
@@ -45,7 +44,7 @@ graph TD
   * Synthetic random velocity fields with prescribed power spectrum $E(k) \propto k^{-\alpha}$ or correlation length, optionally enforcing divergence-free ($\nabla \cdot \mathbf{u} = 0$) conditions.
   * Target: `pivpy.synthetic.randvec(...)`.
 * **`makebospattern` ([`pivmat/makebospattern.m`](file:///C:/Users/alex/Github/pivmat/pivmat/makebospattern.m))**:
-  * High-density random speckle/dot pattern generator for Background Oriented Schlieren (BOS) and synthetic PIV calibration.
+  * High-density random speckle/dot pattern generator for synthetic PIV and optical calibration.
 
 ---
 
@@ -117,17 +116,6 @@ graph TD
 
 ---
 
-### Phase 6: Optical Metrology & Free-Surface Synthetic Schlieren (FS-SS)
-
-**Objective**: Interfacing with advanced optical diagnostic techniques.
-
-* **Free-Surface Height Reconstruction ([`pivmat/surfheight.m`](file:///C:/Users/alex/Github/pivmat/pivmat/surfheight.m))**:
-  * Reconstruct free-surface wave topography $h(x, y)$ from displacement vector fields by solving the 2D Poisson integration equation:
-    $$\nabla^2 h = f(\mathbf{u}, \mathbf{x}, H_0, H_c, n)$$
-  * Target: `pivpy.interfacing.surfheight(displacement_ds, h0, H_camera, refractive_index=1.33)`.
-
----
-
 ## Roadmap Tracking & Milestones
 
 | Phase | Core Milestone | Target Status |
@@ -137,4 +125,3 @@ graph TD
 | **Phase 3** | Spatial Median Filtering & Geometry Masking | In Queue |
 | **Phase 4** | Temporal Frequency & Modal Filtering | In Queue |
 | **Phase 5** | Structure Functions & Reynolds Stress Tensor | In Queue |
-| **Phase 6** | Free-Surface Schlieren Poisson Solver | In Queue |

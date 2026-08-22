@@ -14,7 +14,7 @@ PIVPy's development roadmap is divided into thematic phases aimed at achieving f
    - Analytical vortices (Burgers, Lamb-Oseen, Rankine, Vatistas)
    - Multi-vortex synthetic turbulence fields
    - Random divergence-free vector fields
-   - Synthetic speckle/Schlieren BOS pattern generation
+   - Synthetic speckle pattern generation
 
 2. **Phase 2: Vortex Identification Criteria & Flow Topology**
    - Normalized Angular Momentum ($\Gamma_1$ & $\Gamma_2$)
@@ -34,6 +34,3 @@ PIVPy's development roadmap is divided into thematic phases aimed at achieving f
    - Multi-order longitudinal and transverse velocity structure functions ($S_p(r)$)
    - Full Reynolds stress tensor and Lumley anisotropy invariants
    - 2D/1D spatial wavenumber energy spectra ($E(k)$)
-
-6. **Phase 6: Optical Metrology & Free-Surface Synthetic Schlieren**
-   - Free-surface topography reconstruction via 2D Poisson solver (`surfheight`)

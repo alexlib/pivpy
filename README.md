@@ -121,7 +121,7 @@ fig.tight_layout()
 plt.show()
 ```
 
-![Quiver over vorticity heatmap](docs/source/_static/getting_started_quiver_vorticity.png)
+![Quiver over vorticity heatmap](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_quiver_vorticity.png)
 
 Legacy loaders (still supported):
 

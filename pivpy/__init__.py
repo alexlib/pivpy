@@ -13,3 +13,7 @@ except PackageNotFoundError:
 	__version__ = "0.1.1"
 
 from .update import check_update, UpdateCheckResult  # noqa: E402,F401
+
+# registers the .piv xarray Dataset accessor (@xr.register_dataset_accessor) --
+# importing pivpy.io / pivpy.graphics alone does not trigger this
+from . import pivpy as _pivpy_accessor  # noqa: E402,F401

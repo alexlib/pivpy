@@ -2,7 +2,11 @@
 
 ## Overview
 
-This roadmap defines the multi-phase evolution plan for **PIVPy**, inspired by the MATLAB **PIVMat 4.22** toolbox (F. Moisy), the Python **PyPostPiv** library (J. Hu et al., Univ. of Waterloo), and modernized for Python's scientific ecosystem (`xarray`, `zarr`, `dask`, `scipy`, `marimo`).
+This roadmap defines the multi-phase evolution plan for **PIVPy**, inspired by:
+- The MATLAB **PIVMat 4.22** toolbox (F. Moisy)
+- The Python **PyPostPiv** library (J. Hu et al., Univ. of Waterloo)
+- The **PIV Flow Visualizer** suite (ASPiRE Lab, Univ. of Toronto)
+- Modern Python scientific libraries (`xarray`, `zarr`, `dask`, `scipy`, `marimo`).
 
 The goal is to establish PIVPy as the definitive, intuitive, out-of-core post-processing framework for Particle Image Velocimetry (PIV) and fluid dynamics research.
 
@@ -13,7 +17,7 @@ The goal is to establish PIVPy as the definitive, intuitive, out-of-core post-pr
 1. **Pure Accessor Operations**: Accessor methods (`ds.piv.*`) must return a new `xarray.Dataset` (or DataArray/figure) rather than mutating datasets in-place.
 2. **Canonical Schema Conformance**: All synthetic generators, transforms, and readers construct datasets via `pivpy.schema.build_dataset()` with standard dimensions `('y', 'x', 't')`, variables (`u`, `v`, `chc`, optional `w`), and metadata.
 3. **Out-of-Core Scalability**: Heavy calculations (temporal reductions, structure functions, spectral transforms) must preserve or leverage Dask-backed chunking.
-4. **PIVMat & PyPostPiv Parity with Pythonic Defaults**: Maintain PIVMat-compatible method aliases (e.g. `averf`, `filterf`, `interpf`, `corrf`) and PyPostPiv field calculus conventions (`tke`, `rms`, `fluctuations`, `circulation`) alongside readable Pythonic conventions.
+4. **Toolbox Parity with Pythonic Defaults**: Maintain PIVMat-compatible method aliases (e.g. `averf`, `filterf`, `interpf`, `corrf`), PyPostPiv calculus operators (`tke`, `rms`, `circulation`), and ASPiRE Lab integration schemes alongside readable Pythonic conventions.
 
 ---
 
@@ -25,7 +29,8 @@ graph TD
     P2 --> P3[Phase 3: Spatial Filtering, Geometry Masking & Gradient Calculus]
     P3 --> P4[Phase 4: Temporal Signal Processing & Mode Filtering]
     P4 --> P5[Phase 5: Turbulence Statistics, TKE & Structure Functions]
-    P5 --> P6[Phase 6: Multi-Camera, Stereoscopic 3C & Ingestion Pipeline]
+    P5 --> P6[Phase 6: Multi-Camera, Dynamic Studio & Ingestion Pipeline]
+    P6 --> P7[Phase 7: Advanced RK Streamlines & Uncertainty Reporting]
 ```
 
 ---
@@ -133,7 +138,7 @@ graph TD
 
 ---
 
-### Phase 6: Multi-Camera, Stereoscopic (3C) & Ingestion Pipeline
+### Phase 6: Multi-Camera, Dynamic Studio & Ingestion Pipeline
 
 **Objective**: Streamline multi-camera stereoscopic PIV workflows and batch raw data ingestion directly into Zarr.
 
@@ -142,6 +147,28 @@ graph TD
 * **Batch VC7/DaVis to Zarr Ingestion (PyPostPiv pattern)**:
   * Batch loader for folders of multi-camera / time-series DaVis `.vc7` or `.set` files using `ReadIM` into unified Zarr stores.
   * Target: `pivpy.io.convert_vc7_to_zarr(input_dir, output_zarr, dt=...)`.
+* **Dantec Dynamic Studio Batch CSV Ingestion (ASPiRE Lab pattern)**:
+  * Ingestion of multi-trial Dynamic Studio tabular CSV exports (`X (mm)[mm]`, `U[m/s]`, `V[m/s]`) directly into chunked xarray/Zarr datasets.
+  * Target: `pivpy.io.load_dantec_csv(dir_or_files, ...)` and `pivpy.io.convert_dantec_to_zarr(...)`.
+
+---
+
+### Phase 7: Advanced RK Streamlines, Uncertainty & Report Generation
+
+**Objective**: Deliver high-fidelity flowline integration, uncertainty-propagating spatial probing, and automated publication report generation.
+
+* **Adaptive Runge-Kutta (RK2/RK4) Streamline Integrator (ASPiRE Lab pattern)**:
+  * Bidirectional 2nd-order Runge-Kutta (Heun's method) and 4th-order particle trajectory integration with adaptive time-stepping ($dt = \min(0.5h/\|\mathbf{u}\|, dt_{\max})$) and cubic `CloughTocher` interpolation.
+  * Flexible seed generation (grids, line rakes, circles, bounding-box offsets) and velocity threshold clipping.
+  * Continuous multi-color line rendering via `matplotlib.collections.LineCollection` colored by velocity magnitude, vorticity, or TKE.
+  * Target: `ds.piv.streamlines(seeds=..., method='rk2'|'rk4')` and `ds.piv.plot_streamlines(c='mag'|'vorticity')`.
+* **Uncertainty-Propagating Interpolation & Probing (ASPiRE Lab pattern)**:
+  * Analytical uncertainty propagation for 2D spatial interpolation from grid nodes with variance $\sigma^2$:
+    $$\sigma_{\text{interp}} = \sqrt{a^2 \sigma_{11}^2 + b^2 \sigma_{21}^2 + c^2 \sigma_{12}^2 + d^2 \sigma_{22}^2}$$
+  * Target: `ds.piv.interp_with_uncertainty(points)` and `ds.piv.probe(points, with_uncertainty=True)`.
+* **Automated PDF / Dashboard Summary Reporting (ASPiRE Lab pattern)**:
+  * One-click generation of multi-page PDF summaries or interactive Marimo reports capturing ensemble velocity fields, streamlines, statistics, and experimental run metadata.
+  * Target: `ds.piv.to_pdf_report(filepath, metadata=...)`.
 
 ---
 
@@ -149,10 +176,12 @@ graph TD
 
 | Phase | Core Milestone | Influences | Target Status |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | Synthetic Flow & Vortex Generators | PIVMat (`vortex`, `multivortex`, `randvec`) | In Queue |
+| **Phase 1** | Synthetic Flow & Vortex Suite | PIVMat (`vortex`, `multivortex`, `randvec`) | In Queue |
 | **Phase 2** | Vortex Identification ($\Gamma_1, \Gamma_2$) & Circulation Vorticity | PIVMat (`nam`, `subsbr`), PyPostPiv | In Queue |
 | **Phase 3** | Spatial Filtering, Polygon Masking & Gradient Calculus | PIVMat (`medianf`, `circmaskf`), PyPostPiv | In Queue |
 | **Phase 4** | Temporal Frequency & Modal Filtering | PIVMat (`tempfilterf`, `phaseaverf`) | In Queue |
 | **Phase 5** | Turbulence Statistics, TKE & Structure Functions | PIVMat (`vsf`, `stresstensor`), PyPostPiv (`tke`) | In Queue |
-| **Phase 6** | Multi-Camera, Stereoscopic 3C & VC7 Ingestion | PyPostPiv (`convert_vc7`), Zarr Arch | In Queue |
+| **Phase 6** | Multi-Camera, Dynamic Studio & Ingestion Pipeline | PyPostPiv (`convert_vc7`), ASPiRE Lab, Zarr Arch | In Queue |
+| **Phase 7** | RK Streamlines, Uncertainty Probing & PDF Reporting | ASPiRE Lab (`streamlines_rk2`, `topdf`) | In Queue |
+
 

@@ -1,14 +1,14 @@
 # PIVPy Development Roadmap
 
 For full architectural designs and implementation details, see:
-- [PIVMat & PyPostPiv Parity Roadmap](docs/architecture/pivmat-parity-roadmap.md)
+- [PIVPy Comprehensive Parity & Evolution Roadmap](docs/architecture/pivmat-parity-roadmap.md)
 - [Zarr-First Storage Architecture & API Design](docs/architecture/zarr-migration.md)
 
 ---
 
 ## Executive Summary
 
-PIVPy's development roadmap synthesizes key capabilities from MATLAB's **PIVMat 4.22** toolbox (F. Moisy) and the Python **PyPostPiv** library (J. Hu et al., Univ. of Waterloo), delivering a modern, high-performance, out-of-core Pythonic experience:
+PIVPy's development roadmap synthesizes key capabilities from MATLAB's **PIVMat 4.22** toolbox (F. Moisy), the Python **PyPostPiv** library (J. Hu et al., Univ. of Waterloo), and the **PIV Flow Visualizer** suite (ASPiRE Lab, Univ. of Toronto):
 
 1. **Phase 1: Synthetic Flow Generators & Benchmarking Suite**
    - Analytical vortices (Burgers, Lamb-Oseen, Rankine, Vatistas)
@@ -38,7 +38,14 @@ PIVPy's development roadmap synthesizes key capabilities from MATLAB's **PIVMat 
    - Full Reynolds stress tensor and Lumley anisotropy invariants
    - 2D/1D spatial wavenumber energy spectra ($E(k)$)
 
-6. **Phase 6: Multi-Camera, Stereoscopic 3C & Ingestion Pipeline**
+6. **Phase 6: Multi-Camera, Dynamic Studio & Ingestion Pipeline**
    - Stereoscopic 3-component ($u, v, w$) pipeline support across all accessors
    - Direct batch DaVis `.vc7`/`.set` to Zarr conversion tool (`convert_vc7_to_zarr`)
+   - Dantec Dynamic Studio multi-trial CSV batch ingestion
+
+7. **Phase 7: Advanced RK Streamlines, Uncertainty & Report Generation**
+   - Adaptive Runge-Kutta (RK2/RK4) particle streamline tracking with `LineCollection` coloring
+   - Uncertainty-propagating 2D spatial interpolation and point probing
+   - Automated multi-page PDF & Marimo dashboard publication report generation
+
 

@@ -31,6 +31,12 @@ from pivpy.graphics import jpdfscal_disp as gjpdfscal_disp
 from pivpy.compute_funcs import (
     Γ1_moving_window_function,
     Γ2_moving_window_function,
+    gamma1 as cgamma1,
+    gamma2 as cgamma2,
+    vorticity_circulation as cvorticity_circulation,
+    q_criterion as cq_criterion,
+    okubo_weiss as cokubo_weiss,
+    subsbr as csubsbr,
     bwfilter2d,
     corrf,
     corrm,
@@ -1904,34 +1910,38 @@ class PIVAccessor(object):
         self._obj["v"] -= other._obj["v"]
         return self._obj
 
-    def vorticity(self, name: str = "w"):
-        """Calculates vorticity of the data array (at one time instance) and
-        adds it to the dataset
+    def vorticity(self, method: str = "differentiation", radius: int = 1, name: str = "w"):
+        """Calculates vorticity of the data array and adds it to the dataset.
         
         Args:
+            method (str): Vorticity calculation method. Options:
+                'differentiation' (default): Standard finite difference (dv_dx - du_dy).
+                'circulation': Closed contour line-integral circulation method,
+                providing superior noise immunity.
+            radius (int): Contour radius in grid points (used when method='circulation'). Defaults to 1.
             name (str): Name for the output scalar field. Defaults to "w".
-                Use different names to store multiple scalar fields in one dataset.
 
         Input:
-            xarray with the variables u,v and dimensions x,y
+            xarray with the variables u,v and dimensions x,y (and optional t)
 
         Output:
-            xarray with the estimated vorticity as a scalar field with
-            same dimensions
+            xarray with the estimated vorticity as a scalar field with same dimensions
             
         Example:
-            >>> data.piv.vorticity()  # Creates data["w"] with vorticity
+            >>> data.piv.vorticity()  # Creates data["w"] with finite-difference vorticity
+            >>> data.piv.vorticity(method="circulation", radius=2)  # Noise-robust circulation vorticity
             >>> data.piv.vorticity(name="vort")  # Creates data["vort"] with vorticity
-
         """
         warn_if_overwriting_scalar(self._obj, name)
 
-        self._obj[name] = self._obj["v"].differentiate("x") - self._obj[
-            "u"
-        ].differentiate("y")
-
-        self._obj[name].attrs["units"] = "1/delta_t"
-        self._obj[name].attrs["standard_name"] = "vorticity"
+        if str(method).lower() in ["circulation", "circ"]:
+            self._obj = cvorticity_circulation(self._obj, radius=radius, name=name)
+        else:
+            self._obj[name] = self._obj["v"].differentiate("x") - self._obj[
+                "u"
+            ].differentiate("y")
+            self._obj[name].attrs["units"] = "1/delta_t"
+            self._obj[name].attrs["standard_name"] = "vorticity"
 
         return self._obj
 
@@ -2153,112 +2163,82 @@ class PIVAccessor(object):
         self._obj[name].attrs["units"] = "m/s"
         return self._obj
 
-    def Γ1(self, n, convCoords = True):
-        """Makes use of Dask (kind of) to run Γ1_moving_window_function via Γ1_pad.
-           It takes an Xarray dataset, applies rolling window to it, groups rolling windows
-           and applyies custom Γ1-calculating function to it in a parallel manner.
+    def gamma1(self, radius: int = 3, name: str = "gamma1"):
+        """Calculates the Gamma1 vortex criterion (normalized angular momentum).
+
+        Gamma1 identifies vortex centers where abs(Gamma1) >= 2/pi (~0.6366),
+        reaching +/-1 at ideal vortex centers.
 
         Args:
-            self._obj (xarray.Dataset): Must contain at least ``u``, ``v``, ``x``, ``y`` and ``t``.
-            n (int): Rolling window radius. Window size is ``(2*n+1) x (2*n+1)``.
-            convCoords (bool): Convert coordinates.
-                                if True - create two new data arrays within self._obj with
-                                the names "xCoordiantes" and "yCoordiantes" that store x and y
-                                coordinates as data arrays; always keep it "True" unless you
-                                have already created "xCoordiantes" and "yCoordiantes" somehow
-                                (say, by running Γ1 or Γ2 functions before)
+            radius (int): Stencil radius in grid points. Defaults to 3.
+            name (str): Variable name for the output field. Defaults to 'gamma1'.
 
         Returns:
-            self._obj (xarray.Dataset) - the argument with the Γ1 data array
+            xarray.Dataset: Dataset with Gamma1 scalar field.
         """
-        # Xarray rolling window (below) doesn't roll over the coordinates. We're going to convert
-        # them to data arrays. Xarray does't make the conversion procedure easy. So, instead of
-        # Xarray, we are going to adhere to numpy for the conversion.
-        if convCoords:
-            PMX, PMY = np.meshgrid(self._obj.coords['x'].to_numpy(), self._obj.coords['y'].to_numpy())
-            tTimes = self._obj.coords['t'].to_numpy().size
-            XYshape = PMX.T.shape + (tTimes,)
-            self._obj['xCoordinates'] = xr.DataArray(np.broadcast_to(PMX.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
-            self._obj['yCoordinates'] = xr.DataArray(np.broadcast_to(PMY.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
-
-        # Create the object of class rolling:
-        rollingW = self._obj.rolling({"x":(2*n+1), "y":(2*n+1), "t":1}, center=True)
-        # Construct the dataset containing a new dimension corresponding to the rolling window
-        fieldRoll = rollingW.construct(x='rollWx', y='rollWy', t='rollWt')
-        # Xarray requires stacked array in case of a multidimensional rolling window
-        fieldStacked = fieldRoll.stack(gridcell=['x','y','t'])
-
-        # map_blocks is an automated Dask-parallel mapping function. It requires a 
-        # special implementation. Thus, I have to create a separate function - Γ1_pad - 
-        # which performs groupping of the stacked dataset fieldStacked. Then map_blocks
-        # automaticly Dask-chunks Γpad returns. Every Dask-chunk can contain several groups.
-        # The chunks are computed in parallel. See here for map_blocks() function:
-        # https://tutorial.xarray.dev/advanced/map_blocks/simple_map_blocks.html
-        def Γ1_pad(ds, n):
-            dsGroup = ds.groupby("gridcell")
-            return dsGroup.map(Γ1_moving_window_function, args=[n])
-        
-        newArr = fieldStacked.map_blocks(Γ1_pad, args=[n]).compute()   
-        # Now, the result must be unstacked to return to the original x, y, t coordinates.
-        self._obj['Γ1'] = newArr.unstack("gridcell")
-
-        self._obj['Γ1'].attrs["standard_name"] = "Gamma 1"
-        self._obj['Γ1'].attrs["units"] = "dimensionless"
-
+        self._obj = cgamma1(self._obj, radius=radius, name=name)
         return self._obj
-    
-    def Γ2(self, n, convCoords = True):
-        """Makes use of Dask (kind of) to run Γ2_moving_window_function via Γ2_pad.
-           It takes an Xarray dataset, applies rolling window to it, groups rolling windows
-           and applyies custom Γ2-calculating function to it in a parallel manner.
+
+    def gamma2(self, radius: int = 3, name: str = "gamma2"):
+        """Calculates the Galilean-invariant Gamma2 vortex identification criterion.
+
+        Gamma2 identifies vortex core boundaries where abs(Gamma2) >= 2/pi (~0.6366),
+        subtracting local convective velocity.
 
         Args:
-            self._obj (xarray.Dataset): Must contain at least ``u``, ``v``, ``x``, ``y`` and ``t``.
-            n (int): Rolling window radius. Window size is ``(2*n+1) x (2*n+1)``.
-            convCoords (bool): Convert coordinates.
-                                if True - create two new data arrays within self._obj with
-                                the names "xCoordiantes" and "yCoordiantes" that store x and y
-                                coordinates as data arrays; always keep it "True" unless you
-                                have already created "xCoordiantes" and "yCoordiantes" somehow
-                                (say, by running Γ1 or Γ2 functions before)
+            radius (int): Stencil radius in grid points. Defaults to 3.
+            name (str): Variable name for the output field. Defaults to 'gamma2'.
 
         Returns:
-            self._obj (xarray.Dataset) - the argument with the Γ2 data array
+            xarray.Dataset: Dataset with Gamma2 scalar field.
         """
-        # Xarray rolling window (below) doesn't roll over the coordinates. We're going to convert
-        # them to data arrays. Xarray does't make the conversion procedure easy. So, instead of
-        # Xarray, we are going to adhere to numpy for the conversion.
-        if convCoords:
-            PMX, PMY = np.meshgrid(self._obj.coords['x'].to_numpy(), self._obj.coords['y'].to_numpy())
-            tTimes = self._obj.coords['t'].to_numpy().size
-            XYshape = PMX.T.shape + (tTimes,)
-            self._obj['xCoordinates'] = xr.DataArray(np.broadcast_to(PMX.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
-            self._obj['yCoordinates'] = xr.DataArray(np.broadcast_to(PMY.T[:,:,np.newaxis], XYshape), dims=['x','y','t'])
+        self._obj = cgamma2(self._obj, radius=radius, name=name)
+        return self._obj
 
-        # Create the object of class rolling:
-        rollingW = self._obj.rolling({"x":(2*n+1), "y":(2*n+1), "t":1}, center=True)
-        # Construct the dataset containing a new dimension corresponding to the rolling window
-        fieldRoll = rollingW.construct(x='rollWx', y='rollWy', t='rollWt')
-        # Xarray requires stacked array in case of a multidimensional rolling window
-        fieldStacked = fieldRoll.stack(gridcell=['x','y','t'])
+    def Γ1(self, n: int = 3, convCoords: bool = True):
+        """Legacy method for Γ1 vortex criterion calculation."""
+        self._obj = cgamma1(self._obj, radius=n, name="Γ1")
+        return self._obj
 
-        # map_blocks is an automated Dask-parallel mapping function. It requires a 
-        # special implementation. Thus, I have to create a separate function - Γ2_pad - 
-        # which performs groupping of the stacked dataset fieldStacked. Then map_blocks
-        # automaticly Dask-chunks Γpad returns. Every Dask-chunk can contain several groups.
-        # The chunks are computed in parallel. See here for map_blocks() function:
-        # https://tutorial.xarray.dev/advanced/map_blocks/simple_map_blocks.html
-        def Γ2_pad(ds, n):
-            dsGroup = ds.groupby("gridcell")
-            return dsGroup.map(Γ2_moving_window_function, args=[n])
-        
-        newArr = fieldStacked.map_blocks(Γ2_pad, args=[n]).compute()   
-        # Now, the result must be unstacked to return to the original x, y, t coordinates.
-        self._obj['Γ2'] = newArr.unstack("gridcell")
+    def Γ2(self, n: int = 3, convCoords: bool = True):
+        """Legacy method for Γ2 vortex criterion calculation."""
+        self._obj = cgamma2(self._obj, radius=n, name="Γ2")
+        return self._obj
 
-        self._obj['Γ2'].attrs["standard_name"] = "Gamma 2"
-        self._obj['Γ2'].attrs["units"] = "dimensionless"
+    def q_criterion(self, name: str = "Q"):
+        """Calculates Hunt's Q-criterion for vortex core identification (Q > 0).
 
+        Args:
+            name (str): Variable name for the output field. Defaults to 'Q'.
+
+        Returns:
+            xarray.Dataset: Dataset with Q-criterion scalar field.
+        """
+        self._obj = cq_criterion(self._obj, name=name)
+        return self._obj
+
+    def okubo_weiss(self, name: str = "Q_ow"):
+        """Calculates the Okubo-Weiss criterion for vortex identification (Q_ow < 0).
+
+        Args:
+            name (str): Variable name for the output field. Defaults to 'Q_ow'.
+
+        Returns:
+            xarray.Dataset: Dataset with Okubo-Weiss scalar field.
+        """
+        self._obj = cokubo_weiss(self._obj, name=name)
+        return self._obj
+
+    def subsbr(self, r0=None):
+        """Subtracts solid body rotation from the velocity field.
+
+        Args:
+            r0 (ArrayLike, optional): Center coordinates [x0, y0]. Defaults to field center.
+
+        Returns:
+            xarray.Dataset: Dataset with subtracted solid body rotation.
+        """
+        self._obj = csubsbr(self._obj, r0=r0)
         return self._obj
 
     def vec2scal(self, flow_property: str = "curl", name: str = "w"):
@@ -2267,7 +2247,8 @@ class PIVAccessor(object):
         Args:
             flow_property (str): Name of the flow property to compute.
                 Valid options: 'curl'/'vorticity'/'vort', 'ke'/'ken'/'kinetic_energy',
-                'strain', 'divergence', 'acceleration', 'tke', 'reynolds_stress', 'rms'.
+                'strain', 'divergence', 'acceleration', 'tke', 'reynolds_stress', 'rms',
+                'gamma1', 'gamma2', 'q_criterion'/'q', 'okubo_weiss'/'q_ow'.
                 Defaults to "curl".
             name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
@@ -2280,21 +2261,28 @@ class PIVAccessor(object):
             
         Example:
             >>> data = data.piv.vec2scal('vorticity')  # Compute vorticity in data["w"]
-            >>> data = data.piv.vec2scal('ke', name='ke')  # Compute KE in data["ke"]
-            >>> # Store multiple scalars in one dataset:
-            >>> data = data.piv.vec2scal('vorticity', name='vort')
-            >>> data = data.piv.vec2scal('tke', name='tke')
-            >>> data = data.piv.vec2scal('reynolds_stress', name='rey_stress')
+            >>> data = data.piv.vec2scal('gamma1', name='g1')  # Compute Gamma1 in data["g1"]
+            >>> data = data.piv.vec2scal('gamma2', name='g2')  # Compute Gamma2 in data["g2"]
+            >>> data = data.piv.vec2scal('q_criterion', name='Q')  # Compute Q in data["Q"]
         """
         # Replace common aliases with canonical names
-        flow_property = "vorticity" if flow_property in ["curl", "vort"] else flow_property
-        flow_property = "kinetic_energy" if flow_property in ["ken", "ke"] else flow_property
+        alias_map = {
+            "curl": "vorticity",
+            "vort": "vorticity",
+            "ke": "kinetic_energy",
+            "ken": "kinetic_energy",
+            "q": "q_criterion",
+            "q_ow": "okubo_weiss",
+            "ow": "okubo_weiss",
+        }
+        flow_property = alias_map.get(str(flow_property).lower(), flow_property)
         
         # Check if method exists
         if not hasattr(self, flow_property):
             valid_properties = [
                 'vorticity', 'kinetic_energy', 'strain', 'divergence', 
-                'acceleration', 'tke', 'reynolds_stress', 'rms'
+                'acceleration', 'tke', 'reynolds_stress', 'rms',
+                'gamma1', 'gamma2', 'q_criterion', 'okubo_weiss'
             ]
             raise AttributeError(
                 f"Unknown flow property '{flow_property}'. "

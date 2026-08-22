@@ -3359,71 +3359,314 @@ def surfheight(
     return out_fields if isinstance(dr, list) else out_fields[0]
 
 
+
+def _apply_2d_slices(ds: xr.Dataset, func, *args, **kwargs) -> np.ndarray:
+    """Helper to apply a 2D spatial function over all time frames in a dataset."""
+    u = np.asarray(ds["u"].values, dtype=float)
+    v = np.asarray(ds["v"].values, dtype=float)
+    x = np.asarray(ds["x"].values, dtype=float)
+    y = np.asarray(ds["y"].values, dtype=float)
+    dx = float(x[1] - x[0]) if x.size >= 2 else 1.0
+    dy = float(y[1] - y[0]) if y.size >= 2 else 1.0
+
+    is_3d = (u.ndim == 3)
+    if is_3d:
+        ny, nx, nt = u.shape
+        out = np.zeros((ny, nx, nt), dtype=float)
+        for ti in range(nt):
+            out[:, :, ti] = func(u[:, :, ti], v[:, :, ti], dx, dy, *args, **kwargs)
+        return out
+    else:
+        return func(u, v, dx, dy, *args, **kwargs)
+
+
+def _gamma1_2d(u: np.ndarray, v: np.ndarray, dx: float, dy: float, radius: int = 3) -> np.ndarray:
+    """Vectorized calculation of Gamma1 on a 2D velocity grid."""
+    ny, nx = u.shape
+    r = int(radius)
+    if r < 1 or ny <= 2 * r or nx <= 2 * r:
+        return np.zeros_like(u)
+
+    accum = np.zeros((ny - 2 * r, nx - 2 * r), dtype=float)
+    n_pts = 0
+
+    for dj in range(-r, r + 1):
+        for di in range(-r, r + 1):
+            if di == 0 and dj == 0:
+                continue
+            rx = di * dx
+            ry = dj * dy
+            dist = np.sqrt(rx**2 + ry**2)
+            if dist > (r + 0.5) * max(dx, dy):
+                continue
+
+            n_pts += 1
+            u_s = u[r + dj : ny - r + dj, r + di : nx - r + di]
+            v_s = v[r + dj : ny - r + dj, r + di : nx - r + di]
+            speed = np.sqrt(u_s**2 + v_s**2)
+
+            cross = rx * v_s - ry * u_s
+            with np.errstate(divide="ignore", invalid="ignore"):
+                sin_th = np.where(speed > 1e-12, cross / (dist * speed), 0.0)
+                sin_th = np.nan_to_num(sin_th, nan=0.0)
+            accum += sin_th
+
+    g1 = np.zeros((ny, nx), dtype=float)
+    if n_pts > 0:
+        g1[r : ny - r, r : nx - r] = accum / n_pts
+    return g1
+
+
+def _gamma2_2d(u: np.ndarray, v: np.ndarray, dx: float, dy: float, radius: int = 3) -> np.ndarray:
+    """Vectorized calculation of Galilean-invariant Gamma2 on a 2D velocity grid."""
+    ny, nx = u.shape
+    r = int(radius)
+    if r < 1 or ny <= 2 * r or nx <= 2 * r:
+        return np.zeros_like(u)
+
+    u_sum = np.zeros((ny - 2 * r, nx - 2 * r), dtype=float)
+    v_sum = np.zeros((ny - 2 * r, nx - 2 * r), dtype=float)
+    valid_count = np.zeros((ny - 2 * r, nx - 2 * r), dtype=float)
+    offsets = []
+
+    for dj in range(-r, r + 1):
+        for di in range(-r, r + 1):
+            rx = di * dx
+            ry = dj * dy
+            dist = np.sqrt(rx**2 + ry**2)
+            if dist > (r + 0.5) * max(dx, dy):
+                continue
+            offsets.append((di, dj, rx, ry, dist))
+            u_s = u[r + dj : ny - r + dj, r + di : nx - r + di]
+            v_s = v[r + dj : ny - r + dj, r + di : nx - r + di]
+            mask_fin = np.isfinite(u_s) & np.isfinite(v_s)
+            u_sum += np.where(mask_fin, u_s, 0.0)
+            v_sum += np.where(mask_fin, v_s, 0.0)
+            valid_count += mask_fin.astype(float)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        u_mean = np.where(valid_count > 0, u_sum / valid_count, 0.0)
+        v_mean = np.where(valid_count > 0, v_sum / valid_count, 0.0)
+
+    accum = np.zeros((ny - 2 * r, nx - 2 * r), dtype=float)
+    n_pts = 0
+
+    for di, dj, rx, ry, dist in offsets:
+        if di == 0 and dj == 0:
+            continue
+        n_pts += 1
+        u_s = u[r + dj : ny - r + dj, r + di : nx - r + di]
+        v_s = v[r + dj : ny - r + dj, r + di : nx - r + di]
+        u_rel = u_s - u_mean
+        v_rel = v_s - v_mean
+        speed_rel = np.sqrt(u_rel**2 + v_rel**2)
+        cross = rx * v_rel - ry * u_rel
+        with np.errstate(divide="ignore", invalid="ignore"):
+            sin_th = np.where(speed_rel > 1e-12, cross / (dist * speed_rel), 0.0)
+            sin_th = np.nan_to_num(sin_th, nan=0.0)
+        accum += sin_th
+
+    g2 = np.zeros((ny, nx), dtype=float)
+    if n_pts > 0:
+        g2[r : ny - r, r : nx - r] = accum / n_pts
+    return g2
+
+
+def _vorticity_circulation_2d(u: np.ndarray, v: np.ndarray, dx: float, dy: float, radius: int = 1) -> np.ndarray:
+    """Vectorized calculation of circulation vorticity via closed loop integration."""
+    ny, nx = u.shape
+    r = int(radius)
+    if r < 1 or ny <= 2 * r or nx <= 2 * r:
+        return np.zeros_like(u)
+
+    w_x = np.ones(2 * r + 1, dtype=float)
+    w_x[0] = 0.5
+    w_x[-1] = 0.5
+
+    w_y = np.ones(2 * r + 1, dtype=float)
+    w_y[0] = 0.5
+    w_y[-1] = 0.5
+
+    bot_integral = np.zeros((ny - 2 * r, nx - 2 * r), dtype=float)
+    top_integral = np.zeros((ny - 2 * r, nx - 2 * r), dtype=float)
+
+    for k, di in enumerate(range(-r, r + 1)):
+        bot_integral += w_x[k] * np.nan_to_num(u[0 : ny - 2 * r, r + di : nx - r + di], nan=0.0)
+        top_integral += w_x[k] * np.nan_to_num(u[2 * r : ny, r + di : nx - r + di], nan=0.0)
+    bot_integral *= dx
+    top_integral *= dx
+
+    right_integral = np.zeros((ny - 2 * r, nx - 2 * r), dtype=float)
+    left_integral = np.zeros((ny - 2 * r, nx - 2 * r), dtype=float)
+
+    for k, dj in enumerate(range(-r, r + 1)):
+        right_integral += w_y[k] * np.nan_to_num(v[r + dj : ny - r + dj, 2 * r : nx], nan=0.0)
+        left_integral += w_y[k] * np.nan_to_num(v[r + dj : ny - r + dj, 0 : nx - 2 * r], nan=0.0)
+    right_integral *= dy
+    left_integral *= dy
+
+    gamma = bot_integral + right_integral - top_integral - left_integral
+    area = (2 * r * dx) * (2 * r * dy)
+
+    w_circ = np.zeros((ny, nx), dtype=float)
+    w_circ[r : ny - r, r : nx - r] = gamma / area
+    return w_circ
+
+
+def _q_criterion_2d(u: np.ndarray, v: np.ndarray, dx: float, dy: float) -> np.ndarray:
+    """Calculates Hunt's Q-criterion in 2D."""
+    dudx = np.gradient(u, dx, axis=1)
+    dudy = np.gradient(u, dy, axis=0)
+    dvdx = np.gradient(v, dx, axis=1)
+    dvdy = np.gradient(v, dy, axis=0)
+    return -0.5 * (dudx**2 + dvdy**2 + 2.0 * dudy * dvdx)
+
+
+def _okubo_weiss_2d(u: np.ndarray, v: np.ndarray, dx: float, dy: float) -> np.ndarray:
+    """Calculates Okubo-Weiss parameter in 2D."""
+    dudx = np.gradient(u, dx, axis=1)
+    dudy = np.gradient(u, dy, axis=0)
+    dvdx = np.gradient(v, dx, axis=1)
+    dvdy = np.gradient(v, dy, axis=0)
+    sn = dudx - dvdy
+    ss = dvdx + dudy
+    omega = dvdx - dudy
+    return sn**2 + ss**2 - omega**2
+
+
+def gamma1(ds: xr.Dataset, radius: int = 3, name: str = "gamma1") -> xr.Dataset:
+    """Calculates the Gamma1 vortex criterion (normalized angular momentum).
+
+    Gamma1 identifies vortex centers where abs(Gamma1) >= 2/pi (~0.6366),
+    reaching +/-1 at ideal vortex cores.
+
+    Args:
+        ds (xr.Dataset): Velocity field containing 'u', 'v', 'x', 'y' (and optional 't').
+        radius (int): Stencil radius in grid points. Defaults to 3.
+        name (str): Variable name for the output field. Defaults to 'gamma1'.
+
+    Returns:
+        xr.Dataset: Dataset with new Gamma1 variable.
+    """
+    warn_if_overwriting_scalar(ds, name)
+    out_arr = _apply_2d_slices(ds, _gamma1_2d, radius=radius)
+    out = ds.copy(deep=False)
+    dims = ("y", "x", "t") if "t" in ds.dims else ("y", "x")
+    out[name] = xr.DataArray(out_arr, dims=dims, coords=ds.coords)
+    out[name].attrs["standard_name"] = "Gamma 1"
+    out[name].attrs["units"] = "dimensionless"
+    out[name].attrs["radius"] = radius
+    return out
+
+
+def gamma2(ds: xr.Dataset, radius: int = 3, name: str = "gamma2") -> xr.Dataset:
+    """Calculates the Galilean-invariant Gamma2 vortex identification criterion.
+
+    Gamma2 identifies vortex core boundaries where abs(Gamma2) >= 2/pi (~0.6366),
+    remaining invariant under uniform background convection.
+
+    Args:
+        ds (xr.Dataset): Velocity field containing 'u', 'v', 'x', 'y' (and optional 't').
+        radius (int): Stencil radius in grid points. Defaults to 3.
+        name (str): Variable name for the output field. Defaults to 'gamma2'.
+
+    Returns:
+        xr.Dataset: Dataset with new Gamma2 variable.
+    """
+    warn_if_overwriting_scalar(ds, name)
+    out_arr = _apply_2d_slices(ds, _gamma2_2d, radius=radius)
+    out = ds.copy(deep=False)
+    dims = ("y", "x", "t") if "t" in ds.dims else ("y", "x")
+    out[name] = xr.DataArray(out_arr, dims=dims, coords=ds.coords)
+    out[name].attrs["standard_name"] = "Gamma 2"
+    out[name].attrs["units"] = "dimensionless"
+    out[name].attrs["radius"] = radius
+    return out
+
+
+def vorticity_circulation(ds: xr.Dataset, radius: int = 1, name: str = "w") -> xr.Dataset:
+    """Calculates noise-robust vorticity via closed contour circulation integral.
+
+    Args:
+        ds (xr.Dataset): Velocity field containing 'u', 'v', 'x', 'y' (and optional 't').
+        radius (int): Integration loop radius in grid points. Defaults to 1.
+        name (str): Variable name for the output field. Defaults to 'w'.
+
+    Returns:
+        xr.Dataset: Dataset with circulation-based vorticity scalar field.
+    """
+    warn_if_overwriting_scalar(ds, name)
+    out_arr = _apply_2d_slices(ds, _vorticity_circulation_2d, radius=radius)
+    out = ds.copy(deep=False)
+    dims = ("y", "x", "t") if "t" in ds.dims else ("y", "x")
+    out[name] = xr.DataArray(out_arr, dims=dims, coords=ds.coords)
+    out[name].attrs["standard_name"] = "vorticity_circulation"
+    out[name].attrs["units"] = "1/s"
+    out[name].attrs["radius"] = radius
+    return out
+
+
+def q_criterion(ds: xr.Dataset, name: str = "Q") -> xr.Dataset:
+    """Calculates Hunt's Q-criterion for vortex core identification.
+
+    Regions with Q > 0 indicate rotation-dominated vortex cores.
+
+    Args:
+        ds (xr.Dataset): Velocity field containing 'u', 'v', 'x', 'y' (and optional 't').
+        name (str): Variable name for the output field. Defaults to 'Q'.
+
+    Returns:
+        xr.Dataset: Dataset with Q-criterion scalar field.
+    """
+    warn_if_overwriting_scalar(ds, name)
+    out_arr = _apply_2d_slices(ds, _q_criterion_2d)
+    out = ds.copy(deep=False)
+    dims = ("y", "x", "t") if "t" in ds.dims else ("y", "x")
+    out[name] = xr.DataArray(out_arr, dims=dims, coords=ds.coords)
+    out[name].attrs["standard_name"] = "Q_criterion"
+    out[name].attrs["units"] = "1/s^2"
+    return out
+
+
+def okubo_weiss(ds: xr.Dataset, name: str = "Q_ow") -> xr.Dataset:
+    """Calculates the Okubo-Weiss criterion for vortex identification.
+
+    Regions with Q_ow < 0 indicate vortex cores dominated by rotation over strain.
+
+    Args:
+        ds (xr.Dataset): Velocity field containing 'u', 'v', 'x', 'y' (and optional 't').
+        name (str): Variable name for the output field. Defaults to 'Q_ow'.
+
+    Returns:
+        xr.Dataset: Dataset with Okubo-Weiss scalar field.
+    """
+    warn_if_overwriting_scalar(ds, name)
+    out_arr = _apply_2d_slices(ds, _okubo_weiss_2d)
+    out = ds.copy(deep=False)
+    dims = ("y", "x", "t") if "t" in ds.dims else ("y", "x")
+    out[name] = xr.DataArray(out_arr, dims=dims, coords=ds.coords)
+    out[name].attrs["standard_name"] = "okubo_weiss"
+    out[name].attrs["units"] = "1/s^2"
+    return out
+
+
 def Γ1_moving_window_function(
         fWin: xr.Dataset,
         n: int,
 ) -> xr.DataArray:
-    """
-    This is the implementation of Γ1 function given by equation 9 in L.Graftieaux, M. Michard,
-    N. Grosjean, "Combining PIV, POD and vortex identification algorithms for the study of
-    unsteady turbulent swirling flows", Meas.Sci.Technol., 12(2001), p.1422-1429.
-    Γ1 function is used to identify the locations of the centers of the vortices (which are
-    given by the Γ1 peak values within the velocity field).
-    IMPORTANT NOTICE: even though this function, theoretically, can be used on its own,  
-    it is not supposed to. It is designed to be used with Dask for big
-    PIV datasets. The recomendation is not to use this function on its own, but rather use
-    Γ1 attribute of piv class of PIVPY package (example of usage in this case would be: ds.piv.Γ1())
-    This function accepts a (2*n+1)x(2*n+1) neighborhood of one velocity vector from the
-    entire velocity field in the form of Xarray dataset. And for this neighborhood only, 
-    it calculates the value of Γ1.
-    Also, note this function is designed in a way that assumes point P (see the referenced
-    article) to coincide with the center for fWin.
-    This function works only for 2D velocity field.
-
-    Args:
-        fWin (xarray.Dataset): A moving-window view of the dataset.
-        n (int): Rolling window radius. The window size is ``(2*n+1) x (2*n+1)``.
-
-    Returns:
-        xarray.DataArray: Γ1 value for the given rolling window.
-    """
-    # We must convert fWin to numpy, because when this function was originally implemented 
-    # with fWin being an xr.Dataset, it was unbelievably slow! Conversion of fWin to numpy 
-    # proved to give an incredible boost in speed.
-    # To speed up the things even more I put everything in one line, which is unreadable.
-    # Thus, to understand, what is going one, I'm giving a break up of the line
-    # (the names of the variables are taken from the referenced article):
-    # PMx = fWin['xCoordinates'].to_numpy() - float(fWin['xCoordinates'][n,n])
-    # PMy = fWin['yCoordinates'].to_numpy() - float(fWin['yCoordinates'][n,n])
-    # PM = np.sqrt(np.add(np.square(PMx), np.square(PMy)))
-    # u = fWin['u'].to_numpy()
-    # v = fWin['v'].to_numpy()
-    # U = (u**2 + v**2)**(0.5)
-    # The external tensor product (PM ^ U) * z (see the referenced article) can be simplified as a
-    # cross product for the case of the 2D velocity field: (PM x U). According to the rules of
-    # cross product, for the 2D velocity field, we have (PM x U) = PM_x * v - PM_y * u. In other
-    # words, we don't have to compute the sin given in the referenced article. But I am, still,
-    # going to use sin down below as the variable to be consistent with the expression given
-    # in the referenced article.
-    # sinΘM_Γ1 = (PMx*v - PMy*u) / PM / U 
-    # Γ1 = np.nansum(sinΘM_Γ1) / (((2*n+1)**2))
-    # And now here goes my one-liner. Note, that I didn't put PMx, PMy, u and v calculations
-    # into my line. That's because I figured out emperically that would slow down the calculations.
-    # n always points to the central interrogation window (just think of it). It gives me point P.
-    # Robustly extract the central-point coordinates.
-    # Newer xarray versions may reorder dimensions; avoid assuming positional [n, n]
-    # returns a scalar.
-    xcoords = fWin['xCoordinates']
-    ycoords = fWin['yCoordinates']
+    """Legacy moving-window function for Γ1 calculation."""
+    xcoords = fWin.get('xCoordinates', fWin.get('x'))
+    ycoords = fWin.get('yCoordinates', fWin.get('y'))
 
     def _center_scalar(arr: xr.DataArray) -> float:
+        if arr is None:
+            return 0.0
         if 'rollWx' in arr.dims and 'rollWy' in arr.dims:
             sel = arr.isel(rollWx=n, rollWy=n)
         elif len(arr.dims) >= 2:
-            sel = arr.isel({arr.dims[0]: n, arr.dims[1]: n})
+            sel = arr.isel({arr.dims[0]: min(n, arr.shape[0]-1), arr.dims[1]: min(n, arr.shape[1]-1)})
         else:
             sel = arr
-        # Reduce any remaining dims (e.g. rollWt) to a scalar.
         for d in list(sel.dims):
             sel = sel.isel({d: 0})
         return float(np.asarray(sel.values).reshape(-1)[0])
@@ -3431,13 +3674,11 @@ def Γ1_moving_window_function(
     cx = _center_scalar(xcoords)
     cy = _center_scalar(ycoords)
 
-    PMx = np.subtract(np.asarray(xcoords.to_numpy(), dtype=float), cx)
-    PMy = np.subtract(np.asarray(ycoords.to_numpy(), dtype=float), cy)
+    PMx = np.subtract(np.asarray(xcoords.to_numpy(), dtype=float), cx) if xcoords is not None else 0.0
+    PMy = np.subtract(np.asarray(ycoords.to_numpy(), dtype=float), cy) if ycoords is not None else 0.0
     u = np.asarray(fWin['u'].to_numpy(), dtype=float)
     v = np.asarray(fWin['v'].to_numpy(), dtype=float)
 
-    # Avoid RuntimeWarning("Mean of empty slice") when a window has no valid vectors.
-    # This happens in masked/no-flow regions where the entire neighborhood becomes NaN.
     num = PMx * v - PMy * u
     denom = np.hypot(PMx, PMy) * np.hypot(u, v)
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -3449,75 +3690,25 @@ def Γ1_moving_window_function(
         )
 
     valid = np.isfinite(values)
-    Γ1 = float(values[valid].mean()) if np.any(valid) else np.nan
-
-    return xr.DataArray(Γ1).fillna(0.0) # fillna(0) is necessary for plotting
+    val = float(values[valid].mean()) if np.any(valid) else 0.0
+    return xr.DataArray(val).fillna(0.0)
 
 
 def Γ2_moving_window_function(
         fWin: xr.Dataset,
         n: int,
 ) -> xr.DataArray:
-    """
-    This is the implementation of Γ2 function given by equation 11 in L.Graftieaux, M. Michard,
-    N. Grosjean, "Combining PIV, POD and vortex identification algorithms for the study of
-    unsteady turbulent swirling flows", Meas.Sci.Technol., 12(2001), p.1422-1429.
-    Γ2 function is used to identify the boundaries of the vortices in a velocity field.
-    IMPORTANT NOTICE: even though this function, theoretically, can be used on its own, 
-    it is not supposed to. It is designed to be used with Dask for big
-    PIV datasets. The recomendation is not to use this function on its own, but rather use
-    Γ2 attribute of piv class of PIVPY package (example of usage in this case would be: ds.piv.Γ2())
-    This function accepts a (2*n+1)x(2*n+1) neighborhood of one velocity vector from the
-    entire velocity field in the form of Xarray dataset. And for this neighborhood only, 
-    it calculates the value of Γ2.
-    Also, note this function is designed in a way that assumes point P (see the referenced
-    article) to coincide with the center for fWin.
-    And finally, the choice of convective velocity (see the referenced article) is made in the
-    article: it is the average velocity within fWin.
-    This function works only for 2D velocity field.
-
-    Args:
-        fWin (xarray.Dataset): A moving-window view of the dataset.
-        n (int): Rolling window radius. The window size is ``(2*n+1) x (2*n+1)``.
-
-    Returns:
-        xarray.DataArray: Γ2 value for the given rolling window.
-    """
-    # We must convert fWin to numpy, because when this function was originally implemented 
-    # with fWin being an xr.Dataset, it was unbelievably slow! Conversion of fWin to numpy 
-    # proved to give an incredible boost in speed.
-    # To speed up the things even more I put everything in one line, which is unreadable.
-    # Thus, to understand, what is going one, I'm giving a break up of the line
-    # (the names of the variables are taken from the referenced article):
-    # PMx = fWin['xCoordinates'].to_numpy() - float(fWin['xCoordinates'][n,n])
-    # PMy = fWin['yCoordinates'].to_numpy() - float(fWin['yCoordinates'][n,n])
-    # PM = np.sqrt(np.add(np.square(PMx), np.square(PMy)))
-    # u = fWin['u'].to_numpy()
-    # v = fWin['v'].to_numpy()
-    # We are going to include point P into the calculations of velocity UP_tilde
-    # uP_tilde = np.nanmean(u)
-    # vP_tilde = np.nanmean(v)
-    # uDif = u - uP_tilde
-    # vDif = v - vP_tilde
-    # UDif = (uDif**2 + vDif**2)**(0.5)
-    # The external tensor product (PM ^ UDif) * z (see the referenced article) can be simplified as a
-    # cross product for the case of the 2D velocity field: (PM x UDif). According to the rules of
-    # cross product, for the 2D velocity field, we have (PM x UDif) = PM_x * vDif - PM_y * uDif. 
-    # I am going to use sin down below as the variable to be consistent with the expression given
-    # for Γ1 function.
-    # sinΘM_Γ2 = (PMx*vDif - PMy*uDif) / PM / UDif 
-    # Γ2 = np.nansum(sinΘM_Γ2) / (((2*n+1)**2))
-    # And now here goes my one-liner. Note, that I didn't put PMx, PMy, u and v calculations
-    # into my line. That's because I figured out emperically that would slow down the calculations.
-    # n always points to the central interrogation window (just think of it). It gives me point P.
-    xcoords = fWin['xCoordinates']
-    ycoords = fWin['yCoordinates']
+    """Legacy moving-window function for Γ2 calculation."""
+    xcoords = fWin.get('xCoordinates', fWin.get('x'))
+    ycoords = fWin.get('yCoordinates', fWin.get('y'))
 
     def _center_scalar(arr: xr.DataArray) -> float:
+        if arr is None:
+            return 0.0
         if 'rollWx' in arr.dims and 'rollWy' in arr.dims:
             sel = arr.isel(rollWx=n, rollWy=n)
         elif len(arr.dims) >= 2:
-            sel = arr.isel({arr.dims[0]: n, arr.dims[1]: n})
+            sel = arr.isel({arr.dims[0]: min(n, arr.shape[0]-1), arr.dims[1]: min(n, arr.shape[1]-1)})
         else:
             sel = arr
         for d in list(sel.dims):
@@ -3527,19 +3718,18 @@ def Γ2_moving_window_function(
     cx = _center_scalar(xcoords)
     cy = _center_scalar(ycoords)
 
-    PMx = np.subtract(np.asarray(xcoords.to_numpy(), dtype=float), cx)
-    PMy = np.subtract(np.asarray(ycoords.to_numpy(), dtype=float), cy)
+    PMx = np.subtract(np.asarray(xcoords.to_numpy(), dtype=float), cx) if xcoords is not None else 0.0
+    PMy = np.subtract(np.asarray(ycoords.to_numpy(), dtype=float), cy) if ycoords is not None else 0.0
     u = np.asarray(fWin['u'].to_numpy(), dtype=float)
     v = np.asarray(fWin['v'].to_numpy(), dtype=float)
 
     finite_u = np.isfinite(u)
     finite_v = np.isfinite(v)
-    u_mean = float(u[finite_u].mean()) if np.any(finite_u) else np.nan
-    v_mean = float(v[finite_v].mean()) if np.any(finite_v) else np.nan
+    u_mean = float(u[finite_u].mean()) if np.any(finite_u) else 0.0
+    v_mean = float(v[finite_v].mean()) if np.any(finite_v) else 0.0
     uDif = u - u_mean
     vDif = v - v_mean
 
-    # Avoid RuntimeWarning("Mean of empty slice") when a window has no valid vectors.
     num = PMx * vDif - PMy * uDif
     denom = np.hypot(PMx, PMy) * np.hypot(uDif, vDif)
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -3551,6 +3741,5 @@ def Γ2_moving_window_function(
         )
 
     valid = np.isfinite(values)
-    Γ2 = float(values[valid].mean()) if np.any(valid) else np.nan
-
-    return xr.DataArray(Γ2).fillna(0.0) # fillna(0) is necessary for plotting
+    val = float(values[valid].mean()) if np.any(valid) else 0.0
+    return xr.DataArray(val).fillna(0.0)

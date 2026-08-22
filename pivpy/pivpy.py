@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 """
 This script extends the functionality of xarray.Dataset by adding a new accessor called piv. The accessor adds several properties and methods that are useful for working with particle image velocimetry (PIV) data. The properties include average, which returns the mean flow field, and delta_t, which returns the time step used in the PIV measurement. The methods include crop, which allows the user to crop the data by a given number of rows and columns from the boundaries, vec2scal, which converts vector data to scalar data, pan, which pans the data by a given number of pixels, and rotate, which rotates the data by a given angle.
 
 
 @author: Ron, Alex
 """
-try:
-    from typing_extensions import Literal
-except ImportError:
-    from typing import Literal
-from typing import List, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
 import warnings
 
 import numpy as np

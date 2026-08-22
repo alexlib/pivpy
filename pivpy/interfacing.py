@@ -6,6 +6,8 @@ Here is the link to the VortexFitting article:
 https://www.sciencedirect.com/science/article/pii/S2352711020303174?via%3Dihub .
 """
 
+from __future__ import annotations
+
 import numpy as np
 
 try:

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import warnings
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import xarray as xr

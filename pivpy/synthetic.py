@@ -249,6 +249,96 @@ def multivortex(
     return ds
 
 
+def vortex_pair(
+    n_frames: int = 30,
+    n: Union[int, Tuple[int, int]] = 128,
+    r0: Optional[float] = None,
+    dx: float = 1.0,
+    dy: float = 1.0,
+) -> xr.Dataset:
+    """Generate a time-series dataset of an interacting counter-rotating vortex pair (dipole).
+
+    Two vortices (positive cyclonic and negative anticyclonic) translate from left to right.
+    As they advance, the negative (blue) vortex strengthens and approaches the positive (red) one.
+
+    Parameters
+    ----------
+    n_frames : int, default 30
+        Number of time frames to generate.
+    n : int or tuple of (rows, cols), default 128
+        Spatial grid dimension.
+    r0 : float, optional
+        Vortex core radius in coordinate units. Defaults to 8% of domain height.
+    dx, dy : float, default 1.0
+        Grid spacing in x and y.
+
+    Returns
+    -------
+    xr.Dataset
+        Canonical multi-frame PIVPy dataset with variables ('u', 'v', 'chc') and coords ('x', 'y', 't').
+    """
+    if isinstance(n, int):
+        rows, cols = n, n
+    else:
+        rows, cols = n
+
+    x_coords = np.arange(cols, dtype=float) * dx
+    y_coords = np.arange(rows, dtype=float) * dy
+    x2d, y2d = np.meshgrid(x_coords, y_coords)
+
+    x_min, x_max = x_coords[0], x_coords[-1]
+    y_min, y_max = y_coords[0], y_coords[-1]
+    y_center = (y_min + y_max) / 2.0
+    domain_width = max(1e-6, x_max - x_min)
+    domain_height = max(1e-6, y_max - y_min)
+
+    core_radius = float(r0) if r0 is not None else 0.085 * domain_height
+    frames = []
+
+    for t_idx in range(n_frames):
+        tau = float(t_idx) / max(1, n_frames - 1)  # Normalized time progress 0.0 -> 1.0
+
+        # Positive / Red vortex (upper path, steady circulation)
+        x_red = x_min + 0.22 * domain_width + 0.56 * domain_width * tau
+        y_red = y_center + 0.18 * domain_height - 0.04 * domain_height * tau
+        omega_red = 2.4
+
+        # Negative / Blue vortex (lower path, strengthens and gets closer to red vortex)
+        x_blue = x_min + 0.18 * domain_width + 0.60 * domain_width * tau
+        y_blue = y_center - 0.26 * domain_height + 0.20 * domain_height * tau
+        omega_blue = -(1.6 + 2.4 * tau)
+
+        u_frame = np.zeros((rows, cols), dtype=float)
+        v_frame = np.zeros((rows, cols), dtype=float)
+
+        for xc, yc, omega in [(x_red, y_red, omega_red), (x_blue, y_blue, omega_blue)]:
+            rx = x2d - xc
+            ry = y2d - yc
+            r2 = rx**2 + ry**2
+            safe_r2 = np.where(r2 == 0.0, 1e-12, r2)
+            c2 = core_radius**2
+            decay = (1.0 - np.exp(-r2 / c2)) / safe_r2
+            ampl = omega * c2 / 2.0 * decay
+            u_frame += -ampl * ry
+            v_frame += ampl * rx
+
+        chc_frame = np.ones_like(u_frame, dtype=float)
+        ds_t = build_dataset(
+            x=x_coords,
+            y=y_coords,
+            t=np.array([float(t_idx)], dtype=float),
+            u=u_frame[:, :, np.newaxis],
+            v=v_frame[:, :, np.newaxis],
+            chc=chc_frame[:, :, np.newaxis],
+            delta_t=float(DELTA_T),
+        )
+        frames.append(ds_t)
+
+    ds = xr.concat(frames, dim="t") if len(frames) > 1 else frames[0]
+    ds.attrs["flow_model"] = "vortex_pair"
+    return ds
+
+
 def randvec(
     n: Union[int, Tuple[int, int]] = 128,
     n_frames: int = 1,

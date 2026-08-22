@@ -132,3 +132,13 @@ def test_shear_layer():
     assert abs(float(ds["u"].sel(y=yc).isel(x=0, t=0))) < 1e-10
     assert float(ds["u"].isel(y=-1, x=0, t=0)) > 4.5
     assert float(ds["u"].isel(y=0, x=0, t=0)) < -4.5
+
+
+def test_vortex_pair():
+    ds = synthetic.vortex_pair(n_frames=5, n=64)
+    validate(ds)
+    assert ds.sizes["t"] == 5
+    assert ds.sizes["x"] == 64
+    assert ds.sizes["y"] == 64
+    assert "u" in ds.data_vars
+    assert "v" in ds.data_vars

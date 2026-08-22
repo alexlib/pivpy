@@ -87,6 +87,23 @@ plt.show()
 
 ![PIVPy Multi-Vortex Flow Visualization](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_quiver_vorticity.png)
 
+### Dynamic Flow Animations
+
+Animate time-series datasets with in-place vector updates (`set_UVC`) and dynamic vorticity tracking:
+
+```python
+# 1. Generate or load time-series flow data (e.g. interacting vortex pair)
+ds = synthetic.vortex_pair(n_frames=24, n=128)
+
+# 2. Animate with one call
+anim = ds.piv.animate(interval=80)
+
+# Save as GIF / MP4 or display in Jupyter / Marimo
+anim.save("vortex_interaction.gif")
+```
+
+![PIVPy Flow Animation](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_animation.gif)
+
 ### Customizing Your Plots
 
 Every visual layer can be easily tailored or toggled:

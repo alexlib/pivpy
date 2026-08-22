@@ -824,6 +824,61 @@ class ZarrReader(PIVReader):
         return set_default_attrs(ds)
 
 
+class CSVReader(PIVReader):
+    name = "csv"
+
+    def can_read(self, filepath: Any) -> bool:
+        path = _to_path(filepath)
+        return path.suffix.lower() in {".csv"}
+
+    def read_metadata(self, filepath: Any) -> PIVMetadata:
+        path = _to_path(filepath)
+        df = pd.read_csv(path, nrows=5)
+        return PIVMetadata(
+            pos_units=POS_UNITS,
+            vel_units=VEL_UNITS,
+            time_units=TIME_UNITS,
+            delta_t=float(DELTA_T),
+            variables=list(df.columns),
+            frame=_extract_frame_number(path),
+        )
+
+    def read(self, filepath: Any, frame: Optional[int] = None, **kwargs) -> xr.Dataset:
+        path = _to_path(filepath)
+        df = pd.read_csv(path)
+        col_map = {c.lower(): c for c in df.columns}
+        if "x" not in col_map or "y" not in col_map or "u" not in col_map or "v" not in col_map:
+            raise ValueError(f"CSV file {path} missing required x, y, u, v columns.")
+
+        x_col = col_map["x"]
+        y_col = col_map["y"]
+        u_col = col_map["u"]
+        v_col = col_map["v"]
+        chc_col = col_map.get("chc", None)
+
+        x_unique = np.unique(df[x_col].values)
+        y_unique = np.unique(df[y_col].values)
+        nx = len(x_unique)
+        ny = len(y_unique)
+
+        u_grid = df[u_col].values.reshape((ny, nx))
+        v_grid = df[v_col].values.reshape((ny, nx))
+        chc_grid = df[chc_col].values.reshape((ny, nx)) if chc_col is not None else np.ones((ny, nx), dtype=float)
+
+        t_val = float(frame if frame is not None else _extract_frame_number(path))
+
+        return build_dataset(
+            x=x_unique,
+            y=y_unique,
+            t=np.array([t_val], dtype=float),
+            u=u_grid[:, :, np.newaxis],
+            v=v_grid[:, :, np.newaxis],
+            chc=chc_grid[:, :, np.newaxis],
+            delta_t=float(DELTA_T),
+            files=[str(path)],
+        )
+
+
 # Legacy/convenience aliases accepted by read_piv(format=...) and
 # PIVReaderRegistry.get_by_name, mapped to a reader's canonical `name`.
 _FORMAT_ALIASES = {
@@ -841,7 +896,7 @@ class PIVReaderRegistry:
         self._register_builtin_readers()
 
     def _register_builtin_readers(self) -> None:
-        self._readers = [InsightVECReader(), OpenPIVReader(), Davis8Reader(), LaVisionVC7Reader(), PIVLabReader(), NetCDFReader(), ZarrReader()]
+        self._readers = [InsightVECReader(), OpenPIVReader(), Davis8Reader(), LaVisionVC7Reader(), PIVLabReader(), NetCDFReader(), ZarrReader(), CSVReader()]
 
     def register(self, reader: PIVReader) -> None:
         self._readers.insert(0, reader)
@@ -954,6 +1009,172 @@ def convert_directory_to_zarr(
     for i, fp in enumerate(files):
         frame_ds = read_piv(fp, frame=i).chunk(chunk_spec)
         frame_ds.to_zarr(zpath, mode="w" if i == 0 else "a", append_dim=None if i == 0 else "t")
+
+
+# Modern alias for convert_directory_to_zarr
+stream_directory_to_zarr = convert_directory_to_zarr
+
+
+def stream_statistics(
+    source: Any,
+    pattern: str = "*",
+    ext: Optional[str] = None,
+    name_mean: str = "mean",
+    name_prime: str = "prime",
+) -> xr.Dataset:
+    r"""Computes online streaming temporal mean, normal Reynolds stresses, shear stress,
+    TKE, and turbulence intensities across large multi-frame PIV data with O(1) memory.
+
+    Accepts:
+    - An ``xr.Dataset`` (eager or lazy Dask-backed)
+    - A directory path (``pathlib.Path`` or ``str``) containing per-frame PIV files
+    - A Zarr store path
+    - A Sequence/list of file paths or Datasets
+
+    Uses the online Welford accumulation algorithm across time 't', holding only 2D grid
+    arrays in memory.
+
+    Parameters
+    ----------
+    source : xr.Dataset, Path, str, or Sequence[Path | str]
+        PIV data source.
+    pattern : str
+        Glob pattern when source is a directory (default '*').
+    ext : str, optional
+        File extension filter (e.g. '.txt', '.vec', '.vc7').
+    name_mean : str
+        Prefix for mean velocity variables (default 'mean').
+    name_prime : str
+        Suffix for fluctuating velocity variables (default 'prime').
+
+    Returns
+    -------
+    xr.Dataset
+        Single 2D grid dataset containing:
+        - ``u_mean``, ``v_mean``
+        - ``uu_prime``, ``vv_prime``, ``uv_prime``
+        - ``tke``
+        - ``intensity_u``, ``intensity_v``
+    """
+    coords = None
+    attrs = {}
+    u_mean: Optional[np.ndarray] = None
+    v_mean: Optional[np.ndarray] = None
+    M2_xx: Optional[np.ndarray] = None
+    M2_yy: Optional[np.ndarray] = None
+    M2_xy: Optional[np.ndarray] = None
+    n_frames = 0
+
+    def _process_frame(u_k: np.ndarray, v_k: np.ndarray, k: int):
+        nonlocal u_mean, v_mean, M2_xx, M2_yy, M2_xy, n_frames
+        count = k + 1
+        n_frames = count
+        if u_mean is None:
+            u_mean = np.zeros_like(u_k, dtype=float)
+            v_mean = np.zeros_like(v_k, dtype=float)
+            M2_xx = np.zeros_like(u_k, dtype=float)
+            M2_yy = np.zeros_like(v_k, dtype=float)
+            M2_xy = np.zeros_like(u_k, dtype=float)
+
+        delta_u = u_k - u_mean
+        delta_v = v_k - v_mean
+
+        u_mean += delta_u / count
+        v_mean += delta_v / count
+
+        M2_xx += delta_u * (u_k - u_mean)
+        M2_yy += delta_v * (v_k - v_mean)
+        M2_xy += delta_u * (v_k - v_mean)
+
+    if isinstance(source, xr.Dataset):
+        has_t = "t" in source.dims and source.sizes["t"] > 1
+        n_t = source.sizes["t"] if has_t else 1
+        coords = {"y": source["y"], "x": source["x"]}
+        attrs = source.attrs.copy()
+
+        for k in range(n_t):
+            u_k = source["u"].isel(t=k).to_numpy().squeeze() if has_t else source["u"].to_numpy().squeeze()
+            v_k = source["v"].isel(t=k).to_numpy().squeeze() if has_t else source["v"].to_numpy().squeeze()
+            _process_frame(u_k, v_k, k)
+
+    elif isinstance(source, (str, pathlib.Path)):
+        p = _to_path(source)
+        if p.is_dir() and (p / ".zmetadata").exists() or p.name.endswith(".zarr"):
+            # Zarr store
+            ds_lazy = read_directory_lazy(p)
+            return stream_statistics(ds_lazy, name_mean=name_mean, name_prime=name_prime)
+        elif p.is_dir():
+            # Directory of files
+            glob_pattern = pattern
+            if ext is not None and not glob_pattern.endswith(ext):
+                glob_pattern = f"{pattern}{ext}"
+            files = sorted(p.glob(glob_pattern))
+            if not files:
+                raise IOError(f"No matching PIV files found in {p}")
+            for k, fp in enumerate(files):
+                frame_ds = read_piv(fp, frame=k)
+                if coords is None:
+                    coords = {"y": frame_ds["y"], "x": frame_ds["x"]}
+                    attrs = frame_ds.attrs.copy()
+                u_k = frame_ds["u"].to_numpy().squeeze()
+                v_k = frame_ds["v"].to_numpy().squeeze()
+                _process_frame(u_k, v_k, k)
+        else:
+            frame_ds = read_piv(p)
+            return stream_statistics(frame_ds, name_mean=name_mean, name_prime=name_prime)
+
+    elif isinstance(source, Sequence):
+        for k, item in enumerate(source):
+            if isinstance(item, xr.Dataset):
+                frame_ds = item
+            else:
+                frame_ds = read_piv(item, frame=k)
+            if coords is None:
+                coords = {"y": frame_ds["y"], "x": frame_ds["x"]}
+                attrs = frame_ds.attrs.copy()
+            u_k = frame_ds["u"].to_numpy().squeeze()
+            v_k = frame_ds["v"].to_numpy().squeeze()
+            _process_frame(u_k, v_k, k)
+    else:
+        raise ValueError(f"Unsupported source type: {type(source)}")
+
+    if n_frames == 0 or u_mean is None or v_mean is None:
+        raise ValueError("No frames processed during stream statistics accumulation.")
+
+    uu_prime = M2_xx / n_frames
+    vv_prime = M2_yy / n_frames
+    uv_prime = -M2_xy / n_frames
+    tke = 0.5 * (uu_prime + vv_prime)
+
+    u_mag_mean = np.sqrt(u_mean**2 + v_mean**2)
+    eps_denom = 1e-12
+    intensity_u = np.sqrt(uu_prime) / np.maximum(u_mag_mean, eps_denom)
+    intensity_v = np.sqrt(vv_prime) / np.maximum(u_mag_mean, eps_denom)
+
+    out = xr.Dataset(
+        data_vars={
+            f"u_{name_mean}": (("y", "x"), u_mean),
+            f"v_{name_mean}": (("y", "x"), v_mean),
+            "uu_prime": (("y", "x"), uu_prime),
+            "vv_prime": (("y", "x"), vv_prime),
+            "uv_prime": (("y", "x"), uv_prime),
+            "tke": (("y", "x"), tke),
+            "intensity_u": (("y", "x"), intensity_u),
+            "intensity_v": (("y", "x"), intensity_v),
+        },
+        coords=coords,
+        attrs=attrs,
+    )
+    out[f"u_{name_mean}"].attrs["units"] = "m/s"
+    out[f"v_{name_mean}"].attrs["units"] = "m/s"
+    out["uu_prime"].attrs["units"] = "(m/s)^2"
+    out["vv_prime"].attrs["units"] = "(m/s)^2"
+    out["uv_prime"].attrs["units"] = "(m/s)^2"
+    out["tke"].attrs["units"] = "(m/s)^2"
+    out["intensity_u"].attrs["units"] = "1"
+    out["intensity_v"].attrs["units"] = "1"
+
+    return out
 
 
 def read_directory_lazy(directory: Any, chunks: Any = "auto") -> xr.Dataset:

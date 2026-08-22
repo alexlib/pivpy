@@ -2845,6 +2845,16 @@ class PIVAccessor(object):
         out["hy"].attrs["long_name"] = f"histogram({yname})"
         return out
 
+    def explore(self, port: int = 8000, host: str = "127.0.0.1", open_browser: bool = True):
+        """Launches the interactive Marimo PIVPy diagnostics and visualization app."""
+        from pivpy.app import launch_app
+        return launch_app(dataset=self._obj, port=port, host=host, open_browser=open_browser)
+
+    def stream_statistics(self, name_mean: str = "mean", name_prime: str = "prime"):
+        """Computes online streaming temporal mean, Reynolds stresses, and TKE with O(1) memory."""
+        from pivpy.io import stream_statistics
+        return stream_statistics(self._obj, name_mean=name_mean, name_prime=name_prime)
+
     # @property
     # def vel_units(self):
     #     " Return the geographic center point of this dataset."

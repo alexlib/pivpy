@@ -2,7 +2,8 @@
 name: pivpy
 description: >-
   Expert skill for deep Particle Image Velocimetry (PIV) vector field analysis, post-processing,
-  vortex topology identification, spatial filtering, outlier cleaning, and publication-ready figures/reports.
+  vortex topology identification, spatial filtering, outlier cleaning, out-of-core streaming,
+  interactive Marimo app exploration, and publication-ready figures/reports.
   Designed to work in tandem with openpiv-skill and scientific reporting workflows.
 ---
 
@@ -25,12 +26,14 @@ This skill equips the agent with comprehensive domain expertise, workflows, and 
 |                                    PIVPy Skill                                     |
 |                                                                                    |
 |  1. Canonical Ingestion:   build_dataset(), load_directory(), from_openpiv()       |
-|  2. Validation & Clean:    normalized_median_test(), clean(), harmonic inpainting  |
-|  3. Spatial Filtering:     smooth(method='gaussian' | 'median' | 'butterworth')    |
-|  4. Kinematic & Topology:  vorticity, Gamma1, Gamma2, Q-criterion, Okubo-Weiss    |
-|  5. Gradient & Strain:     gradient_tensor(), max_shear(), acceleration()          |
-|  6. Turbulence & Spectra:  Reynolds decomposition, E(k), dissipation, R_ij(r)     |
-|  7. Publication Figures:   piv.plot(), marimo notebooks, animations, LaTeX reports|
+|  2. Out-of-Core Streaming: stream_directory_to_zarr(), stream_statistics()         |
+|  3. Validation & Clean:    normalized_median_test(), clean(), harmonic inpainting  |
+|  4. Spatial Filtering:     smooth(method='gaussian' | 'median' | 'butterworth')    |
+|  5. Kinematic & Topology:  vorticity, Gamma1, Gamma2, Q-criterion, Okubo-Weiss    |
+|  6. Gradient & Strain:     gradient_tensor(), max_shear(), acceleration()          |
+|  7. Turbulence & Spectra:  Reynolds decomposition, E(k), dissipation, R_ij(r)     |
+|  8. Interactive App:       ds.piv.explore(), Marimo reactive dashboard             |
+|  9. Publication Figures:   piv.plot(), marimo notebooks, animations, LaTeX reports|
 +------------------------------------------------------------------------------------+
 ```
 
@@ -54,22 +57,22 @@ Every PIV field in PIVPy is represented as an `xarray.Dataset` containing:
 
 ## 3. Standard PIV Processing Pipeline
 
-### Step 1: Ingestion from OpenPIV or Files
+### Step 1: Ingestion & Out-of-Core Streaming
 
 ```python
 import xarray as xr
 import pivpy.pivpy  # Registers .piv accessor
 from pivpy import io
 
-# Option A: From OpenPIV output files / directories
-ds = io.load_directory("path/to/openpiv_results/", extension=".txt")
+# Option A: In-memory directory ingestion
+ds = io.load_directory("path/to/openpiv_results/", ext=".txt")
 
-# Option B: From OpenPIV arrays directly in memory
-from pivpy.schema import build_dataset
-ds = build_dataset(x=x, y=y, u=u, v=v, chc=flags, dt=0.001)
+# Option B: Out-of-core directory ingestion to chunked Zarr
+io.stream_directory_to_zarr("path/to/raw_vc7_or_txt/", "dataset.zarr", chunks={"t": 1})
+ds_lazy = io.read_directory_lazy("dataset.zarr")
 
-# Option C: Out-of-core streaming from Zarr archive
-ds = io.open_zarr("dataset.zarr")
+# Option C: O(1) memory streaming statistics reduction across 10,000+ frames
+stats_ds = io.stream_statistics("dataset.zarr")  # or ds.piv.stream_statistics()
 ```
 
 ### Step 2: Outlier Rejection & Inpainting (Normalized Median Test)
@@ -158,7 +161,18 @@ ds_eps_sgs = ds.piv.dissipation(method="smagorinsky", name="eps_sgs")
 
 ---
 
-## 5. Publication-Ready Visualizations
+## 5. Interactive Diagnostics & Publication Figures
+
+### Interactive Marimo Web Explorer
+
+```python
+# Launch interactive real-time PIV explorer in web browser
+ds.piv.explore()
+
+# Or from command-line:
+# marimo run pivpy/app.py
+# python -m pivpy.app
+```
 
 ### Beautiful Single-Frame Quiver & Contour Plots
 

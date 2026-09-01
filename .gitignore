@@ -22,3 +22,4 @@ __marimo__/
 # Generated at Sphinx build time by docs/source/conf.py's marimo export hook.
 /docs/source/_static/notebook.html
 /docs/source/_static/tutorial.html
+*.png

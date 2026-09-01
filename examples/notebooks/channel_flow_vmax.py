@@ -59,8 +59,8 @@ def _(mo):
         value="vorticity",
         label="Instantaneous background",
     )
-    skip_inst = mo.ui.slider(1, 16, 4, label="Arrow skip")
-    scale_inst = mo.ui.slider(0.5, 200.0, step=0.5, value=5.0, label="Arrow scale")
+    skip_inst = mo.ui.slider(0, 16, 2, label="Arrow skip")
+    scale_inst = mo.ui.slider(0.1, 200.0, step=0.5, value=1.0, label="Arrow scale")
     stream_inst = mo.ui.checkbox(label="Streamlines", value=True)
     mo.hstack([bg_inst, skip_inst, scale_inst, stream_inst], justify="start")
     return bg_inst, scale_inst, skip_inst, stream_inst
@@ -126,8 +126,8 @@ def _(mo):
         value="speed",
         label="Ensemble average background",
     )
-    skip_avg = mo.ui.slider(1, 16, 4, label="Arrow skip")
-    scale_avg = mo.ui.slider(0.5, 200.0, step=0.5, value=5.0, label="Arrow scale")
+    skip_avg = mo.ui.slider(1, 16, 1, label="Arrow skip")
+    scale_avg = mo.ui.slider(0.1, 200.0, step=0.5, value=5.0, label="Arrow scale")
     stream_avg = mo.ui.checkbox(label="Streamlines", value=True)
     mo.hstack([bg_avg, skip_avg, scale_avg, stream_avg], justify="start")
     return bg_avg, scale_avg, skip_avg, stream_avg

@@ -75,6 +75,61 @@ ds_lazy = io.read_directory_lazy("dataset.zarr")
 stats_ds = io.stream_statistics("dataset.zarr")  # or ds.piv.stream_statistics()
 ```
 
+### Step 1b: Raw LaVision Image Pairs -> PIV -> PIVPy (no vectors yet)
+
+If you only have raw camera image pairs (LaVision `.im7`/`.vc7` buffers, not
+pre-computed vectors), read them with `lvpyio`, run cross-correlation
+yourself (e.g. with `openpiv`), and only then hand the result to PIVPy. Two
+things real acquisitions get right that a first attempt easily gets wrong:
+
+- **`.im7` buffers already hold both frames** - `lvpyio.read_buffer()`
+  returns a 2-frame buffer directly; there's no need to split a stacked
+  image (`buffer.as_masked_array(0)` / `(1)` are frame A / B).
+- **The true PIV pulse separation (`dt`) is in the buffer's own metadata**,
+  not something to assume or leave as a placeholder. LaVision timing
+  channels are typically stored as `DevDataTrace<N>` / `DevDataAlias<N>`
+  pairs; find the channel whose alias mentions "dt" (e.g. `"Reference time
+  dt : dt 1"`), and its value is in microseconds:
+
+```python
+import lvpyio as lv
+import numpy as np
+import xarray as xr
+import openpiv.pyprocess as pyprocess
+from openpiv import tools, scaling, validation, filters
+import pivpy  # registers .piv accessor
+
+buffer = lv.read_buffer("B0001.im7")
+dt = float(np.asarray(buffer.attributes["DevDataTrace5"]).flat[0]) * 1e-6  # us -> s
+frame_a = np.asarray(buffer.as_masked_array(0).data)
+frame_b = np.asarray(buffer.as_masked_array(1).data)
+
+u, v, s2n = pyprocess.extended_search_area_piv(
+    frame_a.astype(np.int32), frame_b.astype(np.int32),
+    window_size=64, overlap=32, search_area_size=96, dt=dt,
+    sig2noise_method="peak2peak",
+)
+x, y = pyprocess.get_coordinates(image_size=frame_a.shape, search_area_size=96, overlap=32)
+invalid = validation.sig2noise_val(s2n, threshold=1.3)
+u, v = filters.replace_outliers(u, v, invalid, method="localmean", max_iter=10, kernel_size=3)
+x, y, u, v = scaling.uniform(x, y, u, v, scaling_factor=173.4)  # px/mm from calibration, not a guess
+x, y, u, v = tools.transform_coordinates(x, y, u, v)
+
+ds = xr.Dataset(
+    data_vars={"u": (("y", "x"), u), "v": (("y", "x"), v), "chc": (("y", "x"), (~invalid).astype(float))},
+    coords={"x": x[0, :], "y": y[:, 0]},
+)
+```
+
+Sanity-check `dt` against known physics before trusting it (e.g. compare the
+resulting mean speed to a reported/expected flow rate) - a wrong `dt` still
+produces a plausible-looking, uniformly-wrong velocity field.
+
+For a batch (many frames -> one time series), build one `xr.Dataset` per
+frame this way and `xr.concat([...], dim="t")`; for a large batch, save the
+result to Zarr immediately (`ds.to_zarr("run.zarr", mode="w")`) so later
+analysis reloads in under a second instead of re-running PIV.
+
 ### Step 2: Outlier Rejection & Inpainting (Normalized Median Test)
 
 ```python

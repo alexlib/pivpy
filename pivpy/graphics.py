@@ -60,6 +60,7 @@ def plot(
     image: np.ndarray | None = None,
     image_extent: tuple[float, float, float, float] | None = None,
     image_alpha: float = 0.6,
+    image_cmap: str = "gray",
     color_by: str | None = None,
     **kwargs,
 ) -> tuple[Figure, Axes]:
@@ -92,6 +93,8 @@ def plot(
         Physical-coordinate extent for `image`. If None, uses the data's x/y range.
     image_alpha : float, default 0.6
         Transparency of the background image.
+    image_cmap : str, default "gray"
+        Colormap for the background image when background="image".
     color_by : str, optional
         Color the quiver arrows continuously by this field instead of a flat
         `arrow_color` — "mag"/"speed" for velocity magnitude, or any variable
@@ -185,7 +188,7 @@ def plot(
                 extent = image_extent if image_extent is not None else (
                     float(x_arr.min()), float(x_arr.max()), float(y_arr.min()), float(y_arr.max())
                 )
-                ax.imshow(image, cmap="gray", extent=extent, origin="upper", alpha=float(image_alpha))
+                ax.imshow(image, cmap=image_cmap, extent=extent, origin="upper", alpha=float(image_alpha))
                 bg_drawn = True
 
             elif bg_str in ("vorticity", "vort", "curl", "w"):

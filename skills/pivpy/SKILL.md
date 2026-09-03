@@ -203,6 +203,43 @@ fig.tight_layout()
 fig.savefig("figure_vortex_wake.pdf", bbox_inches="tight")
 ```
 
+### PIVlab-Style Image Overlay (Colored Quiver on the Raw Frame)
+
+`ds.piv.plot()`'s `background=` normally draws a *computed* scalar contour
+(vorticity/magnitude/etc.), never a raw camera image, and its quiver arrows
+are a flat color unless colored by speed. For the classic PIV-software look
+(dense/auto-scaled arrows, continuous colormap, raw tracer image behind
+them), use `background="image"` with `color_by=`:
+
+```python
+fig, ax = ds.piv.plot(
+    background="image", image=frame_a,       # raw grayscale camera frame (2D array)
+    image_extent=None,                       # None -> uses ds's x/y range
+    image_cmap="gray", image_alpha=0.6,
+    color_by="v",                            # or "u", "mag"/"speed", any var name
+    cmap="viridis",                          # colormap for the arrows (color_by only)
+    streamlines=False, quiver_key=False,
+)
+```
+
+`ds.piv.animate()` supports the same `background="image"`, `color_by`,
+`cmap`, `image_cmap`, `image_extent`, `image_alpha` — the frame is drawn
+once (assumed the same background for every t), and the quiver's color and
+direction update per frame:
+
+```python
+anim = ds.piv.animate(
+    background="image", image=frame_a, color_by="v", cmap="viridis", interval=100,
+)
+anim.save("flow_overlay.gif", writer="pillow", fps=10)
+```
+
+For quick interactive tuning in a marimo notebook before committing to
+values for a batch pipeline, drive these kwargs from `mo.ui` controls
+(`mo.ui.dropdown` for `color_by`/`cmap`/`image_cmap`, `mo.ui.slider` for
+`image_alpha`, `mo.ui.checkbox` for `streamlines`) — each `.value` read in
+a cell that calls `ds.piv.plot(...)` re-renders automatically on change.
+
 ### Fluid Dynamics Quiver Animation (MP4 / GIF)
 
 ```python
@@ -222,7 +259,24 @@ anim = ds.piv.animate(
 
 ---
 
-## 6. Automated Deep PIV Analysis Reports
+## 6. Multiphase PIV/PTV Analytics & Spatial Turbulence Budgets (WP6 & WP7)
+
+### Multiphase & Lagrangian-Eulerian Analysis (WP6)
+- **Radial Distribution Function ($g(r)$)**: Measures preferential concentration and particle clustering against Poisson null hypothesis with domain boundary correction.
+- **Eulerian-Lagrangian Sub-grid Sampling (`interp_at_points`)**: Interpolates continuous fluid fields (velocity, vorticity, $Q$-criterion, shear) onto Lagrangian particle tracks to calculate slip velocity $\mathbf{u}_p - \mathbf{u}_f$.
+- **PTV Sparse-to-Dense Grid Reconstruction (`ptv_to_grid`)**: Bins scattered particle tracks onto structured `xarray.Dataset` grids with local particle concentration and velocity statistics.
+- **Windowed 1D Spectral Density (`spectrum_1d`)**: Computes 1D spatial and temporal energy spectra with Hanning/Hamming tapering and segment overlap.
+
+### Spatial Turbulence Budgets & Robust Differentiation (WP7)
+- **TKE Production Rate ($P_k$)**: Computes $-\overline{u'u'}\frac{\partial \overline{u}}{\partial x} - \overline{u'v'}\left(\frac{\partial \overline{u}}{\partial y} + \frac{\partial \overline{v}}{\partial x}\right) - \overline{v'v'}\frac{\partial \overline{v}}{\partial y}$.
+- **Turbulence Intensity Field**: $I_u = u_{rms} / U_{ref}$, $I_v = v_{rms} / U_{ref}$, $I_{total}$.
+- **Least-Squares Spatial Derivatives (`lsgradient`)**: 2D polynomial surface fitting to suppress experimental measurement noise during gradient calculation.
+- **Grubbs Outlier Filter (`grubbs_filter`)**: Statistical maximum normed residual outlier detection.
+- **Transect & Slice Extractor (`extract_profile`)**: Extracts 1D profiles across arbitrary spatial transects with confidence intervals.
+
+---
+
+## 7. Automated Deep PIV Analysis Reports
 
 When generating comprehensive analysis reports for experiments:
 1. **Quality Audit Table**: Report total vectors, percentage of valid vs inpainted vectors, mean velocity magnitude, peak Reynolds stresses, and vortex core circulation $\Gamma$.
@@ -235,3 +289,4 @@ When generating comprehensive analysis reports for experiments:
    - Panel F: Radial energy spectrum $E(k)$ with Kolmogorov $-5/3$ reference slope.
 3. **Integral Quantities Table**: Report integral length scale $L_{11}$, Taylor microscale $\lambda_T$, turbulent Reynolds number $\text{Re}_\lambda = u_{\text{rms}} \lambda_T / \nu$, and dissipation rate $\varepsilon$.
 4. **Artifact Generation**: Save high-resolution PNG/PDF figures and export analysis summary markdown artifacts.
+

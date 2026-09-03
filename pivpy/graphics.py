@@ -57,6 +57,10 @@ def plot(
     ax: Axes | None = None,
     aspect: str | float = "equal",
     t_idx: int = 0,
+    image: np.ndarray | None = None,
+    image_extent: tuple[float, float, float, float] | None = None,
+    image_alpha: float = 0.6,
+    color_by: str | None = None,
     **kwargs,
 ) -> tuple[Figure, Axes]:
     """High-level, publication-quality plotting function for PIV datasets.
@@ -80,7 +84,18 @@ def plot(
         - "ke": kinetic energy with plasma colormap.
         - "divergence" / "div": 2D divergence field with RdBu_r.
         - Variable name in data (e.g. "chc", "tke"): plots that variable.
+        - "image": the raw frame passed via `image=`, PIVlab-style (needs `image=`).
         - None / False / 'off': no scalar background (quiver/streamlines only).
+    image : numpy.ndarray, optional
+        Raw camera frame to draw via imshow when background="image".
+    image_extent : (left, right, bottom, top), optional
+        Physical-coordinate extent for `image`. If None, uses the data's x/y range.
+    image_alpha : float, default 0.6
+        Transparency of the background image.
+    color_by : str, optional
+        Color the quiver arrows continuously by this field instead of a flat
+        `arrow_color` — "mag"/"speed" for velocity magnitude, or any variable
+        name in `data` (e.g. "v" for streamwise velocity). Draws a colorbar.
     quiver : bool, default True
         Whether to draw velocity vector arrows.
     streamlines : bool, default True
@@ -166,7 +181,14 @@ def plot(
             default_cbar_label = ""
             symmetric_clim = True
 
-            if bg_str in ("vorticity", "vort", "curl", "w"):
+            if bg_str == "image" and image is not None:
+                extent = image_extent if image_extent is not None else (
+                    float(x_arr.min()), float(x_arr.max()), float(y_arr.min()), float(y_arr.max())
+                )
+                ax.imshow(image, cmap="gray", extent=extent, origin="upper", alpha=float(image_alpha))
+                bg_drawn = True
+
+            elif bg_str in ("vorticity", "vort", "curl", "w"):
                 if "w" in data_slice:
                     bg_val = np.asarray(data_slice["w"].values, dtype=float)
                 elif "vorticity" in data_slice:
@@ -295,12 +317,25 @@ def plot(
             else:
                 auto_scale = float(arrow_scale)
 
+            color_arr = None
+            if color_by is not None:
+                cb_str = str(color_by).lower()
+                if cb_str in ("mag", "magnitude", "speed"):
+                    color_arr = speed_arr
+                elif str(color_by) in data_slice:
+                    color_arr = np.asarray(data_slice[str(color_by)].values, dtype=float)
+                else:
+                    warnings.warn(f"color_by={color_by!r} not found in dataset; using arrow_color instead")
+
+            quiver_extra = {"color": arrow_color} if color_arr is None else {
+                "cmap": cmap if cmap is not None else "viridis",
+            }
             Q = ax.quiver(
                 X[::step, ::step],
                 Y[::step, ::step],
                 u_arr[::step, ::step],
                 v_arr[::step, ::step],
-                color=arrow_color,
+                *(() if color_arr is None else (color_arr[::step, ::step],)),
                 angles="xy",
                 scale_units="xy",
                 scale=auto_scale,
@@ -311,7 +346,12 @@ def plot(
                 minshaft=1.5,
                 pivot="mid",
                 alpha=float(arrow_alpha),
+                **quiver_extra,
             )
+            if color_arr is not None and colorbar:
+                cbar = fig.colorbar(Q, ax=ax, pad=0.03, shrink=0.92)
+                cbar.set_label(cbar_label if cbar_label is not None else str(color_by), fontsize=11, labelpad=10)
+                cbar.ax.tick_params(labelsize=9)
 
             if quiver_key:
                 key_val = round(med_speed, 1) if med_speed >= 1.0 else round(med_speed, 2)

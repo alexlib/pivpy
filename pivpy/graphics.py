@@ -112,9 +112,12 @@ def plot(
         Color limits (vmin, vmax). If None, computed robustly via 99th percentile.
     levels : int, default 80
         Number of contour levels for background contourf.
-    skip : int, optional
-        Vector arrow subsampling step (e.g. skip=4 plots every 4th arrow).
-        If None, auto-calculated based on grid dimensions (~25-35 arrows per axis).
+    skip : int or (skip_rows, skip_cols), optional
+        Vector arrow subsampling step (e.g. skip=4 plots every 4th arrow in
+        both directions). Pass a (skip_rows, skip_cols) pair for independent
+        row/column subsampling - e.g. skip=(6, 1) keeps every column dense
+        while spacing rows apart, for a profile-like view. If None,
+        auto-calculated based on grid dimensions (~25-35 arrows per axis).
     arrow_scale : float, optional
         Scaling factor for vector arrows in matplotlib quiver.
         If None, auto-calculated based on grid spacing and median velocity magnitude.
@@ -301,11 +304,14 @@ def plot(
         if quiver:
             ny, nx = u_arr.shape
             if skip is None:
-                step = max(1, int(round(max(nx, ny) / 16)))
+                step_y = step_x = max(1, int(round(max(nx, ny) / 16)))
+            elif isinstance(skip, (tuple, list)):
+                step_y, step_x = max(1, int(skip[0])), max(1, int(skip[1]))
             else:
-                step = max(1, int(skip))
+                step_y = step_x = max(1, int(skip))
 
             dx = abs(float(x_arr[1] - x_arr[0])) if len(x_arr) > 1 else 1.0
+            dy = abs(float(y_arr[1] - y_arr[0])) if len(y_arr) > 1 else 1.0
             speed_arr = np.sqrt(u_arr**2 + v_arr**2)
             finite_speed = speed_arr[np.isfinite(speed_arr)]
             med_speed = float(np.nanmedian(finite_speed)) if finite_speed.size else 1.0
@@ -315,7 +321,8 @@ def plot(
                 med_speed = 1.0
 
             if arrow_scale is None:
-                target_len = 0.85 * step * dx
+                # Constrain to the denser axis so neighboring arrows don't overlap.
+                target_len = 0.85 * min(step_x * dx, step_y * dy)
                 auto_scale = (med_speed / target_len) if target_len > 0 else 1.0
             else:
                 auto_scale = float(arrow_scale)
@@ -334,11 +341,11 @@ def plot(
                 "cmap": cmap if cmap is not None else "viridis",
             }
             Q = ax.quiver(
-                X[::step, ::step],
-                Y[::step, ::step],
-                u_arr[::step, ::step],
-                v_arr[::step, ::step],
-                *(() if color_arr is None else (color_arr[::step, ::step],)),
+                X[::step_y, ::step_x],
+                Y[::step_y, ::step_x],
+                u_arr[::step_y, ::step_x],
+                v_arr[::step_y, ::step_x],
+                *(() if color_arr is None else (color_arr[::step_y, ::step_x],)),
                 angles="xy",
                 scale_units="xy",
                 scale=auto_scale,
@@ -1406,8 +1413,9 @@ def animate(
         Whether to draw velocity vectors.
     blur : float, default 1.5
         Gaussian filter smoothing sigma for background.
-    skip : int, optional
-        Arrow subsampling step. Default ~16 arrows per axis.
+    skip : int or (skip_rows, skip_cols), optional
+        Arrow subsampling step, or an independent (skip_rows, skip_cols)
+        pair (see plot()). Default ~16 arrows per axis.
     arrow_scale : float, optional
         Arrow scaling factor.
     arrow_width : float, default 0.0065
@@ -1543,8 +1551,14 @@ def animate(
 
     # Quiver Vector Layer
     ny, nx = y2d.shape
-    step = max(1, int(skip)) if skip is not None else max(1, int(round(max(nx, ny) / 16)))
+    if skip is None:
+        step_y = step_x = max(1, int(round(max(nx, ny) / 16)))
+    elif isinstance(skip, (tuple, list)):
+        step_y, step_x = max(1, int(skip[0])), max(1, int(skip[1]))
+    else:
+        step_y = step_x = max(1, int(skip))
     dx_step = abs(float(x_arr[1] - x_arr[0])) if len(x_arr) > 1 else 1.0
+    dy_step = abs(float(y_arr[1] - y_arr[0])) if len(y_arr) > 1 else 1.0
 
     ds0 = data.isel(t=0) if "t" in data.dims else data
     u0 = np.asarray(ds0["u"].values, dtype=float)
@@ -1554,7 +1568,7 @@ def animate(
         med_speed = 1.0
 
     if arrow_scale is None:
-        target_len = 0.85 * step * dx_step
+        target_len = 0.85 * min(step_x * dx_step, step_y * dy_step)
         auto_scale = (med_speed / target_len) if target_len > 0 else 1.0
     else:
         auto_scale = float(arrow_scale)
@@ -1575,11 +1589,11 @@ def animate(
 
     if quiver:
         Q = target_ax.quiver(
-            x2d[::step, ::step],
-            y2d[::step, ::step],
-            u0[::step, ::step],
-            v0[::step, ::step],
-            *(() if color0 is None else (color0[::step, ::step],)),
+            x2d[::step_y, ::step_x],
+            y2d[::step_y, ::step_x],
+            u0[::step_y, ::step_x],
+            v0[::step_y, ::step_x],
+            *(() if color0 is None else (color0[::step_y, ::step_x],)),
             angles="xy",
             scale_units="xy",
             scale=auto_scale,
@@ -1620,9 +1634,9 @@ def animate(
             v_t = np.asarray(ds_t["v"].values, dtype=float)
             if color0 is not None:
                 c_t = color_frame(ds_t, u_t, v_t)
-                Q.set_UVC(u_t[::step, ::step], v_t[::step, ::step], c_t[::step, ::step])
+                Q.set_UVC(u_t[::step_y, ::step_x], v_t[::step_y, ::step_x], c_t[::step_y, ::step_x])
             else:
-                Q.set_UVC(u_t[::step, ::step], v_t[::step, ::step])
+                Q.set_UVC(u_t[::step_y, ::step_x], v_t[::step_y, ::step_x])
             artists.append(Q)
 
         t_coord = float(ds_t["t"].values) if ("t" in ds_t.coords and ds_t["t"].size) else float(frame_i)

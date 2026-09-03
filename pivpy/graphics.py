@@ -1384,6 +1384,11 @@ def animate(
     blit: bool = False,
     ax: Axes | None = None,
     title_fmt: str = "Flow Field (t = {t:.2f})",
+    image: np.ndarray | None = None,
+    image_extent: tuple[float, float, float, float] | None = None,
+    image_alpha: float = 0.6,
+    image_cmap: str = "gray",
+    color_by: str | None = None,
     **kwargs,
 ):
     """Create a high-performance, beautiful Matplotlib FuncAnimation for time-series flow fields.
@@ -1425,6 +1430,14 @@ def animate(
         Existing axes to draw on.
     title_fmt : str, default "Flow Field (t = {t:.2f})"
         Format string for dynamic frame title.
+    image : numpy.ndarray, optional
+        Static raw camera frame drawn via imshow (same for every frame) when
+        background="image", PIVlab-style.
+    image_extent, image_alpha, image_cmap :
+        As in plot(), for the background="image" frame.
+    color_by : str, optional
+        Color the quiver arrows per-frame by this field ("mag"/"speed", or a
+        variable name in `data`) instead of a flat `arrow_color`.
 
     Returns
     -------
@@ -1450,7 +1463,15 @@ def animate(
     # Pre-extract or compute scalar background for all frames
     bg_str = str(background).lower() if (background is not None and not isinstance(background, bool)) else ("vorticity" if background is True or background == "vorticity" else None)
     has_bg = bg_str is not None and bg_str not in {"none", "false", "off"}
-    
+
+    if bg_str == "image" and image is not None:
+        extent = image_extent if image_extent is not None else (
+            float(x_arr.min()), float(x_arr.max()), float(y_arr.min()), float(y_arr.max())
+        )
+        target_ax.imshow(image, cmap=image_cmap, extent=extent, origin="upper",
+                          alpha=float(image_alpha), zorder=1)
+        has_bg = False  # static image, not a per-frame pcolormesh
+
     bg_frames = []
     use_cmap = cmap
     if has_bg:
@@ -1538,13 +1559,27 @@ def animate(
     else:
         auto_scale = float(arrow_scale)
 
+    def color_frame(ds_t, u_t, v_t):
+        cb_str = str(color_by).lower()
+        if cb_str in ("mag", "magnitude", "speed"):
+            return np.sqrt(u_t**2 + v_t**2)
+        if str(color_by) in ds_t:
+            return np.asarray(ds_t[str(color_by)].values, dtype=float)
+        warnings.warn(f"color_by={color_by!r} not found in dataset; using arrow_color instead")
+        return None
+
+    color0 = color_frame(ds0, u0, v0) if color_by is not None else None
+    quiver_extra = {"color": arrow_color} if color0 is None else {
+        "cmap": use_cmap if use_cmap is not None else "viridis",
+    }
+
     if quiver:
         Q = target_ax.quiver(
             x2d[::step, ::step],
             y2d[::step, ::step],
             u0[::step, ::step],
             v0[::step, ::step],
-            color=arrow_color,
+            *(() if color0 is None else (color0[::step, ::step],)),
             angles="xy",
             scale_units="xy",
             scale=auto_scale,
@@ -1556,7 +1591,10 @@ def animate(
             pivot="mid",
             alpha=float(arrow_alpha),
             zorder=2,
+            **quiver_extra,
         )
+        if color0 is not None:
+            fig.colorbar(Q, ax=target_ax, fraction=0.046, pad=0.04).set_label(str(color_by), fontsize=10)
     else:
         Q = None
 
@@ -1580,7 +1618,11 @@ def animate(
         if Q is not None:
             u_t = np.asarray(ds_t["u"].values, dtype=float)
             v_t = np.asarray(ds_t["v"].values, dtype=float)
-            Q.set_UVC(u_t[::step, ::step], v_t[::step, ::step])
+            if color0 is not None:
+                c_t = color_frame(ds_t, u_t, v_t)
+                Q.set_UVC(u_t[::step, ::step], v_t[::step, ::step], c_t[::step, ::step])
+            else:
+                Q.set_UVC(u_t[::step, ::step], v_t[::step, ::step])
             artists.append(Q)
 
         t_coord = float(ds_t["t"].values) if ("t" in ds_t.coords and ds_t["t"].size) else float(frame_i)

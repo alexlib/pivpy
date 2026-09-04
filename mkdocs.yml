@@ -1,0 +1,39 @@
+site_name: PIVPy
+site_description: Post-processing of Particle Image Velocimetry (PIV) data
+site_url: !ENV [READTHEDOCS_CANONICAL_URL, ""]
+repo_url: https://github.com/alexlib/pivpy
+repo_name: alexlib/pivpy
+
+docs_dir: docs_mkdocs
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.tabs
+    - navigation.top
+
+nav:
+  - Home: index.md
+  - Notebook: notebook.md
+  - Tutorial: tutorial.md
+  - Explore: explore.md
+  - API Reference: api_reference.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: true
+  - marimo: {}
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: ["."]

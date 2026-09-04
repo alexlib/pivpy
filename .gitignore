@@ -24,3 +24,4 @@ __marimo__/
 /docs/source/_static/tutorial_wasm/
 /docs/source/_static/explore_wasm/
 *.png
+/site/

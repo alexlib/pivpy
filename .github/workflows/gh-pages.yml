@@ -1,0 +1,43 @@
+name: Deploy MkDocs to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'mkdocs.yml'
+      - 'docs_mkdocs/**'
+      - 'docs/source/notebook.py'
+      - 'docs/source/tutorial.py'
+      - 'docs/source/explore.py'
+      - 'pivpy/**'
+  workflow_dispatch:
+
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          uv sync --python 3.13
+          uv pip install -r docs_mkdocs/requirements.txt
+
+      - name: Deploy to gh-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          uv run mkdocs gh-deploy --force --clean

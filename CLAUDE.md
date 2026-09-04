@@ -39,11 +39,18 @@ Run against a specific managed Python version (sandboxed, no persistent venv):
 
     uv run --isolated --managed-python -p python3.14 --with-editable . pytest -q
 
-Build docs (Sphinx; the marimo notebooks under docs/source/ are auto-exported to static HTML and
-embedded via a `conf.py` build hook, no manual conversion step):
+Build docs (MkDocs; pages live under `docs_mkdocs/`, config in `mkdocs.yml`. The marimo
+notebooks under `docs/source/` -- `notebook.py`, `tutorial.py`, `explore.py` -- are embedded
+live via the `mkdocs-marimo` plugin's `marimo-embed-file` blocks, no manual conversion step;
+`pivpy_visualization.md` also has an inline `{marimo}` reactive-code-fence example):
 
-    uv pip install -r docs/requirements.txt
-    uv run sphinx-build -b html docs/source/ docs/build/html
+    uv pip install -r docs_mkdocs/requirements.txt
+    uv run mkdocs build      # outputs to site/
+    uv run mkdocs serve      # live-reloading local preview
+
+Docs are published to both GitHub Pages (`.github/workflows/gh-pages.yml`, `mkdocs gh-deploy`)
+and Read the Docs (`.readthedocs.yml`) from the same `mkdocs.yml` -- keep them in sync rather
+than special-casing one.
 
 Edit a notebook interactively:
 
@@ -94,9 +101,11 @@ but is minimal (just enables the numpy typing plugin); there's no CI-enforced my
 - `pivpy/update.py` — PyPI version-check helper (`pivpy.check_update()`).
 - `pivpy/data/` — bundled sample datasets used throughout the test suite and README examples (e.g.
   `pivpy/data/openpiv_vec/exp1_001_b.vec`).
-- `examples/notebooks/` and `docs/source/{notebook,tutorial}.py` — marimo notebooks (plain `.py`
-  files, no `.ipynb`/JupyterLab in this repo). Edit with `marimo edit`; `docs/source/conf.py`
-  exports `notebook.py`/`tutorial.py` to static HTML during the Sphinx build.
+- `examples/notebooks/` and `docs/source/{notebook,tutorial,explore}.py` — marimo notebooks
+  (plain `.py` files, no `.ipynb`/JupyterLab in this repo). Edit with `marimo edit`; the
+  `docs/source/` ones are embedded live in the MkDocs site (see `docs_mkdocs/`).
+- `docs_mkdocs/` — MkDocs pages (`mkdocs.yml` at repo root is the config). Published to GitHub
+  Pages and Read the Docs from the same source.
 
 ## Conventions worth knowing before editing
 

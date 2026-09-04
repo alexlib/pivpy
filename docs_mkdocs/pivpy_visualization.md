@@ -25,6 +25,9 @@ The two cells below run right here in the page (via [marimo](https://marimo.io) 
 Pyodide) -- drag the slider and the plot redraws immediately.
 
 ```python {marimo}
+import micropip
+await micropip.install("pivpy")
+
 import marimo as mo
 import matplotlib.pyplot as plt
 import pivpy.pivpy  # registers Dataset.piv accessor

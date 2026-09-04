@@ -19,9 +19,5 @@ tmp.nc
 /README_files
 /docs/_build
 __marimo__/
-# Generated at Sphinx build time by docs/source/conf.py's marimo export hook.
-/docs/source/_static/notebook_wasm/
-/docs/source/_static/tutorial_wasm/
-/docs/source/_static/explore_wasm/
 *.png
 /site/

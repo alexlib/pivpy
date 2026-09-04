@@ -43,7 +43,7 @@ jobs:
       run: uv run --python ${{ matrix.python-version }} pytest -q --tb=short
 
   docs:
-    name: docs build (sphinx -W)
+    name: docs build (mkdocs)
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -57,7 +57,7 @@ jobs:
     - name: Install dependencies
       run: |
         uv sync --python 3.13
-        uv pip install -r docs/requirements.txt
+        uv pip install -r docs_mkdocs/requirements.txt
 
     - name: Build docs
-      run: uv run --python 3.13 sphinx-build -b html -W docs/source/ docs/build/html
+      run: uv run --python 3.13 mkdocs build

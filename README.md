@@ -267,9 +267,10 @@ With `uv`:
 
     uv run pytest -q
     
-## Documentation on Github
+## Documentation
 
-[PIVPy on ReadTheDocs](http://pivpy.readthedocs.io)
+- [PIVPy on GitHub Pages](https://alexlib.github.io/pivpy) (MkDocs, with live interactive marimo notebooks)
+- [PIVPy on ReadTheDocs](http://pivpy.readthedocs.io) (mirrors the same MkDocs documentation)
 
 ## How to help?
 
@@ -278,11 +279,13 @@ contribute
 
 ## How to write tutorials and add those to the documentation
 
-Tutorials live as marimo notebooks (`.py` files) in `docs/source/`. The Sphinx build
-(`docs/source/conf.py`) exports them to static HTML via `marimo export html` and embeds them
-in the generated docs automatically -- no separate conversion step needed:
+Tutorials live as marimo notebooks (`.py` files) in `docs/source/`. The docs are built
+with MkDocs (`mkdocs.yml`, pages under `docs_mkdocs/`); the
+[mkdocs-marimo](https://github.com/marimo-team/mkdocs-marimo) plugin embeds them live
+(editable, running in the browser via Pyodide) -- no separate conversion step needed:
 
-    uv pip install -r docs/requirements.txt
-    uv run sphinx-build -b html docs/source/ docs/build/html
-    
-generates ```docs/build/html``` directory with the documentation
+    uv pip install -r docs_mkdocs/requirements.txt
+    uv run mkdocs build
+
+generates a `site/` directory with the documentation. `uv run mkdocs serve` runs a
+live-reloading local preview.

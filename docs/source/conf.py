@@ -79,6 +79,10 @@ intersphinx_mapping = {
     "xarray": ("https://docs.xarray.dev/en/stable", None),
 }
 
+# CI runners occasionally can't reach one of the inventories above (DNS/network
+# hiccup); don't let that flakiness fail a -W build.
+suppress_warnings = ["intersphinx.external"]
+
 # Map common shorthand/aliases in docstrings to resolvable targets.
 napoleon_type_aliases = {
     "xr.Dataset": "xarray.Dataset",

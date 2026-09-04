@@ -1,5 +1,13 @@
 import marimo
 
+# /// script
+# dependencies = [
+#     "marimo",
+#     "pivpy",
+#     "matplotlib",
+# ]
+# ///
+
 __generated_with = "0.23.16"
 app = marimo.App()
 

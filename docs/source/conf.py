@@ -130,10 +130,13 @@ source_suffix = {
 
 
 def _export_marimo_notebooks(app):
-    """Render notebook.py/tutorial.py (marimo) to static HTML in _static/
-    before the build, so notebook.rst/tutorial.rst can embed them. Runs
-    `marimo export html` via the same interpreter Sphinx is running under
-    (marimo is a hard dependency of the pivpy package itself)."""
+    """Render notebook.py/tutorial.py (marimo) to WASM-powered, editable HTML
+    in _static/ before the build, so notebook.rst/tutorial.rst can embed them.
+    Runs `marimo export html-wasm` via the same interpreter Sphinx is running
+    under (marimo is a hard dependency of the pivpy package itself). The
+    resulting page runs entirely client-side (Pyodide), so readers can edit
+    and re-run cells in the browser -- fitting for a package that's all about
+    trying things and seeing the response."""
     import subprocess
     import sys
     from pathlib import Path
@@ -150,10 +153,13 @@ def _export_marimo_notebooks(app):
         source = src_dir / f"{name}.py"
         if not source.exists():
             continue
-        target = static_dir / f"{name}.html"
+        # html-wasm writes a whole asset bundle (JS/CSS/fonts) next to the
+        # entry file, not just one HTML file -- give each notebook its own
+        # subdirectory so that bundle doesn't spill into the rest of _static.
+        target = static_dir / f"{name}_wasm" / "index.html"
         result = subprocess.run(
-            [sys.executable, "-m", "marimo", "export", "html",
-             "--no-sandbox", "--no-include-code", str(source),
+            [sys.executable, "-m", "marimo", "export", "html-wasm",
+             "--no-sandbox", "--mode", "edit", "--show-code", str(source),
              "-o", str(target), "-f"],
             capture_output=True, text=True,
         )

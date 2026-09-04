@@ -20,6 +20,6 @@ tmp.nc
 /docs/_build
 __marimo__/
 # Generated at Sphinx build time by docs/source/conf.py's marimo export hook.
-/docs/source/_static/notebook.html
-/docs/source/_static/tutorial.html
+/docs/source/_static/notebook_wasm/
+/docs/source/_static/tutorial_wasm/
 *.png

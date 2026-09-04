@@ -1,5 +1,14 @@
 import marimo
 
+# /// script
+# dependencies = [
+#     "marimo",
+#     "pivpy",
+#     "numpy",
+#     "xarray",
+# ]
+# ///
+
 __generated_with = "0.23.16"
 app = marimo.App()
 

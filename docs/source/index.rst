@@ -14,6 +14,7 @@ PIVPy
    pivpy_visualization
    notebook
    tutorial
+   explore
    pivpy_tutorial
    pivpy_faq
    api_reference

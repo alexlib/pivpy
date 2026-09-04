@@ -74,14 +74,15 @@ autodoc_type_aliases = {
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy", None),
     "matplotlib": ("https://matplotlib.org/stable", None),
     "xarray": ("https://docs.xarray.dev/en/stable", None),
+    # scipy intentionally omitted: docs.scipy.org is consistently unreachable
+    # from GitHub Actions runners (ConnectTimeout, not a one-off flake), and
+    # sphinx's intersphinx-fetch-failure warning has no `type`/`subtype`, so
+    # `suppress_warnings` can't target it -- it always fails a `-W` build.
+    # Nothing here is built with `-n` (nitpicky) anyway, so no scipy
+    # cross-references actually depend on this inventory.
 }
-
-# CI runners occasionally can't reach one of the inventories above (DNS/network
-# hiccup); don't let that flakiness fail a -W build.
-suppress_warnings = ["intersphinx.external"]
 
 # Map common shorthand/aliases in docstrings to resolvable targets.
 napoleon_type_aliases = {
@@ -149,7 +150,7 @@ def _export_marimo_notebooks(app):
     static_dir = src_dir / "_static"
     static_dir.mkdir(exist_ok=True)
 
-    for name in ("notebook", "tutorial"):
+    for name in ("notebook", "tutorial", "explore"):
         source = src_dir / f"{name}.py"
         if not source.exists():
             continue

@@ -55,6 +55,23 @@ def test_plot():
     assert fig4 is not None
 
 
+def test_plot_quiver_respects_chc_mask():
+    """quiver arrows (colored or not) must skip points where chc==0"""
+    import numpy as np
+    from matplotlib.quiver import Quiver
+
+    d = _d.copy()
+    chc = np.ones_like(d["chc"].values)
+    chc[:, :3] = 0
+    d["chc"] = (d["chc"].dims, chc)
+
+    fig, ax = graphics.plot(d, background=None, color_by="mag", streamlines=False, skip=1)
+    Q = next(c for c in ax.get_children() if isinstance(c, Quiver))
+    masked = Q.Umask.reshape(chc.shape[0], chc.shape[1])
+    assert masked[:, :3].all()
+    assert not masked[:, 3:].any()
+
+
 def test_animate():
     """tests fast FuncAnimation flow field generation"""
     anim = graphics.animate(_d, interval=50)

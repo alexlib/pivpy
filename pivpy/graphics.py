@@ -177,6 +177,10 @@ def plot(
     if is_vector:
         u_arr = np.asarray(data_slice["u"].values, dtype=float)
         v_arr = np.asarray(data_slice["v"].values, dtype=float)
+        if "chc" in data_slice:
+            invalid = np.asarray(data_slice["chc"].values, dtype=float) == 0
+            u_arr = np.where(invalid, np.nan, u_arr)
+            v_arr = np.where(invalid, np.nan, v_arr)
 
         bg_drawn = False
         # Background Layer
@@ -334,6 +338,8 @@ def plot(
                     color_arr = speed_arr
                 elif str(color_by) in data_slice:
                     color_arr = np.asarray(data_slice[str(color_by)].values, dtype=float)
+                    if "chc" in data_slice:
+                        color_arr = np.where(invalid, np.nan, color_arr)
                 else:
                     warnings.warn(f"color_by={color_by!r} not found in dataset; using arrow_color instead")
 
@@ -1560,9 +1566,16 @@ def animate(
     dx_step = abs(float(x_arr[1] - x_arr[0])) if len(x_arr) > 1 else 1.0
     dy_step = abs(float(y_arr[1] - y_arr[0])) if len(y_arr) > 1 else 1.0
 
+    def _apply_chc_mask(ds_t, *arrs):
+        if "chc" not in ds_t:
+            return arrs
+        invalid = np.asarray(ds_t["chc"].values, dtype=float) == 0
+        return tuple(np.where(invalid, np.nan, a) for a in arrs)
+
     ds0 = data.isel(t=0) if "t" in data.dims else data
     u0 = np.asarray(ds0["u"].values, dtype=float)
     v0 = np.asarray(ds0["v"].values, dtype=float)
+    u0, v0 = _apply_chc_mask(ds0, u0, v0)
     med_speed = float(np.nanmedian(np.sqrt(u0**2 + v0**2)))
     if med_speed == 0.0:
         med_speed = 1.0
@@ -1576,11 +1589,14 @@ def animate(
     def color_frame(ds_t, u_t, v_t):
         cb_str = str(color_by).lower()
         if cb_str in ("mag", "magnitude", "speed"):
-            return np.sqrt(u_t**2 + v_t**2)
-        if str(color_by) in ds_t:
-            return np.asarray(ds_t[str(color_by)].values, dtype=float)
-        warnings.warn(f"color_by={color_by!r} not found in dataset; using arrow_color instead")
-        return None
+            arr = np.sqrt(u_t**2 + v_t**2)
+        elif str(color_by) in ds_t:
+            arr = np.asarray(ds_t[str(color_by)].values, dtype=float)
+            arr, = _apply_chc_mask(ds_t, arr)
+        else:
+            warnings.warn(f"color_by={color_by!r} not found in dataset; using arrow_color instead")
+            return None
+        return arr
 
     color0 = color_frame(ds0, u0, v0) if color_by is not None else None
     quiver_extra = {"color": arrow_color} if color0 is None else {
@@ -1632,6 +1648,7 @@ def animate(
         if Q is not None:
             u_t = np.asarray(ds_t["u"].values, dtype=float)
             v_t = np.asarray(ds_t["v"].values, dtype=float)
+            u_t, v_t = _apply_chc_mask(ds_t, u_t, v_t)
             if color0 is not None:
                 c_t = color_frame(ds_t, u_t, v_t)
                 Q.set_UVC(u_t[::step_y, ::step_x], v_t[::step_y, ::step_x], c_t[::step_y, ::step_x])

@@ -1,6 +1,6 @@
 site_name: PIVPy
 site_description: Post-processing of Particle Image Velocimetry (PIV) data
-site_url: !ENV [READTHEDOCS_CANONICAL_URL, ""]
+site_url: !ENV [READTHEDOCS_CANONICAL_URL, "https://alexlib.github.io/pivpy/"]
 repo_url: https://github.com/alexlib/pivpy
 repo_name: alexlib/pivpy
 
@@ -15,9 +15,14 @@ theme:
 
 nav:
   - Home: index.md
+  - Introduction: intro.md
+  - Data model: pivpy_data_model.md
+  - Visualization: pivpy_visualization.md
   - Notebook: notebook.md
   - Tutorial: tutorial.md
   - Explore: explore.md
+  - Written tutorial: pivpy_tutorial.md
+  - FAQ: pivpy_faq.md
   - API Reference: api_reference.md
 
 plugins:

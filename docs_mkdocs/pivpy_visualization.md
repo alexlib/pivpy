@@ -221,6 +221,59 @@ A few practical notes from real use:
   unevenly (colorbar included), while passing a pre-sized `ax=` in gets
   everything scaled correctly from the start.
 
+## Synthetic Data: Freestream + Vortex Pair
+
+`pivpy.synthetic.freestream_vortex_pair()` builds a uniform freestream with one
+or more regularized point vortices superimposed - useful for testing
+vorticity/Q-criterion code or for a quick demo plot without any real data:
+
+```python
+from pivpy import synthetic
+
+ds = synthetic.freestream_vortex_pair(n=80, noise_std=0.05, seed=42)
+
+# pre-filter (denoise) BEFORE differentiating - see tip 1 below
+ds = ds.piv.filterf([1.2, 1.2, 0.0]).piv.vorticity()
+
+fig, ax = ds.piv.plot(
+    background="vorticity",
+    cmap="coolwarm",
+    skip=3,
+    arrow_color="black",
+    arrow_alpha=0.7,
+    arrow_width=0.003,
+    title=r"Synthetic PIV: Vorticity $\omega_z$ & Vectors",
+)
+```
+
+![Synthetic freestream with a counter-rotating vortex pair, vorticity background and streamlines](_static/gallery/synthetic_freestream_vortex_pair.png){ width="70%" }
+
+**Tricks and tips for nicer `ds.piv.plot()` results, learned while building this
+example:**
+
+1. **Pre-filter `u`/`v` before differentiating, not the noisy vorticity after.**
+   `ds.piv.filterf([sigma_y, sigma_x, 0.0])` Gaussian-smooths the velocity
+   components first, so `.piv.vorticity()` differentiates a clean field
+   instead of amplifying pixel-level noise. Smoothing vorticity *after* the
+   fact just blurs real gradients along with the noise.
+2. **Prefer `.piv.vorticity(method="circulation")` over a hand-rolled
+   finite-difference stencil** when the input is noisy - it integrates
+   velocity around each cell's border instead of differentiating pointwise,
+   so it's less sensitive to noise than even a 4th-order central-difference
+   scheme, with no extra pre-filtering step required.
+3. **Let `background=` pick its own color limits.** `plot()` already clips to
+   a symmetric, percentile-based `clim` for diverging fields like vorticity -
+   more robust than `vmax=np.max(np.abs(w))`, which one bad outlier vector can
+   blow up.
+4. **`background="vorticity"` reuses an already-computed `w`** if one exists
+   in the dataset (as it does above, after `.piv.vorticity()`) instead of
+   recomputing it - compute it once, plot it as many times as needed.
+5. **Keep circulation strengths independent of grid size.** A vortex's
+   induced velocity scales as `circulation / radius`; if you scale the
+   circulation by the domain size (as an early draft of this example did),
+   growing the grid makes the vortices explode relative to `u_inf` instead of
+   just adding resolution.
+
 ## Flow Animations (`ds.piv.animate`)
 
 ### How PIVPy Animations Work
@@ -313,4 +366,6 @@ imvectomovie("data_run_*.vec", output="run_movie.mp4", background="mag", fps=20)
 | --- | --- |
 | ![Quiver plot](_static/gallery/quiver.png) | ![showf with vorticity background](_static/gallery/showf_vorticity.png) |
 | ![Scalar vorticity plot](_static/gallery/scalar_vorticity.png) | ![Streamplot](_static/gallery/streamplot.png) |
-| ![Image background, streamlines, and colored quiver revealing a cavity vortex](_static/gallery/wall_masked_cavity_vortex.png) | see the [worked example](#worked-example-image-background--streamlines--colored-quiver) above for the full parameter walkthrough |
+| ![Image background, streamlines, and colored quiver revealing a cavity vortex](_static/gallery/wall_masked_cavity_vortex.png) | ![Synthetic freestream with a counter-rotating vortex pair](_static/gallery/synthetic_freestream_vortex_pair.png) |
+
+See the [worked example](#worked-example-image-background--streamlines--colored-quiver) above and the [synthetic data example](#synthetic-data-freestream--vortex-pair) for the full parameter walkthroughs.

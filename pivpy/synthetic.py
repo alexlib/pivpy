@@ -339,6 +339,126 @@ def vortex_pair(
     return ds
 
 
+def freestream_vortex_pair(
+    n: Union[int, Tuple[int, int]] = 80,
+    u_inf: float = 1.0,
+    vortex_positions: Optional[Sequence[Tuple[float, float]]] = None,
+    vortex_strengths: Optional[Sequence[float]] = None,
+    r0: Optional[float] = None,
+    noise_std: float = 0.0,
+    dx: float = 1.0,
+    dy: float = 1.0,
+    seed: Optional[int] = None,
+) -> xr.Dataset:
+    """Generate a uniform freestream with one or more superimposed regularized
+    point vortices - a wake-like pattern (e.g. a counter-rotating vortex pair
+    shed behind a bluff body), as opposed to :func:`vortex_pair`'s
+    freestream-free translating dipole.
+
+    Uses the same regularized (Lamb-Oseen-like) vortex kernel as
+    :func:`vortex_pair`, which stays finite at the core (unlike a bare
+    Rankine ``1/r^2`` kernel) - safe to evaluate arbitrarily close to a
+    vortex center.
+
+    Parameters
+    ----------
+    n : int or tuple of (rows, cols), default 80
+        Spatial grid dimension.
+    u_inf : float, default 1.0
+        Uniform freestream velocity in x (added on top of the vortices).
+    vortex_positions : sequence of (x, y), optional
+        Vortex centers in coordinate units. Defaults to a counter-rotating
+        pair positioned like a bluff-body wake, roughly a third of the way
+        into the domain.
+    vortex_strengths : sequence of float, optional
+        Circulation of each vortex (sign gives rotation direction). Must
+        match the length of ``vortex_positions`` if both are given. Defaults
+        to one positive (cyclonic) and one negative (anticyclonic) vortex.
+    r0 : float, optional
+        Vortex core radius in coordinate units. Defaults to 8% of the
+        domain height, matching :func:`vortex_pair`.
+    noise_std : float, default 0.0
+        Standard deviation of Gaussian noise added to u and v, to mimic PIV
+        measurement noise. 0.0 (default) gives a noise-free field.
+    dx, dy : float, default 1.0
+        Grid spacing in x and y.
+    seed : int, optional
+        Random seed for reproducible noise.
+
+    Returns
+    -------
+    xr.Dataset
+        Canonical single-frame PIVPy dataset with variables ('u', 'v',
+        'chc') and coords ('x', 'y', 't').
+
+    Examples
+    --------
+    >>> ds = synthetic.freestream_vortex_pair(noise_std=0.05, seed=42)
+    >>> ds = ds.piv.filterf([1.2, 1.2, 0.0]).piv.vorticity()
+    >>> fig, ax = ds.piv.plot(background="vorticity", cmap="coolwarm", skip=3)
+    """
+    if isinstance(n, int):
+        rows, cols = n, n
+    else:
+        rows, cols = n
+
+    x_coords = np.arange(cols, dtype=float) * dx
+    y_coords = np.arange(rows, dtype=float) * dy
+    x2d, y2d = np.meshgrid(x_coords, y_coords)
+
+    x_min, x_max = x_coords[0], x_coords[-1]
+    y_min, y_max = y_coords[0], y_coords[-1]
+    y_center = (y_min + y_max) / 2.0
+    domain_width = max(1e-6, x_max - x_min)
+    domain_height = max(1e-6, y_max - y_min)
+
+    core_radius = float(r0) if r0 is not None else 0.085 * domain_height
+
+    if vortex_positions is None:
+        vortex_positions = [
+            (x_min + 0.3 * domain_width, y_center + 0.15 * domain_height),
+            (x_min + 0.38 * domain_width, y_center - 0.2 * domain_height),
+        ]
+    if vortex_strengths is None:
+        # Modest absolute circulation (matching vortex_pair's own scale, not
+        # scaled by domain size) so the induced velocity stays comparable to
+        # u_inf instead of overwhelming it near the cores.
+        vortex_strengths = [2.4, -1.8]
+    if len(vortex_positions) != len(vortex_strengths):
+        raise ValueError("vortex_positions and vortex_strengths must have the same length")
+
+    u_frame = np.full((rows, cols), float(u_inf), dtype=float)
+    v_frame = np.zeros((rows, cols), dtype=float)
+
+    for (xc, yc), omega in zip(vortex_positions, vortex_strengths):
+        rx = x2d - xc
+        ry = y2d - yc
+        r2 = rx**2 + ry**2
+        safe_r2 = np.where(r2 == 0.0, 1e-12, r2)
+        c2 = core_radius**2
+        decay = (1.0 - np.exp(-r2 / c2)) / safe_r2
+        ampl = omega * c2 / 2.0 * decay
+        u_frame += -ampl * ry
+        v_frame += ampl * rx
+
+    if noise_std > 0.0:
+        rng = np.random.default_rng(seed)
+        u_frame = u_frame + rng.normal(0.0, noise_std, u_frame.shape)
+        v_frame = v_frame + rng.normal(0.0, noise_std, v_frame.shape)
+
+    chc_frame = np.ones_like(u_frame, dtype=float)
+    ds = build_dataset(
+        x=x_coords,
+        y=y_coords,
+        u=u_frame,
+        v=v_frame,
+        chc=chc_frame,
+        delta_t=float(DELTA_T),
+    )
+    ds.attrs["flow_model"] = "freestream_vortex_pair"
+    return ds
+
+
 def randvec(
     n: Union[int, Tuple[int, int]] = 128,
     n_frames: int = 1,

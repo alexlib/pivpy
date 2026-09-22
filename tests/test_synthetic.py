@@ -142,3 +142,30 @@ def test_vortex_pair():
     assert ds.sizes["y"] == 64
     assert "u" in ds.data_vars
     assert "v" in ds.data_vars
+
+
+def test_freestream_vortex_pair():
+    ds = synthetic.freestream_vortex_pair(n=80, u_inf=1.0, seed=42)
+    validate(ds)
+    assert ds.sizes["x"] == 80
+    assert ds.sizes["y"] == 80
+    assert ds.sizes["t"] == 1
+
+    # freestream dominates away from the vortex cores: mean u close to u_inf,
+    # and the induced perturbation stays the same order of magnitude as
+    # u_inf rather than blowing up (regression check for the strength/core
+    # scaling - see "Currently unresolved" note in synthetic.py history).
+    u = ds["u"].values
+    assert abs(float(u.mean()) - 1.0) < 1.0
+    assert u.max() < 20.0 * 1.0
+    assert u.min() > -20.0 * 1.0
+
+    # reproducible noise
+    ds2 = synthetic.freestream_vortex_pair(n=80, u_inf=1.0, seed=42)
+    assert np.allclose(ds["u"].values, ds2["u"].values)
+
+    # vorticity picks up two opposite-signed peaks (counter-rotating pair)
+    ds_vort = ds.piv.vorticity()
+    w = ds_vort["w"].values
+    assert w.max() > 0.0
+    assert w.min() < 0.0

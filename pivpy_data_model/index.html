@@ -1,0 +1,1557 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Post-processing of Particle Image Velocimetry (PIV) data">
+      
+      
+      
+        <link rel="canonical" href="https://alexlib.github.io/pivpy/pivpy_data_model/">
+      
+      
+        <link rel="prev" href="../intro/">
+      
+      
+        <link rel="next" href="../pivpy_visualization/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Data model - PIVPy</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@marimo-team/islands@0.24.0/dist/main.js"></script>
+<link
+    href="https://cdn.jsdelivr.net/npm/@marimo-team/islands@0.24.0/dist/style.css"
+    rel="stylesheet"
+    title="marimo-islands"
+    crossorigin="anonymous"
+/>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+/>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500;700&amp;family=Lora&amp;family=PT+Sans:wght@400;700&amp;display=swap" rel="stylesheet" />
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css"
+    integrity="sha384-wcIxkf4k558AjM3Yz3BBFQUbk/zgIYC2R0QpeeYb+TwlBVMrlgLqwRjRtGZiK7ww"
+    crossorigin="anonymous"
+/>
+<marimo-filename hidden></marimo-filename>
+</head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#pivpy-data-model-xarray" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PIVPy" class="md-header__button md-logo" aria-label="PIVPy" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PIVPy
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Data model
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alexlib/pivpy" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alexlib/pivpy
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../intro/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Introduction
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Data model
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../pivpy_visualization/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Visualization
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../notebook/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Notebook
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../tutorial/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Tutorial
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../explore/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Explore
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../pivpy_tutorial/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Written tutorial
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../pivpy_faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api_reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PIVPy" class="md-nav__button md-logo" aria-label="PIVPy" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    PIVPy
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alexlib/pivpy" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alexlib/pivpy
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data model
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Single fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-vector-field" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single vector field
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Single vector field">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-data-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common data variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-coordinates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common coordinates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#units-and-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Units and labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#single-scalar-field" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single scalar field
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-series-array-of-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time series ("array of fields")
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Time series (&#34;array of fields&#34;)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspecting-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#selecting-frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selecting frames
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indexing-and-coordinate-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indexing and coordinate conventions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Indexing and coordinate conventions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#plotting-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plotting conventions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#about-ysign" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        About "ysign"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata-attrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata (attrs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#davis-vendor-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DaVis / vendor attributes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#practical-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practical examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Practical examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#show-the-dataset-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Show the dataset "layout"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compute-a-derived-scalar-with-consistent-units" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compute a derived scalar with consistent units
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#track-processing-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Track processing history
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pivpy_visualization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pivpy_tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Written tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pivpy_faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Single fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-vector-field" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single vector field
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Single vector field">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-data-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common data variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-coordinates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common coordinates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#units-and-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Units and labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#single-scalar-field" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single scalar field
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-series-array-of-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time series ("array of fields")
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Time series (&#34;array of fields&#34;)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspecting-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#selecting-frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selecting frames
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indexing-and-coordinate-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indexing and coordinate conventions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Indexing and coordinate conventions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#plotting-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plotting conventions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#about-ysign" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        About "ysign"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata-attrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata (attrs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#davis-vendor-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DaVis / vendor attributes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#practical-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practical examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Practical examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#show-the-dataset-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Show the dataset "layout"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compute-a-derived-scalar-with-consistent-units" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compute a derived scalar with consistent units
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#track-processing-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Track processing history
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="pivpy-data-model-xarray">PIVPy data model (xarray)</h1>
+<p>PIVPy's core data structure is an <code>xarray.Dataset</code>.
+This page explains how it is organized, how to access values correctly,
+which metadata is typically stored, and how this compares conceptually
+to PIVMat "structures" and "structure arrays".</p>
+<h2 id="overview">Overview</h2>
+<p>A typical <em>vector</em> PIV dataset contains:</p>
+<ul>
+<li>dimensions: <code>('y', 'x', 't')</code></li>
+<li>coordinates: 1D <code>x</code>, 1D <code>y</code>, 1D <code>t</code></li>
+<li>data variables: <code>u</code>, <code>v</code> and <code>chc</code> (and sometimes <code>mask</code>)</li>
+</ul>
+<p>A typical <em>scalar</em> dataset contains:</p>
+<ul>
+<li>dimensions: usually <code>('y', 'x', 't')</code> (or <code>('y', 'x')</code> for single images)</li>
+<li>data variable: <code>w</code> (plus optionally <code>chc</code>/<code>mask</code>)</li>
+</ul>
+<p>The recommended way to interact with PIVPy datasets is via the xarray accessor:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pivpy.pivpy</span>  <span class="c1"># registers the Dataset.piv accessor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pivpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">io</span>
+
+<span class="n">ds</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">read_piv</span><span class="p">(</span><span class="s2">"B00001.VC7"</span><span class="p">)</span>
+<span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">showf</span><span class="p">()</span>
+</code></pre></div>
+<h2 id="single-fields">Single fields</h2>
+<h3 id="single-vector-field">Single vector field</h3>
+<p>A single field is typically represented as a dataset with <code>t</code> of length 1
+(or sometimes without <code>t</code>, depending on the reader and context).</p>
+<h4 id="common-data-variables">Common data variables</h4>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type / dims</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>u</code></td>
+<td>float, <code>(y, x, t)</code></td>
+<td>x-component of velocity (or displacement)</td>
+</tr>
+<tr>
+<td><code>v</code></td>
+<td>float, <code>(y, x, t)</code></td>
+<td>y-component of velocity (or displacement)</td>
+</tr>
+<tr>
+<td><code>chc</code></td>
+<td>int/bool, <code>(y, x, t)</code></td>
+<td>validity / choice / quality flag (reader-dependent)</td>
+</tr>
+<tr>
+<td><code>mask</code> (optional)</td>
+<td>int/bool, <code>(y, x, t)</code></td>
+<td>mask information if present in the source export</td>
+</tr>
+</tbody>
+</table>
+<h4 id="common-coordinates">Common coordinates</h4>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type / dims</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>x</code></td>
+<td>float, <code>(x,)</code></td>
+<td>x-coordinate of grid points (physical units)</td>
+</tr>
+<tr>
+<td><code>y</code></td>
+<td>float, <code>(y,)</code></td>
+<td>y-coordinate of grid points (physical units)</td>
+</tr>
+<tr>
+<td><code>t</code></td>
+<td>float/int, <code>(t,)</code></td>
+<td>time coordinate (frames or physical time, depends on loader)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="units-and-labels">Units and labels</h4>
+<p>PIVPy stores units/labels using xarray attributes:</p>
+<ul>
+<li><code>ds['x'].attrs.get('units')</code></li>
+<li><code>ds['y'].attrs.get('units')</code></li>
+<li><code>ds['u'].attrs.get('units')</code></li>
+<li><code>ds['v'].attrs.get('units')</code></li>
+</ul>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code><span class="n">x_units</span> <span class="o">=</span> <span class="n">ds</span><span class="p">[</span><span class="s2">"x"</span><span class="p">]</span><span class="o">.</span><span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"units"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+<span class="n">u_units</span> <span class="o">=</span> <span class="n">ds</span><span class="p">[</span><span class="s2">"u"</span><span class="p">]</span><span class="o">.</span><span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"units"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="single-scalar-field">Single scalar field</h3>
+<p>Scalar fields (images or derived scalars like vorticity) usually use <code>w</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type / dims</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>w</code></td>
+<td>float, <code>(y, x, t)</code> or <code>(y, x)</code></td>
+<td>scalar field values (e.g. vorticity, divergence, intensity)</td>
+</tr>
+</tbody>
+</table>
+<p>Scalar datasets are often produced using <code>vec2scal</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pivpy.pivpy</span>
+
+<span class="n">vort</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">vec2scal</span><span class="p">(</span><span class="s2">"vorticity"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"w"</span><span class="p">)</span>
+<span class="n">vort</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">showf</span><span class="p">(</span><span class="n">scalar</span><span class="o">=</span><span class="s2">"w"</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="time-series-array-of-fields">Time series ("array of fields")</h2>
+<p>In PIVMat, a "structure array" stores many fields as a 1D array of structs.
+In PIVPy, the usual equivalent is a <em>single</em> <code>xarray.Dataset</code> where
+multiple frames are stacked along the <code>t</code> dimension.</p>
+<h3 id="inspecting-shape">Inspecting shape</h3>
+<div class="highlight"><pre><span></span><code><span class="n">ds</span><span class="o">.</span><span class="n">dims</span>
+<span class="n">ds</span><span class="o">.</span><span class="n">sizes</span>  <span class="c1"># contains sizes for y/x/t</span>
+</code></pre></div>
+<h3 id="selecting-frames">Selecting frames</h3>
+<div class="highlight"><pre><span></span><code><span class="n">first</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">one_frame</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">subset</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+</code></pre></div>
+<h2 id="indexing-and-coordinate-conventions">Indexing and coordinate conventions</h2>
+<p>xarray uses NumPy-like indexing: arrays stored as <code>(y, x, t)</code> mean:</p>
+<ul>
+<li>axis 0 is y (rows)</li>
+<li>axis 1 is x (columns)</li>
+<li>axis 2 is time</li>
+</ul>
+<p>So the element access is:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># value at y-index iy, x-index ix, time-index it</span>
+<span class="n">val</span> <span class="o">=</span> <span class="n">ds</span><span class="p">[</span><span class="s2">"u"</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="n">iy</span><span class="p">,</span> <span class="n">ix</span><span class="p">,</span> <span class="n">it</span><span class="p">]</span>
+</code></pre></div>
+<p>Coordinate-based selection is also available:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># select nearest physical coordinate</span>
+<span class="n">pt</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">20.0</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"nearest"</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="plotting-conventions">Plotting conventions</h3>
+<p>PIVPy plotting helpers are designed to respect coordinate arrays.
+For example:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pivpy.pivpy</span>
+
+<span class="n">ds</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">showf</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"vorticity"</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="about-ysign">About "ysign"</h3>
+<p>PIVMat stores a dedicated <code>ysign</code> string to track upward vs downward y-axis.
+PIVPy generally relies on the <em>ordering of the coordinate arrays</em> <code>y</code> and <code>x</code>.
+The plotting functions in <code>pivpy.graphics</code> handle flipped axes by inspecting
+the coordinate ordering.</p>
+<h2 id="metadata-attrs">Metadata (attrs)</h2>
+<p>PIVPy stores dataset-level metadata in <code>ds.attrs</code>.
+Not every reader populates the same keys, but you will often see entries like:</p>
+<ul>
+<li><code>name</code>: file name</li>
+<li><code>setname</code>: directory / set identifier</li>
+<li><code>source</code>: origin/format</li>
+<li><code>delta_t</code>: time step (when known)</li>
+<li><code>history</code>: list of processing steps (PIVMat-like concept)</li>
+</ul>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code><span class="n">ds</span><span class="o">.</span><span class="n">attrs</span>
+<span class="n">ds</span><span class="o">.</span><span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"history"</span><span class="p">,</span> <span class="p">[])</span>
+</code></pre></div>
+<p>Many PIVPy operations append to <code>ds.attrs['history']</code> (when the function is
+written in the PIVMat-compat style).</p>
+<h2 id="davis-vendor-attributes">DaVis / vendor attributes</h2>
+<p>PIVMat stores vendor metadata in a big string field called <code>Attributes</code> and uses
+functions like <code>getattribute</code> to parse it.</p>
+<p>In PIVPy, vendor-specific metadata may appear either:</p>
+<ul>
+<li>in <code>ds.attrs</code> as structured keys, or</li>
+<li>as separate variables/attributes (reader-dependent)</li>
+</ul>
+<p>The convenience functions in <code>pivpy.io</code> and the accessor methods in
+<code>pivpy.pivpy.PIVAccessor</code> are the recommended way to work with those details.</p>
+<h2 id="practical-examples">Practical examples</h2>
+<h3 id="show-the-dataset-layout">Show the dataset "layout"</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pivpy.pivpy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pivpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">io</span>
+
+<span class="n">ds</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">read_piv</span><span class="p">(</span><span class="s2">"B00001.VC7"</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">ds</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"dims:"</span><span class="p">,</span> <span class="n">ds</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"vars:"</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">data_vars</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"coords:"</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">coords</span><span class="p">))</span>
+</code></pre></div>
+<h3 id="compute-a-derived-scalar-with-consistent-units">Compute a derived scalar with consistent units</h3>
+<div class="highlight"><pre><span></span><code><span class="n">vort</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">vec2scal</span><span class="p">(</span><span class="s2">"vorticity"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"w"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">vort</span><span class="p">[</span><span class="s2">"w"</span><span class="p">]</span><span class="o">.</span><span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"units"</span><span class="p">,</span> <span class="s2">""</span><span class="p">))</span>
+</code></pre></div>
+<h3 id="track-processing-history">Track processing history</h3>
+<div class="highlight"><pre><span></span><code><span class="n">ds2</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">filterf</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">"gauss"</span><span class="p">)</span>
+<span class="n">ds2</span> <span class="o">=</span> <span class="n">ds2</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">vec2scal</span><span class="p">(</span><span class="s2">"vorticity"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"w"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">ds2</span><span class="o">.</span><span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"history"</span><span class="p">,</span> <span class="p">[]))</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.tabs", "navigation.top"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

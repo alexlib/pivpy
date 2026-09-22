@@ -1,0 +1,1405 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Post-processing of Particle Image Velocimetry (PIV) data">
+      
+      
+      
+        <link rel="canonical" href="https://alexlib.github.io/pivpy/">
+      
+      
+      
+        <link rel="next" href="intro/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>PIVPy</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@marimo-team/islands@0.24.0/dist/main.js"></script>
+<link
+    href="https://cdn.jsdelivr.net/npm/@marimo-team/islands@0.24.0/dist/style.css"
+    rel="stylesheet"
+    title="marimo-islands"
+    crossorigin="anonymous"
+/>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+/>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500;700&amp;family=Lora&amp;family=PT+Sans:wght@400;700&amp;display=swap" rel="stylesheet" />
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css"
+    integrity="sha384-wcIxkf4k558AjM3Yz3BBFQUbk/zgIYC2R0QpeeYb+TwlBVMrlgLqwRjRtGZiK7ww"
+    crossorigin="anonymous"
+/>
+<marimo-filename hidden></marimo-filename>
+</head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#pivpy" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="." title="PIVPy" class="md-header__button md-logo" aria-label="PIVPy" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PIVPy
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Home
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alexlib/pivpy" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alexlib/pivpy
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="intro/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Introduction
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="pivpy_data_model/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Data model
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="pivpy_visualization/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Visualization
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="notebook/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Notebook
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="tutorial/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Tutorial
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="explore/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Explore
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="pivpy_tutorial/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Written tutorial
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="pivpy_faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="api_reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="." title="PIVPy" class="md-nav__button md-logo" aria-label="PIVPy" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    PIVPy
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alexlib/pivpy" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alexlib/pivpy
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-do-i-get-set-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I get set up?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Started
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Getting Started">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-flow-animations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic Flow Animations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customizing-your-plots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customizing Your Plots
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pivmat-inspired-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PIVMat-inspired methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PIVMat-inspired methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#for-developers-local-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For developers, local use:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-packages-are-required-and-which-are-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What packages are required and which are optional
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-get-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to get started?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to test?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to help?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-write-tutorials-and-add-those-to-the-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to write tutorials and add those to the documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pivpy_data_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pivpy_visualization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="notebook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="explore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pivpy_tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Written tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pivpy_faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-do-i-get-set-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I get set up?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Started
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Getting Started">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-flow-animations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic Flow Animations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customizing-your-plots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customizing Your Plots
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pivmat-inspired-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PIVMat-inspired methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PIVMat-inspired methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#for-developers-local-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For developers, local use:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-packages-are-required-and-which-are-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What packages are required and which are optional
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-get-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to get started?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to test?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to help?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-write-tutorials-and-add-those-to-the-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to write tutorials and add those to the documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="pivpy"><img alt="PIVPy" src="pivpy_logo.png" /> PIVPy</h1>
+<p>Python-based post-processing PIV data analysis in the repo: https://github.com/openpiv/pivpy</p>
+<p><a href="https://badge.fury.io/py/pivpy"><img alt="PyPI version" src="https://badge.fury.io/py/pivpy.svg" /></a>
+<a href="https://pivpy.readthedocs.io/en/latest/?badge=latest"><img alt="Documentation Status" src="https://readthedocs.org/projects/pivpy/badge/?version=latest" /></a>
+<a href="https://molab.marimo.io/github/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.py"><img alt="Open in molab" src="https://marimo.io/molab-shield.svg" /></a></p>
+<p>Merging the three packages: 
+1. https://github.com/tomerast/Vecpy
+2. https://github.com/alexlib/pivpy/tree/xarray
+3. https://github.com/ronshnapp/vecpy</p>
+<h2 id="how-do-i-get-set-up">How do I get set up?</h2>
+<p>Recommended: use <code>uv</code> (fast, reproducible)  </p>
+<p>Create a virtualenv and install:</p>
+<div class="highlight"><pre><span></span><code>uv venv
+uv pip install pivpy
+</code></pre></div>
+<p>Install this repository (editable / development install):</p>
+<div class="highlight"><pre><span></span><code>uv venv
+uv pip install -e .
+</code></pre></div>
+<p>Install with optional dependencies (including <code>lvpyio</code> for LaVision VC7):</p>
+<div class="highlight"><pre><span></span><code>uv pip install 'pivpy[full]'
+</code></pre></div>
+<p>Run in a sandbox (isolated) environment (no persistent venv required):</p>
+<div class="highlight"><pre><span></span><code>uv run --isolated --with pivpy python -c "import pivpy; print(pivpy.__version__)"
+</code></pre></div>
+<p>Or run with optional dependencies in the sandbox:</p>
+<div class="highlight"><pre><span></span><code>uv run --isolated --with "pivpy[full]" python -c "from pivpy import io; print(io)"
+</code></pre></div>
+<p>Run using a specific Python version (uv-managed) in the sandbox:</p>
+<div class="highlight"><pre><span></span><code>uv python install 3.14
+uv run --isolated --managed-python -p python3.14 --with pivpy python -c "import sys, pivpy; print(sys.version.split()[0], pivpy.__version__)"
+</code></pre></div>
+<p>Run this repository's tests on Python 3.14 (sandboxed):</p>
+<div class="highlight"><pre><span></span><code>uv run --isolated --managed-python -p python3.14 --with-editable . pytest -q
+</code></pre></div>
+<p>Alternative: use <code>pip</code>:</p>
+<div class="highlight"><pre><span></span><code>pip install pivpy
+</code></pre></div>
+<p>or with optional dependencies:</p>
+<div class="highlight"><pre><span></span><code>pip install 'pivpy[full]'
+</code></pre></div>
+<p>if you use OpenPIV, PIVlab, etc. </p>
+<p>Quick start (auto-detect file format):</p>
+<div class="highlight"><pre><span></span><code>from pivpy import io
+ds = io.read_piv('your_file.vec')
+</code></pre></div>
+<h2 id="getting-started">Getting Started</h2>
+<p>Load experimental PIV data or generate analytical flow fields, and visualize publication-quality flow fields with <strong>zero effort</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pivpy.pivpy</span>  <span class="c1"># registers the .piv accessor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pivpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">synthetic</span>
+
+<span class="c1"># 1. Generate an analytical multi-vortex 2D turbulence field (or use io.read_piv)</span>
+<span class="n">ds</span> <span class="o">=</span> <span class="n">synthetic</span><span class="o">.</span><span class="n">multivortex</span><span class="p">(</span><span class="n">n_frames</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span> <span class="n">n_vortices</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">two_d</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+
+<span class="c1"># 2. Zero-effort, publication-quality plot (vorticity background, streamlines &amp; auto-scaled vectors)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+<p><img alt="PIVPy Multi-Vortex Flow Visualization" src="https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_quiver_vorticity.png" /></p>
+<h3 id="dynamic-flow-animations">Dynamic Flow Animations</h3>
+<p>Animate time-series datasets with in-place vector updates (<code>set_UVC</code>) and dynamic vorticity tracking:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Generate or load time-series flow data (e.g. interacting vortex pair)</span>
+<span class="n">ds</span> <span class="o">=</span> <span class="n">synthetic</span><span class="o">.</span><span class="n">vortex_pair</span><span class="p">(</span><span class="n">n_frames</span><span class="o">=</span><span class="mi">24</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+
+<span class="c1"># 2. Animate with one call</span>
+<span class="n">anim</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">animate</span><span class="p">(</span><span class="n">interval</span><span class="o">=</span><span class="mi">80</span><span class="p">)</span>
+
+<span class="c1"># Save as GIF / MP4 or display in Jupyter / Marimo</span>
+<span class="n">anim</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"vortex_interaction.gif"</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="PIVPy Flow Animation" src="https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_animation.gif" /></p>
+<h3 id="customizing-your-plots">Customizing Your Plots</h3>
+<p>Every visual layer can be easily tailored or toggled:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Velocity magnitude background with vectors only (no streamlines)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">background</span><span class="o">=</span><span class="s2">"mag"</span><span class="p">,</span>       <span class="c1"># 'vorticity' (default), 'mag', 'ke', 'divergence', or None</span>
+    <span class="n">streamlines</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>      <span class="c1"># toggle flow streamlines</span>
+    <span class="n">quiver</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>            <span class="c1"># toggle velocity vectors</span>
+    <span class="n">blur</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span>               <span class="c1"># smooth fluid color gradient</span>
+    <span class="n">arrow_scale</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span>       <span class="c1"># custom vector arrow scale</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">"Velocity Magnitude &amp; Vectors"</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Clean vector quiver only (no background)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+<p>Legacy loaders (still supported):</p>
+<div class="highlight"><pre><span></span><code>ds = io.load_vec('your_file.vec')
+ds = io.load_openpiv_txt('your_file.txt')
+</code></pre></div>
+<p>Check whether a newer version is available on PyPI:</p>
+<div class="highlight"><pre><span></span><code>import pivpy
+res = pivpy.check_update(verbose=True)
+# res.status: 0=unavailable, 1=up-to-date, 2=update available, 3=installed newer
+</code></pre></div>
+<h2 id="pivmat-inspired-methods">PIVMat-inspired methods</h2>
+<p>PIVPy exposes many post-processing operations via the xarray accessor <code>Dataset.piv</code>.
+Several common PIVMat toolbox methods are available with similar names/behavior:</p>
+<div class="highlight"><pre><span></span><code>import pivpy.pivpy  # registers the .piv accessor
+from pivpy import io
+
+ds = io.create_sample_Dataset(n_frames=10)
+
+# Add noise (similar to PIVMat addnoisef)
+ds_noisy = ds.copy().piv.addnoisef(eps=0.1, opt='add', nc=0.0, seed=0)
+
+# Ensemble (temporal) average and optional std/rms (similar to PIVMat averf)
+avg = ds.piv.averf()
+avg, std, rms = ds.piv.averf(return_std_rms=True)
+
+# Spatial averages (similar to PIVMat spaverf)
+ds_xy = ds.piv.spaverf('xy')   # excludes zeros by default
+ds_x0 = ds.piv.spaverf('x0')   # include zeros
+
+# Subtract ensemble/spatial average (similar to PIVMat subaverf)
+fluct = ds.piv.subaverf('e')
+fluct_x = ds.piv.subaverf('x0')
+
+# Azimuthal averaging (similar to PIVMat azaverf)
+r, ur, ut = ds.isel(t=0).piv.azaverf(0.0, 0.0, return_profiles=True)
+
+# Temporal resampling and phase average (similar to PIVMat resamplef/phaseaverf)
+ds_r = ds.piv.resamplef(tini=range(ds.sizes['t']), tfin=[0.5, 1.5, 2.5])
+phased = ds.piv.phaseaverf(12)
+</code></pre></div>
+<p>Additional PIVMat-inspired utilities:</p>
+<div class="highlight"><pre><span></span><code># Correlation along a dimension (similar to PIVMat corrm/corrx)
+cu = ds.piv.corrm(variable='u', dim='x')        # returns DataArray with a 'lag' dimension
+cv = ds.piv.corrm(variable='v', dim='y', half=True)
+
+# Spatial correlation function + integral scales (similar to PIVMat corrf)
+cor = ds.piv.corrf(variable='u', dim='x', normalize=True)
+# correlation curve: cor['f'] over cor['r']
+# integral scales: cor['isinf'], cor['is5'], cor['is2'], cor['is1'], cor['is0']
+
+# Fill holes encoded as zeros (similar to PIVMat interpolat.m behavior)
+ds_filled = ds.piv.fill_zeros(max_iter=10)
+
+# Extract a rectangular region (similar to PIVMat extractf)
+sub = ds.piv.extractf([0.0, 0.0, 10.0, 5.0], 'phys')   # [x1,y1,x2,y2] in physical units
+sub = ds.piv.extractf([10, 5, 50, 40], 'mesh')         # 1-based mesh indices (MATLAB-like)
+
+# Spatial convolution filter (similar to PIVMat filterf)
+ds_smooth = ds.piv.filterf(1.0, 'gauss', 'same')   # keep same size
+ds_smooth_valid = ds.piv.filterf(1.0, 'gauss')     # smaller (conv2(...,'valid') behavior)
+
+# Flip field (similar to PIVMat flipf)
+ds_lr = ds.piv.flipf('x')     # left-right mirror (negates u)
+ds_tb = ds.piv.flipf('y')     # top-bottom mirror (negates v)
+ds_xy = ds.piv.flipf('xy')    # both
+
+# 2D Butterworth filter (similar to PIVMat bwfilterf)
+ds_low = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='low', trunc=True)
+ds_high = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='high')
+
+# PIVMat-style option wrapper: opts can include 'high'/'low'/'trunc'
+ds_high2 = ds.piv.bwfilterf_pm(3.0, 8.0, 'high', 'trunc')
+
+# Batch processing over filename series (similar to PIVMat batchf)
+# fun can be a callable (fun(ds, ...)) or an accessor method name (e.g. 'averf', 'bwfilterf')
+from pivpy.io import batchf
+results = batchf('pivpy/data/day2/day2a00500[0:5].T000.D000.P003.H001.L.vec', 'averf')
+</code></pre></div>
+<h3 id="for-developers-local-use">For developers, local use:</h3>
+<p>Using <code>uv</code> (recommended):</p>
+<div class="highlight"><pre><span></span><code>git clone https://github.com/alexlib/pivpy .
+cd pivpy
+uv venv
+uv pip install -e .
+</code></pre></div>
+<p>Editable install with optional dependencies:</p>
+<div class="highlight"><pre><span></span><code>uv pip install -e '.[full]'
+</code></pre></div>
+<p>Alternative (conda):</p>
+<div class="highlight"><pre><span></span><code>git clone https://github.com/alexlib/pivpy .
+cd pivpy
+conda create -n pivpy python=3.11
+conda activate pivpy
+conda install pip
+pip install -e .
+</code></pre></div>
+<h2 id="what-packages-are-required-and-which-are-optional">What packages are required and which are optional</h2>
+<ol>
+<li><code>lvpyio</code> by Lavision Inc. if you use vc7 files</li>
+<li><code>netcdf4</code> if you want to store NetCDF4 files by xarray</li>
+<li><code>pyarrow</code> if you want to store parquet files</li>
+<li><code>vortexfitting</code> if you want to do vortex analysis ($\lambda_2$ and $Q$ criterions, vortex fitting) </li>
+<li><code>numpy</code>, <code>scipy</code>, <code>matplotlib</code>, <code>xarray</code> are must and installed with the <code>pivpy</code></li>
+</ol>
+<h2 id="contributors">Contributors</h2>
+<ol>
+<li>@alexlib</li>
+<li>@ronshnapp - original steps</li>
+<li>@liorshig - LVreader and great visualizaiton for Lavision</li>
+<li>@nepomnyi - connection to VortexFitting and new algorithms </li>
+</ol>
+<h2 id="how-to-get-started">How to get started?</h2>
+<p>Look into the <a href="https://github.com/alexlib/pivpy/blob/master/examples/notebooks/Getting_Started.py">getting started marimo notebook</a>
+(open it with <code>uv run marimo edit examples/notebooks/Getting_Started.py</code>, or click the
+"Open in molab" badge above to run it in your browser)</p>
+<p>and additional notebooks:
+<a href="https://github.com/alexlib/pivpy/blob/master/examples/notebooks/">Notebooks</a></p>
+<h2 id="how-to-test">How to test?</h2>
+<p>From a command line just use:</p>
+<div class="highlight"><pre><span></span><code>pytest
+</code></pre></div>
+<p>With <code>uv</code>:</p>
+<div class="highlight"><pre><span></span><code>uv run pytest -q
+</code></pre></div>
+<h2 id="documentation">Documentation</h2>
+<ul>
+<li><a href="https://alexlib.github.io/pivpy">PIVPy on GitHub Pages</a> (MkDocs, with live interactive marimo notebooks)</li>
+<li><a href="http://pivpy.readthedocs.io">PIVPy on ReadTheDocs</a> (mirrors the same MkDocs documentation)</li>
+</ul>
+<h2 id="how-to-help">How to help?</h2>
+<p>Read the ToDo file and pick one item to program. Use Fork-Develop-Pull Request model to 
+contribute</p>
+<h2 id="how-to-write-tutorials-and-add-those-to-the-documentation">How to write tutorials and add those to the documentation</h2>
+<p>Tutorials live as marimo notebooks (<code>.py</code> files) in <code>docs/source/</code>. The docs are built
+with MkDocs (<code>mkdocs.yml</code>, pages under <code>docs_mkdocs/</code>); the
+<a href="https://github.com/marimo-team/mkdocs-marimo">mkdocs-marimo</a> plugin embeds them live
+(editable, running in the browser via Pyodide) -- no separate conversion step needed:</p>
+<div class="highlight"><pre><span></span><code>uv pip install -r docs_mkdocs/requirements.txt
+uv run mkdocs build
+</code></pre></div>
+<p>generates a <code>site/</code> directory with the documentation. <code>uv run mkdocs serve</code> runs a
+live-reloading local preview.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["content.code.copy", "navigation.tabs", "navigation.top"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

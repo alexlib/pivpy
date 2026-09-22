@@ -72,6 +72,36 @@ def test_plot_quiver_respects_chc_mask():
     assert not masked[:, 3:].any()
 
 
+def test_plot_colorbar_not_duplicated_when_redundant():
+    """background= and color_by= requesting the same quantity (e.g. both
+    "mag") used to draw two stacked, redundant colorbars for one field -
+    should draw exactly one. Genuinely different quantities (background=
+    "vorticity", color_by="mag") still get their own colorbar each."""
+    fig, ax = graphics.plot(_d, background="mag", color_by="mag", streamlines=False)
+    assert len(fig.axes) == 2  # 1 plot axes + 1 colorbar, not 2
+
+    fig2, ax2 = graphics.plot(_d, background="vorticity", color_by="mag", streamlines=False)
+    assert len(fig2.axes) == 3  # 1 plot axes + 2 colorbars - legitimately different
+
+
+def test_plot_colorbar_matches_axes_height():
+    """the colorbar must match the plot's own rendered height regardless of
+    a figure/data aspect-ratio mismatch. Previously sized via
+    fig.colorbar(..., shrink=...), which is relative to the axes' nominal
+    (pre-aspect="equal"-letterboxing) bounding box - on a figure much
+    taller/narrower than the data itself, that came out several times too
+    tall. See "Getting the colorbar right" in
+    docs_mkdocs/pivpy_visualization.md."""
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(3, 12))  # deliberately mismatched vs the data's own aspect
+    graphics.plot(_d, ax=ax, background="mag", color_by=None, streamlines=False)
+    cbar_ax = next(a for a in fig.axes if a is not ax)
+    plot_h = ax.get_position().height
+    cbar_h = cbar_ax.get_position().height
+    assert abs(cbar_h - plot_h) / plot_h < 0.05
+
+
 def test_animate():
     """tests fast FuncAnimation flow field generation"""
     anim = graphics.animate(_d, interval=50)

@@ -80,6 +80,147 @@ fig, ax = ds.piv.plot(
 )
 ```
 
+## Worked Example: Image Background + Streamlines + Colored Quiver
+
+This is the full pattern for the kind of figure that shows up in real PIV
+work: raw camera frame underneath, a colored quiver on top, streamlines to
+show the flow topology at a glance, and a correctly-sized colorbar - here
+revealing a **canonical recirculation (cavity) vortex** near a wavy channel
+wall, averaged over 150 frames to smooth out turbulent fluctuations:
+
+![Wall-masked averaged flow field with a canonical cavity vortex](_static/gallery/wall_masked_cavity_vortex.png){ width="70%" }
+
+Every argument in the call that produced it, explained:
+
+```python
+fig, ax = ds.piv.plot(
+    background="image",          # (1) what to paint behind the vectors
+    image=raw_frame,             # (2) the actual 2D grayscale array to show
+    image_extent=(0, 2.0, -4.9, 0),  # (3) physical (left, right, bottom, top)
+    image_cmap="gray",           # (4) colormap for the *image*, not the data
+    image_alpha=0.6,             # (5) how much the image shows through
+    quiver=True,                 # (6) draw velocity arrows
+    color_by="mag",              # (7) color the arrows by speed
+    cmap="viridis",              # (8) colormap for whatever is colored (mag here)
+    arrow_scale=None,            # (9) None = auto-scaled, no overlap
+    arrow_width=0.004,           # (10) shaft thickness
+    skip=7,                      # (11) draw every 7th vector (density)
+    streamlines=True,            # (12) trace flow topology - this is what
+                                  #      actually reveals the vortex cleanly,
+                                  #      arrows alone rarely do
+    colorbar=True,               # (13) see "Getting the colorbar right" below
+    title="Average flow field over 150 frames - canonical cavity vortex",
+)
+
+# ax is a normal matplotlib Axes - anything not covered by piv.plot()'s own
+# arguments is just ordinary matplotlib on top of the returned (fig, ax):
+ax.axhline(-2.41, color="cyan", linewidth=1.0, linestyle="--", label="camera A edge")
+ax.axhline(-2.42, color="magenta", linewidth=1.0, linestyle="--", label="camera B edge")
+ax.set_xlim(0, 2)
+ax.legend(fontsize=7, loc="lower right")
+```
+
+**Row-by-row reasoning:**
+
+1. **(1)-(5) `background="image"` family** - use this whenever you have the
+   real camera frame (or a photo, a schematic, anything raster) and want
+   vectors drawn on top of it, instead of a synthetic scalar field like
+   vorticity. `image_extent` must be given in the *same physical units* as
+   your `x`/`y` coordinates - if you get the vectors and the picture
+   misaligned, this tuple is almost always the culprit. `image_alpha < 1`
+   keeps the picture visible without it fighting the arrow colors for
+   attention.
+2. **(6)-(11) the quiver itself** - `color_by="mag"` (or `"vorticity"`, or
+   any variable name in the dataset) colors each arrow by that quantity;
+   leave it `None` for plain single-color arrows via `arrow_color`.
+   `arrow_scale=None` is almost always the right starting point - it
+   auto-picks a scale so neighboring arrows at your chosen `skip` don't
+   overlap. Only override it once you've looked at the auto result and know
+   which direction (shorter/longer) you want, and be aware that **one
+   global scale can't make both a fast primary flow and a much slower
+   internal recirculation clearly visible at once** - if the ratio between
+   your fastest and slowest region is large (as it is inside a
+   recirculation zone), lengthening the scale to see the slow region will
+   make the fast region's arrows overlap into an unreadable wash. In that
+   case, let the streamlines carry the recirculation's shape (they don't
+   have this problem) and treat the arrows as directional context for the
+   dominant flow.
+3. **(12) `streamlines=True`** - this is doing the real work of showing the
+   vortex in the image above. Arrows are inherently a "one sample point at
+   a time" view; streamlines integrate the field and reveal closed
+   recirculation loops that are easy to miss by eye in a quiver plot alone.
+4. **(13) Getting the colorbar right** - `colorbar=True` (the default) is
+   almost always what you want, and as of this release it's safe to leave
+   on even when you set *both* `background=` and `color_by=` to the same
+   quantity (e.g. both `"mag"`) - `plot()` now detects that and only draws
+   one colorbar instead of two redundant ones stacked on top of each
+   other. It's also now sized to match your axes' *actual rendered* height
+   regardless of aspect ratio, so a tall, narrow channel or a wide, short
+   wake no longer gets a colorbar several times taller (or shorter) than
+   the plot itself - previously this required manually replacing
+   `colorbar=True` with `colorbar=False` and drawing your own. If you
+   *do* want two colorbars (e.g. `background="vorticity"` colored one way,
+   `color_by="mag"` colored another), that still works exactly as before -
+   the redundancy check only fires when they'd actually show the same
+   thing.
+
+## Using marimo for Interactive Parameter Tuning
+
+Static code-and-rerun is fine for a final figure, but tuning `skip`,
+`arrow_scale`, `background`, or a colormap by trial and error is much
+faster with live sliders than by editing and re-running a script by hand.
+[marimo](https://marimo.io) notebooks are a natural fit for this because
+every cell re-runs automatically when a slider it depends on changes - you
+drag, the plot redraws, no "run cell" click needed.
+
+A minimal tuning panel for `ds.piv.plot()`:
+
+```python {marimo}
+import marimo as mo
+
+cmap_dd = mo.ui.dropdown(
+    options=["viridis", "plasma", "coolwarm", "turbo"], value="viridis", label="colormap"
+)
+background_dd = mo.ui.dropdown(
+    options=["mag", "vorticity", "ke", "none"], value="mag", label="background"
+)
+skip_slider = mo.ui.slider(1, 20, value=8, step=1, label="arrow skip (density)")
+mo.vstack([cmap_dd, background_dd, skip_slider])
+```
+
+```python {marimo}
+fig, ax = ds.piv.plot(
+    background=None if background_dd.value == "none" else background_dd.value,
+    cmap=cmap_dd.value,
+    skip=skip_slider.value,
+    color_by=None if background_dd.value != "none" else "mag",
+)
+fig.gca()
+```
+
+A few practical notes from real use:
+
+- **Keep `color_by` and `background` mutually exclusive** unless you
+  deliberately want two colorbars (see above) - the pattern
+  `color_by=None if background_dd.value != "none" else "mag"` in the second
+  cell is the simplest way to enforce that from a single dropdown.
+- **Reuse one slider across multiple plot cells** if you're comparing, say,
+  a plain scalar-field view and an image-overlay view side by side - marimo
+  reruns *every* cell that references the slider, so both plots stay in
+  sync automatically without extra wiring.
+- **Derive dependent values in their own cell** rather than recomputing
+  them inline in the plotting cell - e.g. if you're driving `arrow_scale`
+  from a "relative length" slider (see the worked example above for why
+  you'd want that), compute the actual scale value in a small cell of its
+  own so it's inspectable on its own, and so the plotting cell stays
+  readable.
+- **`ds.piv.plot(ax=...)`** lets you pre-create the figure at your intended
+  final size (`plt.subplots(figsize=(6, 13))` for a tall channel, say)
+  *before* calling `plot()`, instead of resizing the returned figure
+  afterward - resizing after the fact stretches an already-laid-out figure
+  unevenly (colorbar included), while passing a pre-sized `ax=` in gets
+  everything scaled correctly from the start.
+
 ## Flow Animations (`ds.piv.animate`)
 
 ### How PIVPy Animations Work
@@ -172,3 +313,4 @@ imvectomovie("data_run_*.vec", output="run_movie.mp4", background="mag", fps=20)
 | --- | --- |
 | ![Quiver plot](_static/gallery/quiver.png) | ![showf with vorticity background](_static/gallery/showf_vorticity.png) |
 | ![Scalar vorticity plot](_static/gallery/scalar_vorticity.png) | ![Streamplot](_static/gallery/streamplot.png) |
+| ![Image background, streamlines, and colored quiver revealing a cavity vortex](_static/gallery/wall_masked_cavity_vortex.png) | see the [worked example](#worked-example-image-background--streamlines--colored-quiver) above for the full parameter walkthrough |

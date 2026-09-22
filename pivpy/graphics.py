@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter
 
 if TYPE_CHECKING:
@@ -28,6 +29,29 @@ if TYPE_CHECKING:
     from matplotlib.quiver import Quiver
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+
+
+def _compact_colorbar(fig: Figure, ax: Axes, mappable, label: str | None = None):
+    """Draw a colorbar sized to match ``ax``'s own rendered height, not its
+    nominal (pre-aspect-ratio) bounding box.
+
+    ``fig.colorbar(mappable, ax=ax, fraction=..., shrink=...)`` sizes the
+    colorbar relative to ``ax``'s box *before* ``ax.set_aspect("equal")``
+    letterboxes it - so on any plot whose data isn't roughly square (a long
+    channel, a tall boundary layer, ...) the colorbar comes out badly
+    oversized, sometimes several times taller than the plot itself.
+    ``make_axes_locatable`` instead appends a new axes directly adjacent to
+    ``ax``'s actual rendered box, so it always matches regardless of aspect
+    ratio. Safe to call more than once on the same ``ax`` (e.g. a
+    background colorbar and a separately-colored quiver's colorbar) - each
+    call appends alongside whatever's already there.
+    """
+    cax = make_axes_locatable(ax).append_axes("right", size="4%", pad=0.15)
+    cbar = fig.colorbar(mappable, cax=cax)
+    if label:
+        cbar.set_label(label, fontsize=11, labelpad=10)
+    cbar.ax.tick_params(labelsize=9)
+    return cbar
 
 
 def plot(
@@ -183,6 +207,9 @@ def plot(
             v_arr = np.where(invalid, np.nan, v_arr)
 
         bg_drawn = False
+        bg_scalar_key = None  # normalized background quantity, set below when a
+        # scalar colorbar is actually drawn for it - lets the quiver colorbar
+        # skip itself if color_by requests the same quantity (see Quiver Layer).
         # Background Layer
         if background is not None and background is not False and str(background).lower() not in ("off", "none", ""):
             bg_str = str(background).lower() if isinstance(background, str) else "vorticity"
@@ -263,11 +290,9 @@ def plot(
 
                 cf = ax.contourf(X, Y, bg_val, levels=int(levels), cmap=use_cmap, vmin=vmin, vmax=vmax, extend="both")
                 if colorbar:
-                    cbar = fig.colorbar(cf, ax=ax, pad=0.03, shrink=0.92)
                     cbar_lbl = cbar_label if cbar_label is not None else default_cbar_label
-                    if cbar_lbl:
-                        cbar.set_label(cbar_lbl, fontsize=11, labelpad=10)
-                    cbar.ax.tick_params(labelsize=9)
+                    _compact_colorbar(fig, ax, cf, label=cbar_lbl or None)
+                    bg_scalar_key = bg_str
                 bg_drawn = True
 
         # Streamlines Layer
@@ -364,10 +389,19 @@ def plot(
                 alpha=float(arrow_alpha),
                 **quiver_extra,
             )
-            if color_arr is not None and colorbar:
-                cbar = fig.colorbar(Q, ax=ax, pad=0.03, shrink=0.92)
-                cbar.set_label(cbar_label if cbar_label is not None else str(color_by), fontsize=11, labelpad=10)
-                cbar.ax.tick_params(labelsize=9)
+            # Skip a second colorbar when color_by requests the same quantity
+            # the background already drew one for (e.g. background="mag",
+            # color_by="mag") - background= and color_by= are independent
+            # knobs (color_by can legitimately differ from background, e.g.
+            # background="vorticity", color_by="mag"), so this only fires
+            # when they'd actually be redundant.
+            _redundant_cbar = (
+                bg_scalar_key is not None
+                and color_by is not None
+                and str(color_by).lower() == bg_scalar_key
+            )
+            if color_arr is not None and colorbar and not _redundant_cbar:
+                _compact_colorbar(fig, ax, Q, label=cbar_label if cbar_label is not None else str(color_by))
 
             if quiver_key:
                 key_val = round(med_speed, 1) if med_speed >= 1.0 else round(med_speed, 2)
@@ -407,8 +441,7 @@ def plot(
 
         cf = ax.contourf(X, Y, sc_val, levels=int(levels), cmap=use_cmap, vmin=vmin, vmax=vmax, extend="both")
         if colorbar:
-            cbar = fig.colorbar(cf, ax=ax, pad=0.03, shrink=0.92)
-            cbar.set_label(cbar_label if cbar_label is not None else scalar_name, fontsize=11, labelpad=10)
+            _compact_colorbar(fig, ax, cf, label=cbar_label if cbar_label is not None else scalar_name)
 
     ax.set_aspect(aspect)
     ax.set_xlabel(f"x [{xUnits}]", fontsize=11)

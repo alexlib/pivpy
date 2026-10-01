@@ -10,8 +10,9 @@ theme:
   name: material
   features:
     - content.code.copy
-    - navigation.tabs
     - navigation.top
+    - navigation.sections
+    - navigation.expand
 
 nav:
   - Home: index.md

@@ -16,6 +16,7 @@ theme:
 nav:
   - Home: index.md
   - Introduction: intro.md
+  - Feature Gallery: gallery.md
   - Data model: pivpy_data_model.md
   - Visualization: pivpy_visualization.md
   - Notebook: notebook.md
@@ -37,6 +38,9 @@ plugins:
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.superfences
   - pymdownx.highlight
   - pymdownx.inlinehilite

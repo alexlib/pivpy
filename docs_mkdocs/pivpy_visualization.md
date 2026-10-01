@@ -362,10 +362,12 @@ imvectomovie("data_run_*.vec", output="run_movie.mp4", background="mag", fps=20)
 
 ## Gallery of Static Visualizations
 
+For a comprehensive catalog of all flow diagnostics, vortex criteria, and turbulence statistics on a standard benchmark field, see the dedicated [Feature Gallery](gallery.md).
+
 | | |
 | --- | --- |
 | ![Quiver plot](_static/gallery/quiver.png) | ![showf with vorticity background](_static/gallery/showf_vorticity.png) |
 | ![Scalar vorticity plot](_static/gallery/scalar_vorticity.png) | ![Streamplot](_static/gallery/streamplot.png) |
 | ![Image background, streamlines, and colored quiver revealing a cavity vortex](_static/gallery/wall_masked_cavity_vortex.png) | ![Synthetic freestream with a counter-rotating vortex pair](_static/gallery/synthetic_freestream_vortex_pair.png) |
 
-See the [worked example](#worked-example-image-background--streamlines--colored-quiver) above and the [synthetic data example](#synthetic-data-freestream--vortex-pair) for the full parameter walkthroughs.
+See the [worked example](#worked-example-image-background-streamlines-colored-quiver) above and the [synthetic data example](#synthetic-data-freestream-vortex-pair) for the full parameter walkthroughs.

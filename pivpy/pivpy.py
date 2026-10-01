@@ -2001,18 +2001,10 @@ class PIVAccessor(object):
             >>> data.piv.divergence(name="div")  # Creates data["div"] with divergence
         """
         warn_if_overwriting_scalar(self._obj, name)
-        du_dx, _ = np.gradient(
-            self._obj["u"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
-        _, dv_dy = np.gradient(
-            self._obj["v"], self._obj["x"], self._obj["y"], axis=(0, 1)
-        )
+        du_dx = self._obj["u"].differentiate("x")
+        dv_dy = self._obj["v"].differentiate("y")
 
-        if "t" in self._obj.coords:
-            self._obj[name] = (("x", "y", "t"), dv_dy + du_dx)
-        else:
-            self._obj[name] = (("x", "y"), dv_dy + du_dx)
-
+        self._obj[name] = du_dx + dv_dy
         self._obj[name].attrs["units"] = "1/delta_t"
         self._obj[name].attrs["standard_name"] = "divergence"
 
@@ -2222,6 +2214,7 @@ class PIVAccessor(object):
         y_dim: str = "y",
         time_dim: Optional[str] = None,
         weights: Optional[xr.DataArray] = None,
+        swap_dims: bool = True,
     ) -> xr.DataArray:
         """Calculates localized 2-point spatial correlation relative to reference probe (x_ref, y_ref)."""
         return ctwo_point_correlation(
@@ -2233,6 +2226,7 @@ class PIVAccessor(object):
             y_dim=y_dim,
             time_dim=time_dim,
             weights=weights,
+            swap_dims=swap_dims,
         )
 
     def length_scale(

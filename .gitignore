@@ -20,4 +20,6 @@ tmp.nc
 /docs/_build
 __marimo__/
 *.png
+!docs_mkdocs/_static/**/*.png
+!docs_mkdocs/*.png
 /site/

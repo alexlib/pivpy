@@ -41,16 +41,19 @@ def test_scalar_no_warning_with_distinct_names():
         ds.piv.strain(name="strain")
 
 
-def test_crop_warns_deprecation():
+def test_crop_is_pure_function():
     ds = io.create_sample_Dataset(n_frames=2, rows=10, cols=10)
-    with pytest.warns(DeprecationWarning, match="crop"):
-        ds.piv.crop([0, 5, 0, 5])
+    with warnings_none():
+        cropped = ds.piv.crop([0, 5, 0, 5])
+    assert cropped.sizes["x"] <= 6
+    assert ds.sizes["x"] == 10
 
 
-def test_vec2scal_warns_deprecation():
+def test_vec2scal_returns_dataset_without_deprecation():
     ds = io.create_sample_Dataset(n_frames=2)
-    with pytest.warns(DeprecationWarning, match="vec2scal"):
-        ds.piv.vec2scal("vorticity")
+    with warnings_none():
+        out = ds.piv.vec2scal("vorticity", name="vort")
+    assert "vort" in out
 
 
 class warnings_none:

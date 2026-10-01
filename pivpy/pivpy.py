@@ -5,7 +5,7 @@ from __future__ import annotations
 This script extends the functionality of xarray.Dataset by adding a new accessor called piv. The accessor adds several properties and methods that are useful for working with particle image velocimetry (PIV) data. The properties include average, which returns the mean flow field, and delta_t, which returns the time step used in the PIV measurement. The methods include crop, which allows the user to crop the data by a given number of rows and columns from the boundaries, vec2scal, which converts vector data to scalar data, pan, which pans the data by a given number of pixels, and rotate, which rotates the data by a given angle.
 
 
-@author: Ron, Alex
+@author: Ron, Alex, Lior
 """
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
 import warnings
@@ -46,6 +46,23 @@ from pivpy.compute_funcs import (
     integral_length_scale as cintegral_length_scale,
     taylor_microscale as ctaylor_microscale,
     dissipation as cdissipation,
+    fluct as cfluct,
+    calculate_product as ccalculate_product,
+    reynolds_stresses as creynolds_stresses,
+    tke_turb as ctke_turb,
+    calc_moments as ccalc_moments,
+    calc_all_products as ccalc_all_products,
+    two_point_correlation as ctwo_point_correlation,
+    compute_length_scale as ccompute_length_scale,
+    add_quadrants as cadd_quadrants,
+    calc_quadrant_mean as ccalc_quadrant_mean,
+    calc_quadrant_fraction as ccalc_quadrant_fraction,
+    calc_quadrant_duration as ccalc_quadrant_duration,
+    quadrant_analysis as cquadrant_analysis,
+    smooth_savgol as csmooth_savgol,
+    smooth_spline as csmooth_spline,
+    non_uniform_spectra as cnon_uniform_spectra,
+    _detect_time_dim,
     bwfilter2d,
     corrf,
     corrm,
@@ -187,18 +204,7 @@ class PIVAccessor(object):
         # Note: We don't validate xmin < xmax or ymin < ymax because coordinates
         # might be in reverse order (e.g., negative y-axis pointing down)
 
-        warnings.warn(
-            "piv.crop() currently rebinds this accessor's internal dataset "
-            "reference as a side effect; a future release will make it a pure "
-            "function that only returns the cropped dataset. Always use the "
-            "return value (`ds = ds.piv.crop(...)`) rather than relying on "
-            "in-place state.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._obj = self._obj.sel(x=slice(xmin, xmax), y=slice(ymin, ymax))
-
-        return self._obj
+        return self._obj.sel(x=slice(xmin, xmax), y=slice(ymin, ymax))
 
     def extractf(
         self,
@@ -2056,54 +2062,404 @@ class PIVAccessor(object):
         self._obj[name].attrs["standard_name"] = "kinetic_energy"
         return self._obj
 
-    def tke(self, name: str = "w"):
-        """Estimates turbulent kinetic energy
+    def tke(
+        self,
+        name: str = "w",
+        weights: Optional[xr.DataArray] = None,
+        time_average: bool = False,
+        dim: Optional[str] = None,
+    ):
+        """Estimates turbulent kinetic energy: 0.5 * sum(<u_i'^2>).
         
         Args:
             name (str): Name for the output scalar field. Defaults to "w".
-                Use different names to store multiple scalar fields in one dataset.
+            weights (DataArray, optional): Weights for time averaging.
+            time_average (bool): If True, returns time-averaged TKE field. If False,
+                returns instantaneous TKE across time frames. Defaults to False.
+            dim (str, optional): Time/ensemble dimension.
                 
         Returns:
-            xarray.Dataset: New dataset with TKE field (based on fluctuations from mean)
+            xarray.Dataset: Dataset with TKE field.
             
         Raises:
             ValueError: If dataset has less than 2 time frames
-            
-        Example:
-            >>> data.piv.tke()  # Creates data["w"] with TKE
-            >>> data.piv.tke(name="tke")  # Creates data["tke"]
         """
-        if len(self._obj.t) < 2:
+        t_dim = _detect_time_dim(self._obj, dim)
+        if t_dim not in self._obj.dims or self._obj.sizes[t_dim] < 2:
             raise ValueError(
-                "TKE is not defined for a single vector field, \
-                              use .piv.kinetic_energy()"
+                "TKE is not defined for a single vector field, use .piv.kinetic_energy()"
             )
 
         warn_if_overwriting_scalar(self._obj, name)
         new_obj = self._obj.copy()
-        new_obj -= new_obj.mean(dim="t")
-        new_obj[name] = new_obj["u"] ** 2 + new_obj["v"] ** 2
+
+        comps = [c for c in ["u", "v", "w"] if c in new_obj.data_vars]
+        if not comps:
+            comps = [c for c in ["U", "V", "W"] if c in new_obj.data_vars]
+
+        if weights is not None:
+            mean_obj = new_obj.weighted(weights).mean(dim=t_dim)
+        else:
+            mean_obj = new_obj.mean(dim=t_dim)
+
+        flucs = {c: new_obj[c] - mean_obj[c] for c in comps}
+        tke_inst = 0.5 * sum(flucs[c] ** 2 for c in comps)
+
+        if time_average:
+            if weights is not None:
+                new_obj[name] = tke_inst.weighted(weights).mean(dim=t_dim)
+            else:
+                new_obj[name] = tke_inst.mean(dim=t_dim)
+        else:
+            new_obj[name] = tke_inst
+
         new_obj[name].attrs["units"] = "(m/s)^2"
         new_obj[name].attrs["standard_name"] = "TKE"
 
         return new_obj
 
-    def fluct(self):
-        """returns fluctuations as a new dataset"""
+    def fluct(
+        self,
+        var_key: Optional[str] = None,
+        weights: Optional[xr.DataArray] = None,
+        dim: Optional[str] = None,
+    ):
+        """Returns velocity fluctuations relative to the ensemble mean.
+        
+        If `var_key` is provided (e.g. 'u', 'v'), returns an xr.DataArray of fluctuations.
+        If `var_key` is None, returns a new xr.Dataset with all velocity components
+        replaced by their fluctuations.
+        """
+        if var_key is not None:
+            return cfluct(self._obj, var_key=var_key, weights=weights, dim=dim)
 
-        if len(self._obj.t) < 2:
+        t_dim = _detect_time_dim(self._obj, dim)
+        if t_dim not in self._obj.dims or self._obj.sizes[t_dim] < 2:
             raise ValueError(
-                "fluctuations cannot be defined for a \
-                              single vector field, use .piv.ke()"
+                "fluctuations cannot be defined for a single vector field, use .piv.ke()"
             )
 
         new_obj = self._obj.copy()
-        new_obj -= new_obj.mean(dim="t")
+        if weights is not None:
+            mean_obj = self._obj.weighted(weights).mean(dim=t_dim)
+        else:
+            mean_obj = self._obj.mean(dim=t_dim)
 
-        new_obj["u"].attrs["standard_name"] = "fluctation"
-        new_obj["v"].attrs["standard_name"] = "fluctation"
+        for c in ["u", "v", "w"]:
+            if c in new_obj.data_vars:
+                new_obj[c] = new_obj[c] - mean_obj[c]
+                new_obj[c].attrs["standard_name"] = "fluctation"
 
         return new_obj
+
+    def product(
+        self,
+        product_key: str,
+        weights: Optional[xr.DataArray] = None,
+        dim: Optional[str] = None,
+    ) -> xr.DataArray:
+        """Calculates element-wise product of variables (raw or fluctuating).
+        
+        Example:
+            >>> ds.piv.product("u'v'")    # u' * v'
+            >>> ds.piv.product("u'u'u'")  # u'^3
+        """
+        return ccalculate_product(self._obj, product_key, weights=weights, dim=dim)
+
+    def reynolds_stresses(
+        self,
+        weights: Optional[xr.DataArray] = None,
+        dim: Optional[str] = None,
+        components: Optional[List[str]] = None,
+    ) -> xr.Dataset:
+        """Calculates all Reynolds stress components <u_i' u_j'> for 2D or 3D fields."""
+        return creynolds_stresses(self._obj, weights=weights, dim=dim, components=components)
+
+    def moments(
+        self,
+        variables: Optional[List[str]] = None,
+        order: int = 2,
+        weights: Optional[xr.DataArray] = None,
+        standardized: bool = False,
+        dim: Optional[str] = None,
+    ) -> xr.Dataset:
+        """Calculates high-order turbulence moments up to specified order.
+        
+        If standardized=True, moments are normalized by powers of standard deviations
+        (e.g. skewness for order 3, kurtosis/flatness for order 4).
+        """
+        return ccalc_moments(
+            self._obj,
+            variables=variables,
+            order=order,
+            weights=weights,
+            standardized=standardized,
+            dim=dim,
+        )
+
+    def all_products(
+        self,
+        variables: Optional[List[str]] = None,
+        order: int = 2,
+        weights: Optional[xr.DataArray] = None,
+        dim: Optional[str] = None,
+    ) -> xr.Dataset:
+        """Adds all instantaneous fluctuation products up to specified order to the dataset."""
+        return ccalc_all_products(
+            self._obj,
+            variables=variables,
+            order=order,
+            weights=weights,
+            dim=dim,
+        )
+
+    def two_point_correlation(
+        self,
+        var_name: str = "u",
+        x_ref: Optional[float] = None,
+        y_ref: Optional[float] = None,
+        x_dim: str = "x",
+        y_dim: str = "y",
+        time_dim: Optional[str] = None,
+        weights: Optional[xr.DataArray] = None,
+    ) -> xr.DataArray:
+        """Calculates localized 2-point spatial correlation relative to reference probe (x_ref, y_ref)."""
+        return ctwo_point_correlation(
+            self._obj,
+            var_name=var_name,
+            x_ref=x_ref,
+            y_ref=y_ref,
+            x_dim=x_dim,
+            y_dim=y_dim,
+            time_dim=time_dim,
+            weights=weights,
+        )
+
+    def length_scale(
+        self,
+        variable: str = "u",
+        dim: str = "x",
+        method: str = "1e",
+        fit_model: str = "single",
+        x_ref: Optional[float] = None,
+        y_ref: Optional[float] = None,
+    ) -> xr.DataArray:
+        """Computes integral length scale using method ('1e', 'integral', 'fit')."""
+        corr = self.two_point_correlation(
+            var_name=variable,
+            x_ref=x_ref,
+            y_ref=y_ref,
+            x_dim="x",
+            y_dim="y",
+        )
+        lag_dim = f"lag_{dim}" if f"lag_{dim}" in corr.coords else dim
+        return ccompute_length_scale(corr, dim=lag_dim, method=method, fit_model=fit_model)
+
+    def add_quadrants(
+        self,
+        x_var: str = "u",
+        y_var: str = "v",
+        z_var: Optional[str] = None,
+        analysis_type: str = "quadrant",
+        hole_size: float = 0.0,
+        hole_vars: Optional[Tuple[str, str]] = None,
+        weights: Optional[xr.DataArray] = None,
+        dim: Optional[str] = None,
+    ) -> xr.Dataset:
+        """Classify data points into quadrants (2D) or octants (3D) and apply hole filtering."""
+        return cadd_quadrants(
+            self._obj,
+            x_var=x_var,
+            y_var=y_var,
+            z_var=z_var,
+            analysis_type=analysis_type,
+            hole_size=hole_size,
+            hole_vars=hole_vars,
+            weights=weights,
+            dim=dim,
+        )
+
+    def calc_quadrant_mean(
+        self,
+        analysis_type: str = "quadrant",
+        x_var: str = "u",
+        y_var: str = "v",
+        z_var: Optional[str] = None,
+        hole_size: float = 0.0,
+        hole_vars: Optional[Tuple[str, str]] = None,
+        weights: Optional[xr.DataArray] = None,
+        dim: Optional[str] = None,
+    ) -> xr.Dataset:
+        """Calculates conditional averages for each quadrant/octant."""
+        return ccalc_quadrant_mean(
+            self._obj,
+            analysis_type=analysis_type,
+            x_var=x_var,
+            y_var=y_var,
+            z_var=z_var,
+            hole_size=hole_size,
+            hole_vars=hole_vars,
+            weights=weights,
+            dim=dim,
+        )
+
+    def calc_quadrant_fraction(
+        self,
+        analysis_type: str = "quadrant",
+        x_var: str = "u",
+        y_var: str = "v",
+        z_var: Optional[str] = None,
+        hole_size: float = 0.0,
+        hole_vars: Optional[Tuple[str, str]] = None,
+        weights: Optional[xr.DataArray] = None,
+        dim: Optional[str] = None,
+    ) -> xr.Dataset:
+        """Calculates the fraction of total stress from each quadrant."""
+        return ccalc_quadrant_fraction(
+            self._obj,
+            analysis_type=analysis_type,
+            x_var=x_var,
+            y_var=y_var,
+            z_var=z_var,
+            hole_size=hole_size,
+            hole_vars=hole_vars,
+            weights=weights,
+            dim=dim,
+        )
+
+    def calc_quadrant_duration(
+        self,
+        analysis_type: str = "quadrant",
+        x_var: str = "u",
+        y_var: str = "v",
+        z_var: Optional[str] = None,
+        hole_size: float = 0.0,
+        hole_vars: Optional[Tuple[str, str]] = None,
+        weights: Optional[xr.DataArray] = None,
+        dim: Optional[str] = None,
+    ) -> xr.Dataset:
+        """Calculates duration or occurrence frequency spent in each quadrant."""
+        return ccalc_quadrant_duration(
+            self._obj,
+            analysis_type=analysis_type,
+            x_var=x_var,
+            y_var=y_var,
+            z_var=z_var,
+            hole_size=hole_size,
+            hole_vars=hole_vars,
+            weights=weights,
+            dim=dim,
+        )
+
+    def quadrant_analysis(
+        self,
+        x_var: str = "u",
+        y_var: str = "v",
+        z_var: Optional[str] = None,
+        analysis_type: str = "quadrant",
+        hole_size: float = 0.0,
+        hole_vars: Optional[Tuple[str, str]] = None,
+        weights: Optional[xr.DataArray] = None,
+        dim: Optional[str] = None,
+    ) -> xr.Dataset:
+        """High-level quadrant/octant turbulence analysis returning fractions, duration, and means."""
+        return cquadrant_analysis(
+            self._obj,
+            x_var=x_var,
+            y_var=y_var,
+            z_var=z_var,
+            analysis_type=analysis_type,
+            hole_size=hole_size,
+            hole_vars=hole_vars,
+            weights=weights,
+            dim=dim,
+        )
+
+    def smooth_savgol(
+        self,
+        var_key: str = "u",
+        dim: str = "x",
+        window_length: int = 5,
+        polyorder: int = 2,
+        **kwargs,
+    ) -> xr.DataArray:
+        """Applies 1D Savitzky-Golay smoothing along coordinate `dim`."""
+        return csmooth_savgol(
+            self._obj,
+            var_key=var_key,
+            dim=dim,
+            window_length=window_length,
+            polyorder=polyorder,
+            **kwargs,
+        )
+
+    def smooth_spline(
+        self,
+        var_key: str = "u",
+        dim: str = "x",
+        s_factor: Optional[float] = None,
+        order: int = 3,
+        deriv: int = 0,
+    ) -> xr.DataArray:
+        """Applies B-Spline smoothing along coordinate `dim` with optional analytical derivative."""
+        return csmooth_spline(
+            self._obj,
+            var_key=var_key,
+            dim=dim,
+            s_factor=s_factor,
+            order=order,
+            deriv=deriv,
+        )
+
+    def non_uniform_spectra(
+        self,
+        var_key: str = "u",
+        dim: str = "t",
+        weights: Optional[Union[str, xr.DataArray]] = None,
+        dt: Optional[float] = None,
+        K2: Optional[int] = None,
+        meanrem: bool = True,
+        atw: bool = False,
+        locnor: bool = False,
+        selfproducts: bool = False,
+    ) -> xr.Dataset:
+        """Estimates autocorrelation and PSD for non-uniformly sampled 1D signal."""
+        da = self._obj[var_key]
+        t = np.asarray(da[dim].values, dtype=float)
+        u = np.asarray(da.values, dtype=float)
+
+        if weights is None:
+            w = np.ones_like(u, dtype=float)
+        elif isinstance(weights, str):
+            w = np.asarray(self._obj[weights].values, dtype=float)
+        elif isinstance(weights, xr.DataArray):
+            w = np.asarray(weights.values, dtype=float)
+        else:
+            w = np.asarray(weights, dtype=float)
+
+        tau, R, f, S = cnon_uniform_spectra(
+            t=t,
+            u=u,
+            w=w,
+            dt=dt,
+            K2=K2,
+            meanrem=meanrem,
+            atw=atw,
+            locnor=locnor,
+            selfproducts=selfproducts,
+        )
+
+        return xr.Dataset(
+            data_vars={
+                "autocorrelation": xr.DataArray(np.real(R), dims=("lag",), coords={"lag": tau}),
+                "psd": xr.DataArray(np.real(S), dims=("frequency",), coords={"frequency": f}),
+            },
+            attrs={
+                "method": "non_uniform_spectra",
+                "source_variable": var_key,
+                "source_dim": dim,
+            },
+        ).sortby("lag").sortby("frequency")
 
     def reynolds_stress(self, name: str = "w"):
         """Calculates Reynolds stress from velocity fluctuations
@@ -2319,6 +2675,34 @@ class PIVAccessor(object):
         Returns:
             xarray.Dataset: Smoothed dataset.
         """
+        m = str(method).lower()
+        if m == "savgol":
+            out = self._obj.copy()
+            dim = kwargs.pop("dim", "x")
+            window_length = kwargs.pop(
+                "window_length",
+                5 if isinstance(sigma, (int, float)) and sigma == 1.0 else int(sigma if isinstance(sigma, (int, float)) else sigma[0]),
+            )
+            polyorder = kwargs.pop("polyorder", 2)
+            for v in ["u", "v", "w"]:
+                if v in out.data_vars:
+                    out[v] = csmooth_savgol(
+                        out, var_key=v, dim=dim, window_length=window_length, polyorder=polyorder, **kwargs
+                    )
+            return out
+        elif m == "spline":
+            out = self._obj.copy()
+            dim = kwargs.pop("dim", "x")
+            s_factor = kwargs.pop("s_factor", None)
+            order = kwargs.pop("order", 3)
+            deriv = kwargs.pop("deriv", 0)
+            for v in ["u", "v", "w"]:
+                if v in out.data_vars:
+                    out[v] = csmooth_spline(
+                        out, var_key=v, dim=dim, s_factor=s_factor, order=order, deriv=deriv
+                    )
+            return out
+
         return csmooth(self._obj, sigma=sigma, method=method, **kwargs)
 
     def filter(
@@ -2456,19 +2840,8 @@ class PIVAccessor(object):
                 f"Valid options are: {', '.join(valid_properties)}"
             )
 
-        warnings.warn(
-            "piv.vec2scal() currently rebinds this accessor's internal dataset "
-            "reference as a side effect; a future release will make it a pure "
-            "function that only returns the computed dataset. Always use the "
-            "return value (`ds = ds.piv.vec2scal(...)`) rather than relying on "
-            "in-place state.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         method = getattr(self, flow_property)
-        self._obj = method(name=name)
-
-        return self._obj
+        return method(name=name)
 
     def __mul__(self, scalar):
         """Multiplies velocity field by a scalar (simple scaling)

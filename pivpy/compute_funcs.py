@@ -4719,4 +4719,1142 @@ def dissipation(
     out[name].attrs["standard_name"] = f"turbulent_dissipation_rate_{method}"
 
     return out
+
+
+# =========================================================================
+# TURBULENCE ANALYSIS FUNCTIONS (Adopted & adapted from xrturb)
+# =========================================================================
+
+def _detect_time_dim(ds: xr.Dataset | xr.DataArray, dim: str | None = None) -> str:
+    """Helper to detect time/ensemble dimension ('t' or 'time')."""
+    if dim is not None:
+        return dim
+    for candidate in ("t", "time"):
+        if candidate in ds.dims:
+            return candidate
+    return "t"
+
+
+def _weighted_mean(
+    da: xr.DataArray,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+) -> xr.DataArray:
+    """Internal helper for weighted averaging over time/ensemble dimension."""
+    d = _detect_time_dim(da, dim)
+    if d not in da.dims:
+        return da
+    if weights is not None:
+        return da.weighted(weights).mean(dim=d)
+    return da.mean(dim=d)
+
+
+def fluct(
+    ds: xr.Dataset,
+    var_key: str,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+) -> xr.DataArray:
+    """Calculate fluctuations of a variable relative to its ensemble mean: u' = u - <u_weighted>.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset containing `var_key`.
+    var_key : str
+        Variable name in `ds` (e.g. 'u', 'v', 'w').
+    weights : xr.DataArray, optional
+        Weighting array for mean calculation.
+    dim : str, optional
+        Ensemble dimension (defaults to 't' or 'time').
+
+    Returns
+    -------
+    xr.DataArray
+        Fluctuation field with name f"{var_key}'".
+    """
+    if var_key not in ds:
+        aliases = {"u": "U", "v": "V", "w": "W", "U": "u", "V": "v", "W": "w"}
+        if var_key in aliases and aliases[var_key] in ds:
+            var_key = aliases[var_key]
+        else:
+            raise KeyError(f"Variable '{var_key}' not found in dataset.")
+
+    d = _detect_time_dim(ds, dim)
+    mean_val = _weighted_mean(ds[var_key], weights=weights, dim=d)
+    fluctuation = ds[var_key] - mean_val
+    fluctuation.name = f"{var_key}'"
+    fluctuation.attrs = dict(ds[var_key].attrs)
+    fluctuation.attrs["standard_name"] = f"fluctuation_{var_key}"
+    return fluctuation
+
+
+def calculate_product(
+    ds: xr.Dataset,
+    product_key: str,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+) -> xr.DataArray:
+    """Calculate element-wise product of raw or fluctuating variables.
+
+    Supports notation such as:
+    - "u'v'" -> fluct('u') * fluct('v')
+    - "u'u'" -> fluct('u') ** 2
+    - "u'v'w'" -> fluct('u') * fluct('v') * fluct('w')
+    - "uv" -> ds['u'] * ds['v']
+    - "u'v" -> fluct('u') * ds['v']
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    product_key : str
+        Product specification string.
+    weights : xr.DataArray, optional
+        Weighting array for fluctuation means.
+    dim : str, optional
+        Ensemble dimension (defaults to 't' or 'time').
+
+    Returns
+    -------
+    xr.DataArray
+        Instantaneous product series with name product_key.
+    """
+    import re
+
+    tokens = re.findall(r"([a-zA-Z0-9_]+?)('?)", product_key)
+    tokens = [t for t in tokens if t[0]]
+    if not tokens:
+        raise ValueError(f"Could not parse product key: {product_key!r}")
+
+    d = _detect_time_dim(ds, dim)
+    combined: Optional[xr.DataArray] = None
+
+    for var_name, prime_tag in tokens:
+        actual_var = var_name
+        if actual_var not in ds:
+            for alias in [var_name.lower(), var_name.upper()]:
+                if alias in ds:
+                    actual_var = alias
+                    break
+            else:
+                raise KeyError(f"Variable '{var_name}' not found in dataset.")
+
+        if prime_tag == "'":
+            term = fluct(ds, actual_var, weights=weights, dim=d)
+        else:
+            term = ds[actual_var]
+
+        combined = term if combined is None else combined * term
+
+    assert combined is not None
+    combined.name = product_key
+    combined.attrs["standard_name"] = f"product_{product_key}"
+    return combined
+
+
+def reynolds_stresses(
+    ds: xr.Dataset,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+    components: Optional[List[str]] = None,
+) -> xr.Dataset:
+    """Calculates all Reynolds stress components <u_i' u_j'> (density-independent).
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset with time frames.
+    weights : xr.DataArray, optional
+        Optional weighting array for averaging.
+    dim : str, optional
+        Ensemble dimension.
+    components : list of str, optional
+        Velocity component names to include (default: detected from ['u', 'v', 'w']).
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset containing normal and shear stress components.
+    """
+    import itertools
+
+    d = _detect_time_dim(ds, dim)
+    if d not in ds.dims:
+        raise ValueError(f"Time/ensemble dimension '{d}' required for Reynolds stress calculation.")
+
+    if components is None:
+        components = [c for c in ["u", "v", "w"] if c in ds.data_vars]
+        if not components:
+            components = [c for c in ["U", "V", "W"] if c in ds.data_vars]
+
+    if len(components) < 2:
+        raise ValueError(f"At least 2 velocity components required; found: {components}")
+
+    rss_dict = {}
+    for i, j in itertools.combinations_with_replacement(components, 2):
+        key = f"{i}'{j}'"
+        prod = calculate_product(ds, key, weights=weights, dim=d)
+        mean_prod = _weighted_mean(prod, weights=weights, dim=d)
+        mean_prod.name = key
+        mean_prod.attrs["units"] = "(m/s)^2"
+        mean_prod.attrs["standard_name"] = f"Reynolds_stress_{key}"
+        rss_dict[key] = mean_prod
+
+    out = xr.Dataset(rss_dict)
+    out.attrs["description"] = "Reynolds stress components"
+    return out
+
+
+def tke_turb(
+    ds: xr.Dataset,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+    components: Optional[List[str]] = None,
+) -> xr.DataArray:
+    """Calculates Turbulent Kinetic Energy: 0.5 * sum(<u_i' u_i'>).
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    weights : xr.DataArray, optional
+        Optional weights for averaging.
+    dim : str, optional
+        Ensemble dimension.
+    components : list of str, optional
+        Velocity component names. Defaults to detected from ['u', 'v', 'w'].
+
+    Returns
+    -------
+    xr.DataArray
+        TKE scalar field.
+    """
+    if components is None:
+        components = [c for c in ["u", "v", "w"] if c in ds.data_vars]
+        if not components:
+            components = [c for c in ["U", "V", "W"] if c in ds.data_vars]
+
+    if not components:
+        raise ValueError("No velocity components found in dataset.")
+
+    d = _detect_time_dim(ds, dim)
+    if d not in ds.dims:
+        ke = 0.5 * sum(ds[comp] ** 2 for comp in components)
+        ke.attrs["standard_name"] = "kinetic_energy"
+        ke.attrs["units"] = "(m/s)^2"
+        return ke
+
+    tke_sum = 0
+    for comp in components:
+        prod = calculate_product(ds, f"{comp}'{comp}'", weights=weights, dim=d)
+        tke_sum = tke_sum + _weighted_mean(prod, weights=weights, dim=d)
+
+    k = 0.5 * tke_sum
+    k.name = "tke"
+    k.attrs["standard_name"] = "TKE"
+    k.attrs["units"] = "(m/s)^2"
+    if len(components) < 3:
+        k.attrs["note"] = f"TKE calculated with {len(components)} components: {', '.join(components)}"
+    return k
+
+
+def calc_moments(
+    ds: xr.Dataset,
+    variables: Optional[List[str]] = None,
+    order: int = 2,
+    weights: Optional[xr.DataArray] = None,
+    standardized: bool = False,
+    dim: Optional[str] = None,
+) -> xr.Dataset:
+    """Calculate high-order turbulence moments up to specified order.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    variables : list of str, optional
+        Variable names to compute moments for (default: velocity components).
+    order : int, default 2
+        Maximum moment order (>= 2).
+    weights : xr.DataArray, optional
+        Weighting array for ensemble averaging.
+    standardized : bool, default False
+        Whether to normalize by standard deviation (e.g. for skewness / flatness).
+    dim : str, optional
+        Ensemble dimension (defaults to 't' or 'time').
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset containing computed moments.
+    """
+    import itertools
+
+    if variables is None:
+        variables = [c for c in ["u", "v", "w"] if c in ds.data_vars]
+        if not variables:
+            variables = [c for c in ["U", "V", "W"] if c in ds.data_vars]
+
+    if not variables:
+        raise ValueError("No valid variables found for moment calculation.")
+
+    d = _detect_time_dim(ds, dim)
+
+    if standardized:
+        stds = {}
+        for var in variables:
+            var_sq = _weighted_mean(calculate_product(ds, f"{var}'{var}'", weights=weights, dim=d), weights=weights, dim=d)
+            stds[var] = np.sqrt(np.maximum(var_sq, 0.0))
+
+    ds_moments = xr.Dataset()
+    for n in range(2, order + 1):
+        for combo in itertools.combinations_with_replacement(variables, n):
+            product_key = "".join(v + "'" for v in combo)
+            prod = calculate_product(ds, product_key, weights=weights, dim=d)
+            raw_moment = _weighted_mean(prod, weights=weights, dim=d)
+
+            if standardized:
+                norm_factor = 1.0
+                for v in combo:
+                    norm_factor = norm_factor * stds[v]
+                norm_factor = xr.where(norm_factor == 0, np.nan, norm_factor)
+                var_name = "M" + product_key
+                ds_moments[var_name] = raw_moment / norm_factor
+                ds_moments[var_name].attrs["standard_name"] = f"standardized_moment_{product_key}"
+            else:
+                var_name = product_key
+                ds_moments[var_name] = raw_moment
+                ds_moments[var_name].attrs["standard_name"] = f"central_moment_{product_key}"
+
+    return ds_moments
+
+
+def calc_all_products(
+    ds: xr.Dataset,
+    variables: Optional[List[str]] = None,
+    order: int = 2,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+) -> xr.Dataset:
+    """Calculate all instantaneous fluctuation products up to order and add to dataset.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    variables : list of str, optional
+        Variables to compute products for.
+    order : int, default 2
+        Maximum order.
+    weights : xr.DataArray, optional
+        Weights for mean subtraction.
+    dim : str, optional
+        Ensemble dimension.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset containing original variables plus all fluctuation products.
+    """
+    import itertools
+
+    if variables is None:
+        variables = [c for c in ["u", "v", "w"] if c in ds.data_vars]
+        if not variables:
+            variables = [c for c in ["U", "V", "W"] if c in ds.data_vars]
+
+    if not variables:
+        raise ValueError("No valid variables found for product calculation.")
+
+    d = _detect_time_dim(ds, dim)
+    ds_out = ds.copy()
+    for n in range(2, order + 1):
+        for combo in itertools.combinations_with_replacement(variables, n):
+            product_key = "".join(v + "'" for v in combo)
+            prod = calculate_product(ds, product_key, weights=weights, dim=d)
+            ds_out[product_key] = prod
+
+    return ds_out
+
+
+def two_point_correlation(
+    ds: xr.Dataset,
+    var_name: str = "u",
+    x_ref: Optional[float] = None,
+    y_ref: Optional[float] = None,
+    x_dim: str = "x",
+    y_dim: str = "y",
+    time_dim: Optional[str] = None,
+    weights: Optional[xr.DataArray] = None,
+    swap_dims: bool = True,
+) -> xr.DataArray:
+    """Calculates the 2-point spatial correlation relative to a reference probe location (x_ref, y_ref).
+
+    .. math::
+
+        R(x, y; x_{ref}, y_{ref}) = \\frac{\\langle u'(x, y) u'(x_{ref}, y_{ref}) \\rangle}{\\sqrt{\\langle u'^2(x, y) \\rangle \\langle u'^2(x_{ref}, y_{ref}) \\rangle}}
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        PIV velocity dataset with time/ensemble frames.
+    var_name : str, default 'u'
+        Variable to correlate.
+    x_ref, y_ref : float, optional
+        Reference point coordinates. If None, defaults to the center of the domain.
+    x_dim, y_dim : str
+        Spatial coordinate names (default 'x', 'y').
+    time_dim : str, optional
+        Time/ensemble dimension (default 't' or 'time').
+    weights : xr.DataArray, optional
+        Weights for averaging.
+    swap_dims : bool, default True
+        If True, swaps spatial dimensions to 'lag_x' and 'lag_y'.
+
+    Returns
+    -------
+    xr.DataArray
+        Spatial correlation map with coordinates `lag_x` and `lag_y` added.
+    """
+    if var_name not in ds:
+        raise KeyError(f"Variable '{var_name}' not found in dataset.")
+    if x_dim not in ds.coords or y_dim not in ds.coords:
+        raise KeyError(f"Dimensions '{x_dim}' or '{y_dim}' not found in dataset.")
+
+    t_dim = _detect_time_dim(ds, time_dim)
+    if t_dim not in ds.dims:
+        raise ValueError(f"Ensemble/time dimension '{t_dim}' required for two-point correlation.")
+
+    # Determine reference coordinates
+    if x_ref is None:
+        x_ref = float(ds[x_dim].mean().values)
+    if y_ref is None:
+        y_ref = float(ds[y_dim].mean().values)
+
+    u_prime = fluct(ds, var_name, weights=weights, dim=t_dim)
+
+    ref_point = u_prime.sel({x_dim: x_ref, y_dim: y_ref}, method="nearest")
+    actual_x_ref = float(ref_point[x_dim].values) if x_dim in ref_point.coords else x_ref
+    actual_y_ref = float(ref_point[y_dim].values) if y_dim in ref_point.coords else y_ref
+
+    cov = _weighted_mean(u_prime * ref_point, weights=weights, dim=t_dim)
+    var_field = _weighted_mean(u_prime ** 2, weights=weights, dim=t_dim)
+    var_ref = _weighted_mean(ref_point ** 2, weights=weights, dim=t_dim)
+
+    denom = np.sqrt(var_field * var_ref)
+    corr = xr.where(denom > 0, cov / denom, 0.0)
+
+    corr.name = f"R_{var_name}{var_name}"
+    corr.attrs["standard_name"] = f"two_point_correlation_{var_name}"
+    corr.attrs["description"] = f"Two-point correlation of {var_name} relative to ({actual_x_ref}, {actual_y_ref})"
+    corr.attrs["x_ref"] = actual_x_ref
+    corr.attrs["y_ref"] = actual_y_ref
+
+    lag_x = corr[x_dim] - actual_x_ref
+    lag_y = corr[y_dim] - actual_y_ref
+    corr = corr.assign_coords(lag_x=lag_x, lag_y=lag_y)
+    if swap_dims:
+        corr = corr.swap_dims({x_dim: "lag_x", y_dim: "lag_y"})
+
+    return corr
+
+
+def _calc_L_1e_kernel(lag_values: np.ndarray, corr_values: np.ndarray) -> float:
+    finite_mask = np.isfinite(lag_values) & np.isfinite(corr_values)
+    lags = lag_values[finite_mask]
+    corrs = corr_values[finite_mask]
+    if len(corrs) < 2:
+        return np.nan
+
+    zero_idx = np.where(corrs <= 0)[0]
+    if len(zero_idx) > 0:
+        lim = int(zero_idx[0]) + 1
+        lags = lags[:lim]
+        corrs = corrs[:lim]
+
+    target = 1.0 / np.e
+    if np.min(corrs) > target:
+        return np.nan
+
+    below = np.where(corrs <= target)[0]
+    if len(below) == 0:
+        return np.nan
+    i = int(below[0])
+    if i == 0:
+        return float(lags[0])
+
+    c0, c1 = corrs[i - 1], corrs[i]
+    l0, l1 = lags[i - 1], lags[i]
+    if c0 == c1:
+        return float(l0)
+    t = (target - c1) / (c0 - c1)
+    return float((1.0 - t) * l1 + t * l0)
+
+
+def _calc_L_integral_kernel(lag_values: np.ndarray, corr_values: np.ndarray) -> float:
+    finite_mask = np.isfinite(lag_values) & np.isfinite(corr_values)
+    lags = lag_values[finite_mask]
+    corrs = corr_values[finite_mask]
+    if len(corrs) < 2:
+        return np.nan
+
+    c0 = corrs[0]
+    if not np.isfinite(c0) or c0 <= 0:
+        return np.nan
+    corr_norm = corrs / c0
+
+    zero_idx = np.where(corr_norm <= 0)[0]
+    if len(zero_idx) == 0:
+        end = len(corr_norm)
+        tau = lags[:end]
+        c_use = corr_norm[:end]
+    else:
+        end = int(zero_idx[0])
+        if end == 0:
+            return 0.0
+        x0, x1 = lags[end - 1], lags[end]
+        y0, y1 = corr_norm[end - 1], corr_norm[end]
+        x_zero = x0 if y1 == y0 else x0 + (0.0 - y0) * (x1 - x0) / (y1 - y0)
+        tau = np.concatenate([lags[:end], [x_zero]])
+        c_use = np.concatenate([corr_norm[:end], [0.0]])
+
+    try:
+        from scipy.integrate import trapezoid
+        return float(trapezoid(c_use, tau))
+    except Exception:
+        return float(np.trapz(c_use, tau))
+
+
+def _calc_L_fit_kernel(lag_values: np.ndarray, corr_values: np.ndarray) -> float:
+    from scipy.optimize import curve_fit
+
+    finite_mask = np.isfinite(lag_values) & np.isfinite(corr_values)
+    lags = lag_values[finite_mask]
+    corrs = corr_values[finite_mask]
+    if len(corrs) < 3:
+        return np.nan
+
+    def exp_decay(x, L):
+        return np.exp(-x / np.maximum(L, 1e-12))
+
+    p0 = float(np.nanmax(lags) / 4.0) if np.nanmax(lags) > 0 else 1.0
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            popt, _ = curve_fit(exp_decay, lags, corrs, p0=[p0], maxfev=10000)
+        return float(popt[0])
+    except Exception:
+        return np.nan
+
+
+def _calc_L_fit_biexp_kernel(lag_values: np.ndarray, corr_values: np.ndarray) -> np.ndarray:
+    from scipy.optimize import curve_fit
+
+    finite_mask = np.isfinite(lag_values) & np.isfinite(corr_values)
+    lags = np.asarray(lag_values[finite_mask], dtype=float)
+    corrs = np.asarray(corr_values[finite_mask], dtype=float)
+    if lags.size < 4:
+        return np.array([np.nan, np.nan, np.nan], dtype=float)
+
+    def biexp_decay(x, a, L1, L2):
+        return a * np.exp(-x / np.maximum(L1, 1e-12)) + (1.0 - a) * np.exp(-x / np.maximum(L2, 1e-12))
+
+    lag_max = float(np.nanmax(lags)) if lags.size > 0 else 1.0
+    p0 = [0.5, max(lag_max / 10.0, 1e-4), max(lag_max / 2.0, 1e-4)]
+    bounds = ([0.0, 1e-12, 1e-12], [1.0, np.inf, np.inf])
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            popt, _ = curve_fit(biexp_decay, lags, corrs, p0=p0, bounds=bounds, maxfev=20000)
+        return np.asarray(popt, dtype=float)
+    except Exception:
+        return np.array([np.nan, np.nan, np.nan], dtype=float)
+
+
+def compute_length_scale(
+    da: xr.DataArray,
+    dim: str = "lag_x",
+    method: str = "1e",
+    fit_model: str = "single",
+) -> xr.DataArray:
+    """Computes integral length scale from a spatial correlation DataArray.
+
+    Parameters
+    ----------
+    da : xr.DataArray
+        Correlation data array with lag dimension `dim`.
+    dim : str, default 'lag_x'
+        Lag coordinate dimension to evaluate along.
+    method : {'1e', 'integral', 'fit'}
+        - '1e': Lag distance where R drops to 1/e (linear interpolation).
+        - 'integral': Trapezoidal integration to the first zero crossing.
+        - 'fit': Exponential decay fit.
+    fit_model : {'single', 'bi'}
+        If method='fit', whether to fit single exponential or bi-exponential.
+
+    Returns
+    -------
+    xr.DataArray
+        Calculated length scale(s), broadcasted across remaining dimensions.
+    """
+    actual_dim = dim
+    if dim not in da.dims:
+        if dim in da.coords:
+            coord_dims = da[dim].dims
+            if len(coord_dims) == 1:
+                da = da.swap_dims({coord_dims[0]: dim})
+                actual_dim = dim
+        elif f"lag_{dim}" in da.dims:
+            actual_dim = f"lag_{dim}"
+        elif f"lag_{dim}" in da.coords:
+            coord_dims = da[f"lag_{dim}"].dims
+            if len(coord_dims) == 1:
+                da = da.swap_dims({coord_dims[0]: f"lag_{dim}"})
+                actual_dim = f"lag_{dim}"
+        else:
+            raise KeyError(f"Lag dimension '{dim}' not found in DataArray.")
+    dim = actual_dim
+
+    subset = da.where(da[dim] >= 0, drop=True)
+    if subset[dim].size < 2:
+        raise ValueError(f"Not enough non-negative lag points along '{dim}' to compute length scale.")
+    subset = subset.sortby(dim)
+    if bool(subset.isnull().any()):
+        subset = subset.interpolate_na(dim=dim)
+
+    m = str(method).lower()
+    if m == "1e":
+        kernel = _calc_L_1e_kernel
+        output_core_dims = [[]]
+    elif m.startswith("int"):
+        kernel = _calc_L_integral_kernel
+        output_core_dims = [[]]
+    elif m == "fit" and str(fit_model).lower().startswith("bi"):
+        kernel = _calc_L_fit_biexp_kernel
+        output_core_dims = [["parameter"]]
+    else:
+        kernel = _calc_L_fit_kernel
+        output_core_dims = [[]]
+
+    is_bi = m == "fit" and str(fit_model).lower().startswith("bi")
+    kwargs = {"dask_gufunc_kwargs": {"output_sizes": {"parameter": 3}}} if is_bi else {}
+
+    result = xr.apply_ufunc(
+        kernel,
+        subset[dim],
+        subset,
+        input_core_dims=[[dim], [dim]],
+        output_core_dims=output_core_dims,
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[float],
+        **kwargs,
+    )
+
+    if is_bi:
+        result = result.assign_coords(parameter=["a", "L1", "L2"])
+        result.name = "biexp_length_scale_parameters"
+    else:
+        result.name = f"length_scale_{m}"
+        result.attrs["units"] = subset[dim].attrs.get("units", "m")
+        result.attrs["standard_name"] = f"integral_length_scale_{m}"
+
+    return result
+
+
+def add_quadrants(
+    ds: xr.Dataset,
+    x_var: str = "u",
+    y_var: str = "v",
+    z_var: Optional[str] = None,
+    analysis_type: str = "quadrant",
+    hole_size: float = 0.0,
+    hole_vars: Optional[Tuple[str, str]] = None,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+) -> xr.Dataset:
+    """Classify data points into quadrants (2D) or octants (3D) and apply hyperbolic hole filtering.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    x_var, y_var : str
+        Variables for quadrant classification (default 'u', 'v').
+    z_var : str, optional
+        Third variable if analysis_type='octant'.
+    analysis_type : {'quadrant', 'octant'}
+        Classification mode.
+    hole_size : float
+        Hole threshold parameter H (0 = no hole). Hole mask is 1 where |u'v'| >= H * |<u'v'>|.
+    hole_vars : tuple of str, optional
+        Variables used for hole filtering (default: (x_var, y_var)).
+    weights : xr.DataArray, optional
+        Weighting array for mean calculation.
+    dim : str, optional
+        Ensemble dimension.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with `quadrant` and `hole` variables/coordinates added.
+    """
+    if analysis_type not in ["quadrant", "octant"]:
+        raise ValueError(f"analysis_type must be 'quadrant' or 'octant', got {analysis_type!r}")
+
+    d = _detect_time_dim(ds, dim)
+    u_prime = fluct(ds, x_var, weights=weights, dim=d)
+    v_prime = fluct(ds, y_var, weights=weights, dim=d)
+
+    if analysis_type == "quadrant":
+        quad = xr.where(
+            (u_prime > 0) & (v_prime > 0), 1,
+            xr.where(
+                (u_prime < 0) & (v_prime > 0), 2,
+                xr.where(
+                    (u_prime < 0) & (v_prime < 0), 3,
+                    xr.where((u_prime > 0) & (v_prime < 0), 4, 0)
+                )
+            )
+        )
+    else:
+        if z_var is None:
+            z_var = "w" if "w" in ds else "c"
+        if z_var not in ds:
+            raise KeyError(f"Third variable '{z_var}' required for octant analysis.")
+        w_prime = fluct(ds, z_var, weights=weights, dim=d)
+        quad = (
+            xr.where((u_prime > 0) & (v_prime > 0) & (w_prime > 0), 1, 0) +
+            xr.where((u_prime < 0) & (v_prime > 0) & (w_prime > 0), 2, 0) +
+            xr.where((u_prime < 0) & (v_prime > 0) & (w_prime < 0), 3, 0) +
+            xr.where((u_prime > 0) & (v_prime > 0) & (w_prime < 0), 4, 0) +
+            xr.where((u_prime > 0) & (v_prime < 0) & (w_prime > 0), 5, 0) +
+            xr.where((u_prime < 0) & (v_prime < 0) & (w_prime > 0), 6, 0) +
+            xr.where((u_prime < 0) & (v_prime < 0) & (w_prime < 0), 7, 0) +
+            xr.where((u_prime > 0) & (v_prime < 0) & (w_prime < 0), 8, 0)
+        )
+
+    # Hole filtering
+    hx_var, hy_var = hole_vars if hole_vars is not None else (x_var, y_var)
+    hu_prime = fluct(ds, hx_var, weights=weights, dim=d)
+    hv_prime = fluct(ds, hy_var, weights=weights, dim=d)
+    prod = hu_prime * hv_prime
+    prod_mean = _weighted_mean(prod, weights=weights, dim=d)
+    hole_mask = xr.where(np.abs(prod) >= hole_size * np.abs(prod_mean), 1, 0)
+
+    out = ds.copy()
+    out = out.assign_coords(quadrant=quad, hole=hole_mask)
+    return out
+
+
+def calc_quadrant_mean(
+    ds: xr.Dataset,
+    analysis_type: str = "quadrant",
+    x_var: str = "u",
+    y_var: str = "v",
+    z_var: Optional[str] = None,
+    hole_size: float = 0.0,
+    hole_vars: Optional[Tuple[str, str]] = None,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+) -> xr.Dataset:
+    """Calculate conditional averages for each quadrant/octant."""
+    d = _detect_time_dim(ds, dim)
+    ds_c = add_quadrants(ds, x_var=x_var, y_var=y_var, z_var=z_var, analysis_type=analysis_type,
+                         hole_size=hole_size, hole_vars=hole_vars, weights=weights, dim=d)
+
+    n_q = 4 if analysis_type == "quadrant" else 8
+    q_list = []
+    q_coords = []
+    for q in range(1, n_q + 1):
+        mask = (ds_c.quadrant == q) & (ds_c.hole == 1)
+        sub = ds_c.where(mask)
+        mean_ds = _weighted_mean(sub, weights=weights, dim=d)
+        q_list.append(mean_ds)
+        q_coords.append(q)
+
+    out = xr.concat(q_list, dim="quadrant")
+    out = out.assign_coords(quadrant=q_coords)
+    return out
+
+
+def calc_quadrant_fraction(
+    ds: xr.Dataset,
+    analysis_type: str = "quadrant",
+    x_var: str = "u",
+    y_var: str = "v",
+    z_var: Optional[str] = None,
+    hole_size: float = 0.0,
+    hole_vars: Optional[Tuple[str, str]] = None,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+) -> xr.Dataset:
+    """Calculate the fractional contribution of each quadrant to total stress sum(u'v')."""
+    d = _detect_time_dim(ds, dim)
+    ds_c = add_quadrants(ds, x_var=x_var, y_var=y_var, z_var=z_var, analysis_type=analysis_type,
+                         hole_size=hole_size, hole_vars=hole_vars, weights=weights, dim=d)
+
+    n_q = 4 if analysis_type == "quadrant" else 8
+    u_prime = fluct(ds_c, x_var, weights=weights, dim=d)
+    v_prime = fluct(ds_c, y_var, weights=weights, dim=d)
+    uv_prime = u_prime * v_prime
+
+    total_sum = (uv_prime.where(ds_c.hole == 1)).sum(dim=d)
+
+    q_list = []
+    q_coords = []
+    for q in range(1, n_q + 1):
+        mask = (ds_c.quadrant == q) & (ds_c.hole == 1)
+        q_sum = uv_prime.where(mask).sum(dim=d)
+        q_frac = xr.where(total_sum != 0, q_sum / total_sum, 0.0)
+        q_list.append(q_frac)
+        q_coords.append(q)
+
+    out = xr.concat(q_list, dim="quadrant")
+    out = out.assign_coords(quadrant=q_coords)
+    out.name = f"quadrant_fraction_{x_var}_{y_var}"
+    return xr.Dataset({"fraction": out})
+
+
+def calc_quadrant_duration(
+    ds: xr.Dataset,
+    analysis_type: str = "quadrant",
+    x_var: str = "u",
+    y_var: str = "v",
+    z_var: Optional[str] = None,
+    hole_size: float = 0.0,
+    hole_vars: Optional[Tuple[str, str]] = None,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+) -> xr.Dataset:
+    """Calculate time or event fraction spent in each quadrant."""
+    d = _detect_time_dim(ds, dim)
+    ds_c = add_quadrants(ds, x_var=x_var, y_var=y_var, z_var=z_var, analysis_type=analysis_type,
+                         hole_size=hole_size, hole_vars=hole_vars, weights=weights, dim=d)
+
+    n_q = 4 if analysis_type == "quadrant" else 8
+    total_valid = (ds_c.hole == 1).sum(dim=d)
+
+    q_list = []
+    q_coords = []
+    for q in range(1, n_q + 1):
+        q_count = ((ds_c.quadrant == q) & (ds_c.hole == 1)).sum(dim=d)
+        q_dur = xr.where(total_valid > 0, q_count / total_valid, 0.0)
+        q_list.append(q_dur)
+        q_coords.append(q)
+
+    out = xr.concat(q_list, dim="quadrant")
+    out = out.assign_coords(quadrant=q_coords)
+    out.name = "quadrant_duration"
+    return xr.Dataset({"duration": out})
+
+
+def quadrant_analysis(
+    ds: xr.Dataset,
+    x_var: str = "u",
+    y_var: str = "v",
+    z_var: Optional[str] = None,
+    analysis_type: str = "quadrant",
+    hole_size: float = 0.0,
+    hole_vars: Optional[Tuple[str, str]] = None,
+    weights: Optional[xr.DataArray] = None,
+    dim: Optional[str] = None,
+) -> xr.Dataset:
+    """Comprehensive quadrant/octant turbulence analysis.
+
+    Returns a Dataset containing:
+    - `fraction`: fractional contribution of each quadrant to total Reynolds stress <u'v'>
+    - `duration`: time fraction / occurrence frequency in each quadrant
+    - `conditional_u`: conditionally averaged u for each quadrant
+    - `conditional_v`: conditionally averaged v for each quadrant
+    """
+    d = _detect_time_dim(ds, dim)
+    q_means = calc_quadrant_mean(ds, analysis_type=analysis_type, x_var=x_var, y_var=y_var,
+                                 z_var=z_var, hole_size=hole_size, hole_vars=hole_vars,
+                                 weights=weights, dim=d)
+    q_frac = calc_quadrant_fraction(ds, analysis_type=analysis_type, x_var=x_var, y_var=y_var,
+                                   z_var=z_var, hole_size=hole_size, hole_vars=hole_vars,
+                                   weights=weights, dim=d)
+    q_dur = calc_quadrant_duration(ds, analysis_type=analysis_type, x_var=x_var, y_var=y_var,
+                                  z_var=z_var, hole_size=hole_size, hole_vars=hole_vars,
+                                  weights=weights, dim=d)
+
+    out = xr.Dataset({
+        "fraction": q_frac["fraction"],
+        "duration": q_dur["duration"],
+        f"conditional_{x_var}": q_means[x_var],
+        f"conditional_{y_var}": q_means[y_var],
+    })
+    if z_var and z_var in q_means:
+        out[f"conditional_{z_var}"] = q_means[z_var]
+
+    out.attrs["analysis_type"] = analysis_type
+    out.attrs["hole_size"] = float(hole_size)
+    return out
+
+
+def smooth_savgol(
+    ds: xr.Dataset,
+    var_key: str,
+    dim: str = "x",
+    window_length: int = 5,
+    polyorder: int = 2,
+    **kwargs,
+) -> xr.DataArray:
+    """Smooth a DataArray variable using 1D Savitzky-Golay filter along dimension `dim`.
+    Automatically handles non-uniform coordinates.
+    """
+    from scipy.signal import savgol_filter
+
+    if var_key not in ds:
+        raise KeyError(f"Variable '{var_key}' not found in dataset.")
+    da = ds[var_key]
+    if dim not in da.dims:
+        raise KeyError(f"Dimension '{dim}' not present in variable '{var_key}'.")
+
+    coord_vals = np.asarray(da[dim].values, dtype=float)
+    diffs = np.diff(coord_vals)
+    is_uniform = np.allclose(diffs, diffs[0], rtol=1e-3, atol=1e-6) if diffs.size > 0 else True
+
+    if not is_uniform and diffs.size > 0:
+        min_val, max_val = float(np.nanmin(coord_vals)), float(np.nanmax(coord_vals))
+        pos_diffs = diffs[diffs > 0]
+        step = float(np.nanmin(pos_diffs)) if pos_diffs.size > 0 else 1.0
+        agrid = np.arange(min_val, max_val + step, step)
+        da_interp = da.interp({dim: agrid})
+        delta = step
+    else:
+        da_interp = da
+        delta = float(diffs[0]) if diffs.size > 0 else 1.0
+
+    sg_kwargs = dict(kwargs)
+    sg_kwargs.update({"window_length": int(window_length), "polyorder": int(polyorder), "delta": float(delta)})
+
+    smoothed = xr.apply_ufunc(
+        savgol_filter,
+        da_interp,
+        input_core_dims=[[dim]],
+        output_core_dims=[[dim]],
+        kwargs=sg_kwargs,
+    )
+
+    if not is_uniform:
+        smoothed = smoothed.interp({dim: coord_vals})
+
+    smoothed = smoothed.transpose(*da.dims)
+    smoothed.name = f"{var_key}_savgol"
+    smoothed.attrs = dict(da.attrs)
+    return smoothed
+
+
+def smooth_spline(
+    ds: xr.Dataset,
+    var_key: str,
+    dim: str = "x",
+    s_factor: Optional[float] = None,
+    order: int = 3,
+    deriv: int = 0,
+) -> xr.DataArray:
+    """Smooth a variable using B-Splines along dimension `dim` (robust to non-uniform data)
+    with optional analytical derivative calculation.
+    """
+    from scipy.interpolate import splrep, BSpline
+
+    if var_key not in ds:
+        raise KeyError(f"Variable '{var_key}' not found in dataset.")
+    da = ds[var_key]
+    if dim not in da.dims:
+        raise KeyError(f"Dimension '{dim}' not present in variable '{var_key}'.")
+
+    coords = ds[dim]
+
+    def _spline_smoother_func(y, x, s, k, nu):
+        finite_mask = np.isfinite(y) & np.isfinite(x)
+        if finite_mask.sum() <= k:
+            return np.full_like(y, np.nan)
+        x_fin, y_fin = x[finite_mask], y[finite_mask]
+        sort_idx = np.argsort(x_fin)
+        x_fin, y_fin = x_fin[sort_idx], y_fin[sort_idx]
+        try:
+            tck = splrep(x_fin, y_fin, s=s, k=k)
+            spl = BSpline(*tck)
+            if nu > 0:
+                spl = spl.derivative(nu=nu)
+            return spl(x)
+        except Exception:
+            return np.full_like(y, np.nan)
+
+    smoothed = xr.apply_ufunc(
+        _spline_smoother_func,
+        da,
+        coords,
+        input_core_dims=[[dim], [dim]],
+        output_core_dims=[[dim]],
+        kwargs={"s": s_factor, "k": int(order), "nu": int(deriv)},
+        vectorize=True,
+    )
+
+    smoothed = smoothed.transpose(*da.dims)
+    smoothed.name = f"{var_key}_spline" if deriv == 0 else f"d{var_key}_d{dim}"
+    smoothed.attrs = dict(da.attrs)
+    return smoothed
+
+
+def non_uniform_spectra(
+    t: np.ndarray,
+    u: np.ndarray,
+    w: Optional[np.ndarray] = None,
+    dt: Optional[float] = None,
+    K2: Optional[int] = None,
+    meanrem: bool = True,
+    atw: bool = False,
+    locnor: bool = False,
+    selfproducts: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Estimate the autocorrelation and PSD for irregularly sampled 1D velocity data."""
+    t_arr = np.asarray(t, dtype=float)
+    u_arr = np.asarray(u, dtype=float)
+    w_arr = np.ones_like(u_arr, dtype=float) if w is None else np.asarray(w, dtype=float)
+
+    N = len(t_arr)
+    if not (len(u_arr) == N and len(w_arr) == N):
+        raise ValueError("time, signal, and weights vectors must have the same length.")
+    if N < 2:
+        raise ValueError("At least two samples are required.")
+
+    if dt is None:
+        diffs = np.diff(t_arr)
+        pos_diffs = diffs[diffs > 0]
+        if pos_diffs.size == 0:
+            raise ValueError("Cannot infer dt from non-positive time increments.")
+        dt = float(np.median(pos_diffs))
+
+    if K2 is None:
+        K2 = max(1, N // 4)
+
+    K1 = -int(K2)
+    K2 = int(K2)
+    K = K2 - K1 + 1
+
+    if atw:
+        wf = np.append(t_arr[1:N] - t_arr[0:N - 1], [0.0])
+        avg_dt = (t_arr[N - 1] - t_arr[0]) / max(1, N - 1)
+        wf[(wf > 5 * avg_dt) | (wf < 0)] = 0.0
+
+        wb = np.append([0.0], t_arr[1:N] - t_arr[0:N - 1])
+        wb[(wb > 5 * avg_dt) | (wb < 0)] = 0.0
+    else:
+        wf = w_arr
+        wb = w_arr
+
+    if meanrem:
+        sum_wb = float(np.sum(wb))
+        ur = u_arr - (np.sum(wb * u_arr) / sum_wb if sum_wb != 0 else np.mean(u_arr))
+    else:
+        ur = u_arr
+
+    Je = int(np.ceil(t_arr[N - 1] / float(dt))) + K2
+    Je = 2 ** int(np.ceil(np.log2(max(Je, 2))))
+
+    if atw:
+        df = 1.0 / float(Je * dt)
+        fe = np.roll(np.arange(-(Je // 2), Je - (Je // 2)), -(Je // 2)) * df
+        U1 = np.zeros(Je, dtype=complex)
+        U0 = np.zeros(Je, dtype=complex)
+        Ub = np.zeros(Je, dtype=complex)
+        Wb = np.zeros(Je, dtype=complex)
+
+        if locnor:
+            Ui = np.zeros(Je, dtype=complex)
+            Uj = np.zeros(Je, dtype=complex)
+            Qb = np.zeros(Je, dtype=complex)
+
+        for i in range(N):
+            E = np.exp(-2j * np.pi * fe * np.floor(t_arr[i] / float(dt)) * dt)
+            Uf = wf[i] * ur[i] * E
+            U1 += np.conj(Ub) * Uf
+            Ub += wb[i] * ur[i] * E
+            Wf = wf[i] * E
+            U0 += np.conj(Wb) * Wf
+            if locnor:
+                Qf = wf[i] * (np.abs(ur[i]) ** 2) * E
+                Ui += np.conj(Qb) * Wf
+                Uj += np.conj(Wb) * Qf
+                Qb += wb[i] * (np.abs(ur[i]) ** 2) * E
+            Wb += wb[i] * E
+
+        R1 = np.fft.ifft(U1 + np.conj(U1))
+        if locnor:
+            Ri = np.real(np.fft.ifft(Ui + np.conj(Uj)))
+            Rj = np.real(np.fft.ifft(Uj + np.conj(Ui)))
+        if (not locnor) or meanrem:
+            R0 = np.real(np.fft.ifft(U0 + np.conj(U0)))
+    else:
+        ue = np.zeros(Je, dtype=complex)
+        we = np.zeros(Je, dtype=float)
+        if locnor:
+            qe = np.zeros(Je, dtype=float)
+
+        for i in range(N):
+            idx = int(np.floor(t_arr[i] / dt))
+            if idx < Je:
+                ue[idx] += w_arr[i] * ur[i]
+                we[idx] += w_arr[i]
+                if locnor:
+                    qe[idx] += w_arr[i] * (np.abs(ur[i]) ** 2)
+
+        U1 = np.fft.fft(ue)
+        U0 = np.fft.fft(we)
+
+        if locnor:
+            U2 = np.fft.fft(qe)
+
+        R1 = np.fft.ifft(np.conj(U1) * U1 - np.sum(np.abs(w_arr * ur) ** 2))
+
+        if locnor:
+            Ri = np.real(np.fft.ifft(np.conj(U2) * U0 - np.sum(np.abs(w_arr * ur) ** 2)))
+            Rj = np.real(np.fft.ifft(np.conj(U0) * U2 - np.sum(np.abs(w_arr * ur) ** 2)))
+
+        if (not locnor) or meanrem:
+            R0 = np.real(np.fft.ifft(np.conj(U0) * U0 - np.sum(w_arr ** 2)))
+
+    if selfproducts:
+        R1[0] += np.sum(wb * wf * (np.abs(ur) ** 2))
+        if locnor:
+            Ri[0] += np.sum(wb * wf * (np.abs(ur) ** 2))
+            Rj[0] += np.sum(wb * wf * (np.abs(ur) ** 2))
+        if (not locnor) or meanrem:
+            R0[0] += np.sum(wb * wf)
+
+    tau = np.roll(np.arange(K1, K2 + 1), K1) * dt
+    R = np.zeros(K, dtype=complex)
+
+    if locnor:
+        sum_wb = float(np.sum(wb))
+        s2u = np.sum(wb * (np.abs(ur) ** 2)) / sum_wb if sum_wb != 0 else 1.0
+        for k in range(K1, K2 + 1):
+            if Ri[k] * Rj[k] > 0:
+                R[k] = s2u * R1[k] / np.sqrt(Ri[k] * Rj[k])
+    else:
+        for k in range(K1, K2 + 1):
+            if R0[k] > 0:
+                R[k] = R1[k] / float(R0[k])
+
+    if meanrem:
+        denom = float(np.sum(wf) * np.sum(wb) - R0[0] - 2 * np.sum(R0[1:K2 + 1]))
+        if denom != 0:
+            if selfproducts:
+                R += (R[0] * R0[0] + 2 * np.sum(np.real(R1[1:K2 + 1]))) / denom
+            else:
+                d2 = denom - np.sum(wf * wb)
+                if d2 != 0:
+                    R += (R[0] * R0[0] + 2 * np.sum(np.real(R1[1:K2 + 1])) + np.sum(wf * wb * (np.abs(ur) ** 2))) / d2
+
+    df = 1.0 / float(K * dt)
+    f = np.roll(np.arange(-(K // 2), K - (K // 2)), -(K // 2)) * df
+    S = dt * np.fft.fft(R)
+
+    return tau, R, f, S
+
 

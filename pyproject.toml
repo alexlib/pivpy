@@ -1,8 +1,10 @@
 [project]
 name = "pivpy"
-version = "0.2.0"
+version = "0.2.1"
 authors = [
-  { name="Alex Liberzon and Ron Shnapp", email="alex.liberzon@gmail.com" },
+  { name = "Alex Liberzon", email = "alex.liberzon@gmail.com" },
+  { name = "Ron Shnapp" },
+  { name = "Lior Shig" },
 ]
 description = "Python package for post-processing PIV results"
 readme = "README.md"
@@ -53,3 +55,15 @@ include-package-data = true
 [tool.setuptools.packages.find]
 include = ["pivpy*"]
 exclude = ["README_files*", "docs*", "examples*", "tests*"]
+
+[tool.marimo-studio]
+notebook = "examples/notebooks/piv_dashboard.py"
+default = "dashboard"
+
+[tool.marimo-studio.cells]
+cell-2 = {ref = "cell:v1:98091fe5d868df16546fdf9642c40bb1e919387f76bacbb237d257c19212aa1e:04d6c6d84ea723e56957b922d35908cea14bcd64d9f116ddc06a8430a849b8f2:0"}
+cell-4 = {ref = "cell:v1:e476f89e69ad9cf1e8bafdf31c26888b16779b81fb1e6032ac78da5b84a07248:9ecd75991f0080fdd0141e7316813bd6ed61fdafc9a164d1da2ac0cbc7ca026e:0"}
+cell-5 = {ref = "cell:v1:c934eaf2fe3ff51e520f11b560601969789c4036e56e8224ad2cb4aa3513b903:c934eaf2fe3ff51e520f11b560601969789c4036e56e8224ad2cb4aa3513b903:0"}
+cell-6 = {ref = "cell:v1:8335736dcba96db562e96077780d633ef6cadf803d7f87c98b86acb810f028bf:8335736dcba96db562e96077780d633ef6cadf803d7f87c98b86acb810f028bf:0"}
+cell-7 = {ref = "cell:v1:475f6bacaa3242cf63d722111b938884a42c0afea785523ce484764f243ec0f2:86e7914e813c123199490e9e0341c418eaf246670c84ee8efd9fdc74bf1bb975:0"}
+cell-14 = {ref = "cell:v1:783dcfaf44cb8ccd866988ee0fe8d4912020ad3c104d6655f059ce2c8570de7f:17228611b9a76d1649e3ed7e7a4cc1d6f17858c6e02b91e473dcb242cab3ada4:0"}

@@ -75,5 +75,42 @@ def _(df, graphics):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Publication-quality figure in one call
+
+    `streamscal` draws a smooth vorticity field under dense black streamlines with small
+    direction arrows. No axes, no margins, nothing to tune.
+    """)
+    return
+
+
+@app.cell
+def _(df):
+    _fig, _ax = df.isel(t=0).piv.streamscal()
+    _fig
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Change the colour quantity with `scalar=` (`"speed"`, `"u"`, `"divergence"`, any variable)
+    and the line density with `density=`. `streamscal_panels` places several frames side by
+    side on one shared colour scale.
+    """)
+    return
+
+
+@app.cell
+def _(df, graphics):
+    _fig, _axs = graphics.streamscal_panels(
+        [df.isel(t=0), df.isel(t=-1)], scalar="speed", density=1.8, labels=["(a)", "(b)"]
+    )
+    _fig
+    return
+
+
 if __name__ == "__main__":
     app.run()

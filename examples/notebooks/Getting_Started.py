@@ -157,6 +157,22 @@ def _(d, graphics):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    A publication-quality view in one call: vorticity colours with dense streamlines and
+    small direction arrows (`streamscal`)
+    """)
+    return
+
+
+@app.cell
+def _(d):
+    _fig, _ax = d.piv.streamscal()
+    _fig
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Also, velocity histograms in x and y directions
     """)
     return

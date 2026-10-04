@@ -6,6 +6,8 @@ PIVPy provides an intuitive, publication-ready visualization and animation suite
 
 The primary visualization entry points are:
 
+- `pivpy.graphics.streamscal` (and `xarray.Dataset.piv.streamscal`), `pivpy.graphics.streamscal_panels`:
+  Publication-quality figure of a smooth scalar field (vorticity by default) under dense black streamlines with small direction arrows. No axes, no margins, one shared colour scale across panels. Works with defaults.
 - `pivpy.graphics.plot` (and `xarray.Dataset.piv.plot`):
   High-level zero-effort publication-quality figure combining smooth scalar fluid contours (vorticity, speed, KE), streamlines, auto-scaled vector arrows, colorbar, and reference arrow key.
 - `pivpy.graphics.animate` (and `xarray.Dataset.piv.animate`):
@@ -42,6 +44,48 @@ blur_slider
 fig, ax = ds.piv.plot(blur=blur_slider.value, title=f"blur={blur_slider.value}")
 fig.gca()
 ```
+
+## Streamlines over a Scalar Field (`ds.piv.streamscal`)
+
+The cleanest way to show flow topology: a smooth diverging colour field under
+thin black streamlines whose small arrowheads give the flow direction. The
+defaults are tuned so the first call is already a finished figure.
+
+```python
+import pivpy.pivpy
+from pivpy import synthetic
+
+ds = synthetic.multivortex(n_frames=1, n=128, n_vortices=8, two_d=True, seed=42)
+fig, ax = ds.piv.streamscal()
+fig.savefig("flow.png", dpi=300)
+```
+
+![Streamlines over vorticity](_static/streamscal_multivortex.png){ width="60%" }
+
+What the defaults do:
+
+- The scalar (and `u`, `v`) are cubic-spline upsampled 4x, so a coarse PIV grid gives smooth colour and smooth streamline curvature (`upsample=1` turns this off).
+- Colour limits are symmetric about zero for signed fields such as vorticity, and the 1st-99th percentile range otherwise, so one outlier vector does not wash out the figure (`clim=`, `center=`, `percentile=`).
+- `smooth=1.0` applies a NaN-aware Gaussian to the scalar; invalid vectors (`chc == 0`) are masked, not drawn through.
+- Streamlines are opaque black, `linewidth=0.6`, `density=2.6`, with `arrowsize=1.1`. Use `density=1.5` for a lighter figure.
+- The figure takes the data aspect ratio and the axes fill the canvas. `axes=True` adds ticks and labels, `colorbar=True` adds a colorbar.
+
+Other quantities: `scalar="speed"`, `"ke"`, `"divergence"`, any variable name, or a 2D array.
+
+### Several panels with one colour scale
+
+```python
+from pivpy import graphics
+
+ds = synthetic.vortex_pair(n_frames=24, n=128)
+fig, axs = graphics.streamscal_panels(
+    [ds.isel(t=0), ds.isel(t=23)], labels=["(a)", "(b)"], figwidth=10
+)
+```
+
+![Two panels](_static/streamscal_panels.png){ width="90%" }
+
+`clim="shared"` (default) pools all panels for one robust range, `clim=None` autoscales each panel, and a `(vmin, vmax)` tuple fixes it. `colorbar=True` adds one shared colorbar. Extra keyword arguments go to `streamscal`.
 
 ## High-Level Plotting (`ds.piv.plot`)
 

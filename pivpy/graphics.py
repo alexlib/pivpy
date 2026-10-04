@@ -886,7 +886,7 @@ def _scalar_field(ds: xr.Dataset, scalar, u: np.ndarray, v: np.ndarray):
         else:
             import pivpy.pivpy  # noqa: F401  (registers the .piv accessor)
 
-            arr = np.asarray(ds.piv.vorticity(name="__w")["__w"].values, dtype=float)
+            arr = np.asarray(ds.copy().piv.vorticity(name="__w")["__w"].values, dtype=float)
         return arr, "vorticity", "RdBu_r", True
     if key in ("speed", "mag", "magnitude"):
         return np.hypot(u, v), "speed", "RdBu_r", False
@@ -895,7 +895,7 @@ def _scalar_field(ds: xr.Dataset, scalar, u: np.ndarray, v: np.ndarray):
     if key in ("divergence", "div"):
         import pivpy.pivpy  # noqa: F401
 
-        arr = np.asarray(ds.piv.divergence(name="__div")["__div"].values, dtype=float)
+        arr = np.asarray(ds.copy().piv.divergence(name="__div")["__div"].values, dtype=float)
         return arr, "divergence", "RdBu_r", True
     if str(scalar) in ds:
         arr = np.asarray(ds[str(scalar)].values, dtype=float)

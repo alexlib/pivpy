@@ -231,6 +231,15 @@ Render publication-ready vector fields and flow trajectories with customizable d
 
     ![Streamlines Colored by Velocity Magnitude](_static/gallery/gallery_streamlines_mag.png){ width="70%" }
 
+=== "Streamlines over a Scalar Field"
+    Smooth `RdBu_r` field under thin black streamlines with small direction arrows, no axes, one shared colour scale across panels. Synthetic separated flow (analytic, not a measurement); the field is built in `examples/streamscal_separated_flow.py`.
+
+    ```python
+    fig, axs = graphics.streamscal_panels([strong, weak], scalar="u", figwidth=12)
+    ```
+
+    ![Streamlines over u, strong and weak separation](_static/gallery/streamscal_separated_flow.png){ width="90%" }
+
 === "Interactive Movie & Animation"
     High-performance animation updating vector artists (`quiver.set_UVC`) in place, exportable to `.mp4` or `.gif`.
 

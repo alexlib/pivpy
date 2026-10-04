@@ -247,3 +247,11 @@ def test_streamscal_panels_shared_clim_and_gap():
     p0, p1 = axs[0].get_position(), axs[1].get_position()
     assert p1.x0 > p0.x1  # white gap between panels
     assert abs(p1.x1 - 1.0) < 1e-9 and p0.x0 == 0.0  # packed edge to edge
+
+
+def test_streamscal_does_not_mutate_input():
+    d = _d.copy(deep=True)
+    before = set(d.data_vars)
+    graphics.streamscal(d)
+    graphics.streamscal(d, scalar="divergence")
+    assert set(d.data_vars) == before

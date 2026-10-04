@@ -80,12 +80,34 @@ from pivpy import synthetic
 # 1. Generate an analytical multi-vortex 2D turbulence field (or use io.read_piv)
 ds = synthetic.multivortex(n_frames=1, n=128, n_vortices=8, two_d=True, seed=42)
 
-# 2. Zero-effort, publication-quality plot (vorticity background, streamlines & auto-scaled vectors)
-fig, ax = ds.piv.plot()
-plt.show()
+# 2. One call, publication-quality figure: smooth RdBu_r vorticity field with
+#    dense black streamlines and small direction arrows, no axes or margins
+fig, ax = ds.piv.streamscal()
+fig.savefig("flow.png", dpi=300)
 ```
 
-![PIVPy Multi-Vortex Flow Visualization](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_quiver_vorticity.png)
+![PIVPy streamlines over vorticity](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/streamscal_multivortex.png)
+
+`streamscal` needs no tuning for a finished figure. Pick another colour quantity with
+`scalar="speed"`, `"u"`, `"divergence"` or any dataset variable, and make the figure lighter with
+`density=1.5`.
+
+### Side-by-side panels
+
+`streamscal_panels` packs several fields into one figure with a thin white gap and a shared
+colour scale, so the panels can be compared directly:
+
+```python
+from pivpy import graphics
+
+ds = synthetic.vortex_pair(n_frames=24, n=128)
+fig, axs = graphics.streamscal_panels(
+    [ds.isel(t=0), ds.isel(t=23)], labels=["(a)", "(b)"], figwidth=10
+)
+fig.savefig("panels.png", dpi=300)
+```
+
+![Two streamline panels with a shared colour scale](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/streamscal_panels.png)
 
 ### Dynamic Flow Animations
 
@@ -104,9 +126,9 @@ anim.save("vortex_interaction.gif")
 
 ![PIVPy Flow Animation](https://raw.githubusercontent.com/alexlib/pivpy/master/docs/source/_static/getting_started_animation.gif)
 
-### Customizing Your Plots
+### Vectors, backgrounds and other layers with `plot()`
 
-Every visual layer can be easily tailored or toggled:
+For velocity vectors, image backgrounds and colorbars use `ds.piv.plot()`. Every visual layer can be tailored or toggled:
 
 ```python
 # Velocity magnitude background with vectors only (no streamlines)

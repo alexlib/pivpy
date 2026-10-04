@@ -1,0 +1,1133 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Post-processing of Particle Image Velocimetry (PIV) data">
+      
+      
+      
+        <link rel="canonical" href="https://alexlib.github.io/pivpy/gallery/">
+      
+      
+        <link rel="prev" href="../intro/">
+      
+      
+        <link rel="next" href="../pivpy_data_model/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Feature Gallery - PIVPy</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@marimo-team/islands@0.25.0/dist/main.js"></script>
+<link
+    href="https://cdn.jsdelivr.net/npm/@marimo-team/islands@0.25.0/dist/style.css"
+    rel="stylesheet"
+    title="marimo-islands"
+    crossorigin="anonymous"
+/>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+/>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500;700&amp;family=Lora&amp;family=PT+Sans:wght@400;700&amp;display=swap" rel="stylesheet" />
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css"
+    integrity="sha384-wcIxkf4k558AjM3Yz3BBFQUbk/zgIYC2R0QpeeYb+TwlBVMrlgLqwRjRtGZiK7ww"
+    crossorigin="anonymous"
+/>
+<marimo-filename hidden></marimo-filename>
+</head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#pivpy-feature-gallery" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PIVPy" class="md-header__button md-logo" aria-label="PIVPy" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PIVPy
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Feature Gallery
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alexlib/pivpy" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alexlib/pivpy
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PIVPy" class="md-nav__button md-logo" aria-label="PIVPy" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    PIVPy
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alexlib/pivpy" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    alexlib/pivpy
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Gallery
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-kinematics-velocity-gradients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Kinematics &amp; Velocity Gradients
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-coherent-vortex-identification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Coherent Vortex Identification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-turbulence-statistics-structure-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Turbulence Statistics &amp; Structure Analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-quality-control-outlier-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Quality Control &amp; Outlier Filtering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-flow-visualization-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Flow Visualization Modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pivpy_data_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pivpy_visualization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pivpy_tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Written tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pivpy_faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-kinematics-velocity-gradients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Kinematics &amp; Velocity Gradients
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-coherent-vortex-identification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Coherent Vortex Identification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-turbulence-statistics-structure-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Turbulence Statistics &amp; Structure Analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-quality-control-outlier-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Quality Control &amp; Outlier Filtering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-flow-visualization-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Flow Visualization Modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="pivpy-feature-gallery">PIVPy Feature Gallery</h1>
+<p>A visual reference showcasing the post-processing, coherent structure identification, turbulence statistics, and visualization features available in <strong>PIVPy</strong>.</p>
+<p>All examples below use the exact same reproducible synthetic flow benchmark: a 16-frame 2D turbulent vortex wake on a $64 \times 64$ grid with ground-truth vortices and shear layers.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pivpy.pivpy</span>  <span class="c1"># registers the .piv accessor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pivpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">synthetic</span>
+
+<span class="c1"># Standard reproducible benchmark field</span>
+<span class="n">ds</span> <span class="o">=</span> <span class="n">synthetic</span><span class="o">.</span><span class="n">multivortex</span><span class="p">(</span><span class="n">n_frames</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">n_vortices</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="1-kinematics-velocity-gradients">1. Kinematics &amp; Velocity Gradients</h2>
+<p>Compute spatial derivatives and derived kinematic fields directly from velocity components $(u, v)$.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:5"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><input id="__tabbed_1_4" name="__tabbed_1" type="radio" /><input id="__tabbed_1_5" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Velocity Magnitude</label><label for="__tabbed_1_2">Vorticity Field</label><label for="__tabbed_1_3">Divergence</label><label for="__tabbed_1_4">Shear Strain Rate</label><label for="__tabbed_1_5">Convective Acceleration</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>The Euclidean speed $|\mathbf{u}| = \sqrt{u^2 + v^2}$ rendered as a background contour with overlaid velocity vectors and a reference arrow key.</p>
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"mag"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"viridis"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Velocity Magnitude &amp; Vector Field" src="../_static/gallery/gallery_vector_magnitude.png" width="80%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Out-of-plane vorticity $\omega_z = \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y}$. Also available via noise-robust closed-contour circulation (<code>method="circulation"</code>).</p>
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"vorticity"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"coolwarm"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Vorticity Field" src="../_static/gallery/gallery_vorticity.png" width="80%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Two-dimensional velocity divergence $\nabla \cdot \mathbf{u} = \frac{\partial u}{\partial x} + \frac{\partial v}{\partial y}$ (measures 2D out-of-plane expansion/compression in incompressible flows).</p>
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"divergence"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"bwr"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="2D Velocity Divergence" src="../_static/gallery/gallery_divergence.png" width="80%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Scalar shear strain rate magnitude $S_{xy} = \left(\frac{\partial u}{\partial x}\right)^2 + \left(\frac{\partial v}{\partial y}\right)^2 + \frac{1}{2}\left(\frac{\partial u}{\partial y} + \frac{\partial v}{\partial x}\right)^2$.</p>
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"strain"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"inferno"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Shear Strain Rate" src="../_static/gallery/gallery_shear_strain.png" width="80%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Material convective acceleration magnitude $|(\mathbf{u} \cdot \nabla)\mathbf{u}| = \sqrt{\left(u \frac{\partial u}{\partial x} + v \frac{\partial u}{\partial y}\right)^2 + \left(u \frac{\partial v}{\partial x} + v \frac{\partial v}{\partial y}\right)^2}$.</p>
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"accel"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"magma"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Convective Acceleration" src="../_static/gallery/gallery_acceleration.png" width="80%" /></p>
+</div>
+</div>
+</div>
+<hr />
+<h2 id="2-coherent-vortex-identification">2. Coherent Vortex Identification</h2>
+<p>Identify and locate coherent vortex cores and vortex boundaries using Galilean-invariant and topological criteria.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:4"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><input id="__tabbed_2_4" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">$\Gamma_1$ (Vortex Center)</label><label for="__tabbed_2_2">$\Gamma_2$ (Vortex Boundary)</label><label for="__tabbed_2_3">$Q$-Criterion</label><label for="__tabbed_2_4">Okubo-Weiss ($Q_{OW}$)</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Normalized angular momentum criterion (Graftieaux et al., 2001). Reaches $\pm 1$ at ideal vortex centers; $| \Gamma_1 | \ge \frac{2}{\pi} \approx 0.64$ bounds vortex cores.</p>
+<div class="highlight"><pre><span></span><code><span class="n">ds_g1</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">gamma1</span><span class="p">(</span><span class="n">radius</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"gamma1"</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds_g1</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"gamma1"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"coolwarm"</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Gamma1 Vortex Center Criterion" src="../_static/gallery/gallery_gamma1.png" width="80%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Galilean-invariant criterion subtracting local convective velocity $\tilde{\mathbf{U}}_P$. Accurately identifies the outer boundary of advecting vortex cores.</p>
+<div class="highlight"><pre><span></span><code><span class="n">ds_g2</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">gamma2</span><span class="p">(</span><span class="n">radius</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"gamma2"</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds_g2</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"gamma2"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"coolwarm"</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Gamma2 Vortex Boundary Criterion" src="../_static/gallery/gallery_gamma2.png" width="80%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Second invariant of the velocity gradient tensor $Q = \frac{1}{2}(\Omega_{ij}\Omega_{ij} - S_{ij}S_{ij})$. Regions with $Q &gt; 0$ indicate rotation dominates over strain rate.</p>
+<div class="highlight"><pre><span></span><code><span class="n">ds_q</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">q_criterion</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Q"</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds_q</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"Q"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"PiYG"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Q-Criterion" src="../_static/gallery/gallery_q_criterion.png" width="80%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Separates elliptic (vortex core, $Q_{OW} &lt; 0$) from hyperbolic (shear layer / saddle point, $Q_{OW} &gt; 0$) regions: $Q_{OW} = s_n^2 + s_s^2 - \omega^2$.</p>
+<div class="highlight"><pre><span></span><code><span class="n">ds_ow</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">okubo_weiss</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"Q_ow"</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds_ow</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"Q_ow"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"PRGn"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Okubo-Weiss Parameter" src="../_static/gallery/gallery_okubo_weiss.png" width="80%" /></p>
+</div>
+</div>
+</div>
+<hr />
+<h2 id="3-turbulence-statistics-structure-analysis">3. Turbulence Statistics &amp; Structure Analysis</h2>
+<p>Analyze multi-frame time series and ensembles with comprehensive statistical and structural tools.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:6"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><input id="__tabbed_3_3" name="__tabbed_3" type="radio" /><input id="__tabbed_3_4" name="__tabbed_3" type="radio" /><input id="__tabbed_3_5" name="__tabbed_3" type="radio" /><input id="__tabbed_3_6" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Turbulent Kinetic Energy (TKE)</label><label for="__tabbed_3_2">Reynolds Shear Stress</label><label for="__tabbed_3_3">Two-Point Spatial Correlation</label><label for="__tabbed_3_4">Quadrant Analysis</label><label for="__tabbed_3_5">Turbulent Energy Spectra</label><label for="__tabbed_3_6">Integral Length Scales</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Time-averaged turbulent kinetic energy $k = \frac{1}{2}(\langle u'^2 \rangle + \langle v'^2 \rangle + \langle w'^2 \rangle)$ computed from ensemble velocity fluctuations.</p>
+<div class="highlight"><pre><span></span><code><span class="n">ds_tke</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">tke</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"tke_field"</span><span class="p">,</span> <span class="n">time_average</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds_tke</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"tke_field"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"plasma"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Turbulent Kinetic Energy" src="../_static/gallery/gallery_tke.png" width="80%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Time-averaged Reynolds shear stress $-\langle u'v' \rangle$. For full 3D/stereo datasets, <code>ds.piv.reynolds_stresses()</code> returns all normal and shear stress components.</p>
+<div class="highlight"><pre><span></span><code><span class="n">ds_rss</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">reynolds_stress</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"rey_stress"</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds_rss</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"rey_stress"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"bwr"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Reynolds Shear Stress" src="../_static/gallery/gallery_reynolds_stress.png" width="80%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Localized cross-covariance $R_{uu}(\mathbf{x}; \mathbf{x}<em ref="ref">{ref}) = \frac{\langle u'(\mathbf{x}) u'(\mathbf{x}</em>$ relative to a reference probe point.}) \rangle}{\sqrt{\langle u'^2(\mathbf{x})\rangle \langle u'^2(\mathbf{x}_{ref})\rangle}</p>
+<div class="highlight"><pre><span></span><code><span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span> <span class="nb">float</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+<span class="n">corr</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">two_point_correlation</span><span class="p">(</span><span class="n">var_name</span><span class="o">=</span><span class="s2">"u"</span><span class="p">,</span> <span class="n">x_ref</span><span class="o">=</span><span class="n">x_mid</span><span class="p">,</span> <span class="n">y_ref</span><span class="o">=</span><span class="n">y_mid</span><span class="p">,</span> <span class="n">swap_dims</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">cf</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">contourf</span><span class="p">(</span><span class="n">corr</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">corr</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">corr</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">levels</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"coolwarm"</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="s2">"k+"</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">markeredgewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">r</span><span class="s2">"$R_</span><span class="si">{uu}</span><span class="s2">$"</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Two-Point Correlation Map" src="../_static/gallery/gallery_two_point_corr.png" width="65%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Classifies turbulent fluctuations into 4 quadrants ($Q_1$ outward, $Q_2$ ejection, $Q_3$ inward, $Q_4$ sweep) with hyperbolic hole filtering $|u'v'| \ge H |\langle u'v' \rangle|$.</p>
+<div class="highlight"><pre><span></span><code><span class="n">qa</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">quadrant_analysis</span><span class="p">(</span><span class="n">x_var</span><span class="o">=</span><span class="s2">"u"</span><span class="p">,</span> <span class="n">y_var</span><span class="o">=</span><span class="s2">"v"</span><span class="p">)</span>
+<span class="c1"># Returns Dataset with:</span>
+<span class="c1"># qa["fraction"]  -- stress contribution per quadrant</span>
+<span class="c1"># qa["duration"]  -- residence frequency per quadrant</span>
+<span class="c1"># qa["conditional_u"], qa["conditional_v"] -- conditional means</span>
+</code></pre></div>
+<p><img alt="Quadrant Analysis" src="../_static/gallery/gallery_quadrant_analysis.png" width="85%" /></p>
+</div>
+<div class="tabbed-block">
+<p>2D spatial wavenumber energy spectrum $E(k_x, k_y)$ and radially-integrated 1D spectrum $E(k)$ with theoretical Kolmogorov $-5/3$ reference slope.</p>
+<div class="highlight"><pre><span></span><code><span class="n">spec</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">energy_spectrum</span><span class="p">(</span><span class="n">radial</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">detrend</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="c1"># spec["E2D"]: 2D wavenumber energy distribution</span>
+<span class="c1"># spec["E_radial"]: 1D radial spectrum over wavenumber k</span>
+</code></pre></div>
+<p><img alt="Turbulent Energy Spectrum" src="../_static/gallery/gallery_energy_spectrum.png" width="85%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Multi-model length scale estimation from spatial correlation: $1/e$ cutoff distance, zero-crossing integral, or exponential / bi-exponential fitting.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1/e threshold distance (with linear interpolation)</span>
+<span class="n">L_1e</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">length_scale</span><span class="p">(</span><span class="n">variable</span><span class="o">=</span><span class="s2">"u"</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="s2">"x"</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"1e"</span><span class="p">)</span>
+
+<span class="c1"># Exponential decay fit R(r) = exp(-r / L)</span>
+<span class="n">L_fit</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">length_scale</span><span class="p">(</span><span class="n">variable</span><span class="o">=</span><span class="s2">"u"</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="s2">"x"</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"fit"</span><span class="p">,</span> <span class="n">fit_model</span><span class="o">=</span><span class="s2">"single"</span><span class="p">)</span>
+
+<span class="c1"># Bi-exponential fit (separates large eddies from fine scales)</span>
+<span class="n">params</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">length_scale</span><span class="p">(</span><span class="n">variable</span><span class="o">=</span><span class="s2">"u"</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="s2">"x"</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"fit"</span><span class="p">,</span> <span class="n">fit_model</span><span class="o">=</span><span class="s2">"bi"</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<hr />
+<h2 id="4-quality-control-outlier-filtering">4. Quality Control &amp; Outlier Filtering</h2>
+<p>Validate, clean, and smooth noisy vector fields.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Normalized Median Test (Outlier Removal)</label><label for="__tabbed_4_2">Savitzky-Golay &amp; B-Spline Smoothing</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Westerweel &amp; Scarano (2005) universal outlier detection test comparing local residual fluctuation against the median of surrounding neighbors, followed by 2D bi-cubic hole inpainting.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Identify spurious vectors and replace with bi-cubic interpolation</span>
+<span class="n">ds_cleaned</span> <span class="o">=</span> <span class="n">ds_noisy</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">clean</span><span class="p">(</span><span class="n">threshold</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Outlier Cleaning Comparison" src="../_static/gallery/gallery_cleaning_comparison.png" width="90%" /></p>
+</div>
+<div class="tabbed-block">
+<p>1D Savitzky-Golay polynomial filtering and B-Spline smoothing along arbitrary coordinate dimensions (<code>x</code> or <code>y</code>), with support for analytical derivatives (<code>deriv=1</code> for noise-free gradients).</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1D Savitzky-Golay filter along x (window=5, polynomial degree=2)</span>
+<span class="n">u_smooth</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">smooth_savgol</span><span class="p">(</span><span class="n">var_key</span><span class="o">=</span><span class="s2">"u"</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="s2">"x"</span><span class="p">,</span> <span class="n">window_length</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">polyorder</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># 1D B-spline analytical differentiation: du/dy without numerical noise</span>
+<span class="n">dudy</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">smooth_spline</span><span class="p">(</span><span class="n">var_key</span><span class="o">=</span><span class="s2">"u"</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="s2">"y"</span><span class="p">,</span> <span class="n">deriv</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<hr />
+<h2 id="5-flow-visualization-modes">5. Flow Visualization Modes</h2>
+<p>Render publication-ready vector fields and flow trajectories with customizable density and coloring.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="5:3"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><input id="__tabbed_5_3" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Flow Streamlines</label><label for="__tabbed_5_2">Streamlines over a Scalar Field</label><label for="__tabbed_5_3">Interactive Movie &amp; Animation</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Streamlines tracing instantaneous velocity trajectories, colored by velocity magnitude or any scalar field.</p>
+<div class="highlight"><pre><span></span><code><span class="n">speed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">"u"</span><span class="p">]</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">ds</span><span class="p">[</span><span class="s2">"v"</span><span class="p">]</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">streamplot</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="n">speed</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"plasma"</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="mf">1.2</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Streamlines Colored by Velocity Magnitude" src="../_static/gallery/gallery_streamlines_mag.png" width="70%" /></p>
+</div>
+<div class="tabbed-block">
+<p>Smooth <code>RdBu_r</code> field under thin black streamlines with small direction arrows, no axes, one shared colour scale across panels. Synthetic separated flow (analytic, not a measurement); the field is built in <code>examples/streamscal_separated_flow.py</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">graphics</span><span class="o">.</span><span class="n">streamscal_panels</span><span class="p">([</span><span class="n">strong</span><span class="p">,</span> <span class="n">weak</span><span class="p">],</span> <span class="n">scalar</span><span class="o">=</span><span class="s2">"u"</span><span class="p">,</span> <span class="n">figwidth</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+</code></pre></div>
+<p><img alt="Streamlines over u, strong and weak separation" src="../_static/gallery/streamscal_separated_flow.png" width="90%" /></p>
+</div>
+<div class="tabbed-block">
+<p>High-performance animation updating vector artists (<code>quiver.set_UVC</code>) in place, exportable to <code>.mp4</code> or <code>.gif</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Interactive FuncAnimation</span>
+<span class="n">anim</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">animate</span><span class="p">(</span><span class="n">background</span><span class="o">=</span><span class="s2">"vorticity"</span><span class="p">,</span> <span class="n">skip</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">60</span><span class="p">)</span>
+
+<span class="c1"># Direct video exporter</span>
+<span class="n">ds</span><span class="o">.</span><span class="n">piv</span><span class="o">.</span><span class="n">to_movie</span><span class="p">(</span><span class="s2">"vortex_wake.mp4"</span><span class="p">,</span> <span class="n">background</span><span class="o">=</span><span class="s2">"vorticity"</span><span class="p">,</span> <span class="n">fps</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<hr />
+<h2 id="quick-reference-summary">Quick Reference Summary</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Feature Category</th>
+<th style="text-align: left;">Accessor Method</th>
+<th style="text-align: left;">Primary Return</th>
+<th style="text-align: left;">Typical Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Composite Visualization</strong></td>
+<td style="text-align: left;"><code>ds.piv.plot()</code></td>
+<td style="text-align: left;"><code>(Figure, Axes)</code></td>
+<td style="text-align: left;">One-line publication-ready flow figure with background, arrows, key</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Vorticity / Curl</strong></td>
+<td style="text-align: left;"><code>ds.piv.vorticity()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">Fluid rotation rate ($\omega_z = \partial v/\partial x - \partial u/\partial y$)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Streamlines</strong></td>
+<td style="text-align: left;"><code>ds.piv.streamplot()</code></td>
+<td style="text-align: left;"><code>(Figure, Axes)</code></td>
+<td style="text-align: left;">Flow trajectories and recirculation visualization</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Vortex Core Center</strong></td>
+<td style="text-align: left;"><code>ds.piv.gamma1()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">Normalized angular momentum ($\Gamma_1 \approx \pm 1$ at centers)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Vortex Boundary</strong></td>
+<td style="text-align: left;"><code>ds.piv.gamma2()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">Galilean-invariant vortex boundary detection</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Rotation vs Strain</strong></td>
+<td style="text-align: left;"><code>ds.piv.q_criterion()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">Second invariant $Q$ (coherent vortices vs shear layers)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Kinetic Energy</strong></td>
+<td style="text-align: left;"><code>ds.piv.kinetic_energy()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">Instantaneous kinetic energy field $\frac{1}{2}(u^2 + v^2)$</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Turbulent Kinetic Energy</strong></td>
+<td style="text-align: left;"><code>ds.piv.tke()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">Time-averaged or instantaneous fluctuation energy $\frac{1}{2}\sum \langle u_i'^2 \rangle$</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Reynolds Stresses</strong></td>
+<td style="text-align: left;"><code>ds.piv.reynolds_stresses()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">Multi-component stress tensor ($\langle u'u' \rangle, \langle v'v' \rangle, \langle u'v' \rangle$, etc.)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Fluctuation Products</strong></td>
+<td style="text-align: left;"><code>ds.piv.product("u'v'")</code></td>
+<td style="text-align: left;"><code>DataArray</code></td>
+<td style="text-align: left;">String-driven fluctuation/raw product parser</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Two-Point Correlation</strong></td>
+<td style="text-align: left;"><code>ds.piv.two_point_correlation()</code></td>
+<td style="text-align: left;"><code>DataArray</code></td>
+<td style="text-align: left;">Localized probe correlation $R_{uu}(\mathbf{x}; \mathbf{x}_{ref})$</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Integral Length Scale</strong></td>
+<td style="text-align: left;"><code>ds.piv.length_scale()</code></td>
+<td style="text-align: left;"><code>DataArray</code></td>
+<td style="text-align: left;">Eddy length scale via $1/e$, zero-crossing integral, or exponential fit</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Quadrant Analysis</strong></td>
+<td style="text-align: left;"><code>ds.piv.quadrant_analysis()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">Burst/sweep classification and Reynolds stress contribution</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Outlier Cleaning</strong></td>
+<td style="text-align: left;"><code>ds.piv.clean()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">Westerweel-Scarano normalized median test + bi-cubic inpainting</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Profile Smoothing</strong></td>
+<td style="text-align: left;"><code>ds.piv.smooth_savgol()</code> / <code>smooth_spline()</code></td>
+<td style="text-align: left;"><code>DataArray</code></td>
+<td style="text-align: left;">Savitzky-Golay and B-spline filtering &amp; analytical derivatives</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Energy Spectrum</strong></td>
+<td style="text-align: left;"><code>ds.piv.energy_spectrum()</code></td>
+<td style="text-align: left;"><code>Dataset</code></td>
+<td style="text-align: left;">2D wavenumber $E(k_x, k_y)$ and 1D radial $E(k)$ spectra</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.top", "navigation.sections", "navigation.expand"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

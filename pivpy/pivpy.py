@@ -21,6 +21,7 @@ from pivpy.graphics import quiver as gquiver
 from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
 from pivpy.graphics import streamplot as gstreamplot
+from pivpy.graphics import streamscal as gstreamscal
 from pivpy.graphics import autocorrelation_plot as gautocorrelation_plot
 from pivpy.graphics import histscal_disp as ghistscal_disp
 from pivpy.graphics import histvec_disp as ghistvec_disp
@@ -2999,6 +3000,20 @@ class PIVAccessor(object):
         """graphics.streamplot() as a flow_property"""
         fig, ax = gstreamplot(self._obj, **kwargs)
         return fig, ax
+
+    def streamscal(self, **kwargs):
+        """Filled scalar field with dense black streamlines (graphics.streamscal).
+
+        Publication-quality defaults: RdBu_r colormap, thin opaque streamlines
+        with small direction arrows, no axes or margins. See
+        :func:`pivpy.graphics.streamscal` for all options.
+
+        Examples
+        --------
+        >>> fig, ax = ds.piv.streamscal()
+        >>> fig, ax = ds.piv.streamscal(scalar="speed", density=2)
+        """
+        return gstreamscal(self._obj, **kwargs)
 
     def showf(self, **kwargs):
         """method for graphics.showf"""

@@ -812,6 +812,451 @@ def streamplot(
     return fig, ax
 
 
+# ---------------------------------------------------------------------------
+# Publication-quality "scalar field + streamlines" figures
+# ---------------------------------------------------------------------------
+
+_SIGNED_SCALARS = {"vorticity", "vort", "curl", "w", "divergence", "div", "u", "v"}
+
+
+def _ascending_grid(x, y, *arrays):
+    """Return x, y strictly ascending and the 2D arrays flipped to match."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    out = [np.asarray(a, dtype=float) for a in arrays]
+    if y.size >= 2 and y[0] > y[-1]:
+        y = y[::-1]
+        out = [a[::-1, :] for a in out]
+    if x.size >= 2 and x[0] > x[-1]:
+        x = x[::-1]
+        out = [a[:, ::-1] for a in out]
+    return (x, y, *out)
+
+
+def _fill_nan_nearest(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Replace NaNs by the nearest valid value; return (filled, nan_mask)."""
+    from scipy.ndimage import distance_transform_edt
+
+    bad = ~np.isfinite(a)
+    if not bad.any():
+        return a, bad
+    if bad.all():
+        return np.zeros_like(a), bad
+    idx = distance_transform_edt(bad, return_distances=False, return_indices=True)
+    return a[tuple(idx)], bad
+
+
+def _smooth_nan_aware(a: np.ndarray, sigma: float) -> np.ndarray:
+    """Gaussian smoothing that does not let NaNs bleed into valid neighbours."""
+    if not sigma or sigma <= 0:
+        return a
+    bad = ~np.isfinite(a)
+    w = gaussian_filter((~bad).astype(float), sigma, mode="nearest")
+    num = gaussian_filter(np.where(bad, 0.0, a), sigma, mode="nearest")
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = num / w
+    out[bad] = np.nan
+    return out
+
+
+def _upsample_field(a: np.ndarray, x: np.ndarray, y: np.ndarray, factor: float):
+    """Cubic-spline upsampling of a 2D field on a regular grid (NaN aware)."""
+    from scipy.ndimage import zoom
+
+    if factor is None or factor <= 1.0 or a.shape[0] < 4 or a.shape[1] < 4:
+        return x, y, a
+    filled, bad = _fill_nan_nearest(a)
+    z = zoom(filled, factor, order=3, mode="nearest")
+    if bad.any():
+        zb = zoom(bad.astype(float), factor, order=1, mode="nearest") > 0.5
+        z = np.where(zb, np.nan, z)
+    xn = np.linspace(x[0], x[-1], z.shape[1])
+    yn = np.linspace(y[0], y[-1], z.shape[0])
+    return xn, yn, z
+
+
+def _scalar_field(ds: xr.Dataset, scalar, u: np.ndarray, v: np.ndarray):
+    """Resolve ``scalar`` to (2D array, name, cmap, signed)."""
+    if isinstance(scalar, np.ndarray):
+        return np.asarray(scalar, dtype=float), "scalar", "RdBu_r", bool(np.nanmin(scalar) < 0 < np.nanmax(scalar))
+    key = str(scalar).lower()
+    if key in ("vorticity", "vort", "curl", "w"):
+        if "w" in ds:
+            arr = np.asarray(ds["w"].values, dtype=float)
+        else:
+            import pivpy.pivpy  # noqa: F401  (registers the .piv accessor)
+
+            arr = np.asarray(ds.piv.vorticity(name="__w")["__w"].values, dtype=float)
+        return arr, "vorticity", "RdBu_r", True
+    if key in ("speed", "mag", "magnitude"):
+        return np.hypot(u, v), "speed", "RdBu_r", False
+    if key in ("ke", "kinetic_energy"):
+        return 0.5 * (u**2 + v**2), "ke", "RdBu_r", False
+    if key in ("divergence", "div"):
+        import pivpy.pivpy  # noqa: F401
+
+        arr = np.asarray(ds.piv.divergence(name="__div")["__div"].values, dtype=float)
+        return arr, "divergence", "RdBu_r", True
+    if str(scalar) in ds:
+        arr = np.asarray(ds[str(scalar)].values, dtype=float)
+        while arr.ndim > 2:
+            arr = arr[..., 0] if arr.shape[-1] == 1 else arr[0]
+        return arr, str(scalar), "RdBu_r", key in _SIGNED_SCALARS
+    raise KeyError(f"scalar={scalar!r} is not a known quantity or a variable of the dataset")
+
+
+def _frame(ds: xr.Dataset, t_idx: int) -> xr.Dataset:
+    if "t" in ds.dims:
+        return ds.isel(t=min(t_idx, ds.sizes["t"] - 1))
+    return ds
+
+
+def _resolve_clim(vals: np.ndarray, signed: bool, clim, percentile: float, center):
+    if isinstance(clim, (tuple, list)) and len(clim) == 2:
+        return float(clim[0]), float(clim[1])
+    f = vals[np.isfinite(vals)]
+    if f.size == 0:
+        return -1.0, 1.0
+    if center is not None:
+        m = float(np.percentile(np.abs(f - center), percentile))
+        m = max(m, 1e-12)
+        return center - m, center + m
+    if signed:
+        # Symmetric about zero only when both signs are really present;
+        # a one-signed field (e.g. streamwise u) would otherwise waste half
+        # of the colormap.
+        lo_a, hi_a = abs(float(f.min())), abs(float(f.max()))
+        if f.min() < 0 < f.max() and min(lo_a, hi_a) > 0.1 * max(lo_a, hi_a):
+            m = max(float(np.percentile(np.abs(f), percentile)), 1e-12)
+            return -m, m
+    lo = float(np.percentile(f, 100 - percentile))
+    hi = float(np.percentile(f, percentile))
+    if hi <= lo:
+        hi = lo + 1.0
+    return lo, hi
+
+
+def streamscal(
+    data: xr.Dataset,
+    *,
+    scalar: str | np.ndarray = "vorticity",
+    cmap="RdBu_r",
+    clim: tuple[float, float] | None = None,
+    center: float | None = None,
+    percentile: float = 99.0,
+    smooth: float = 1.0,
+    upsample: float = 4.0,
+    streamlines: bool = True,
+    density: float = 2.6,
+    linewidth: float = 0.6,
+    streamline_color="k",
+    streamline_alpha: float = 1.0,
+    arrowsize: float = 1.1,
+    arrowstyle: str = "->",
+    minlength: float = 0.15,
+    maxlength: float = 8.0,
+    start_points=None,
+    colorbar: bool = False,
+    cbar_label: str | None = None,
+    axes: bool = False,
+    title: str | None = None,
+    figwidth: float = 6.0,
+    t_idx: int = 0,
+    ax: Axes | None = None,
+    **kwargs,
+) -> tuple[Figure, Axes]:
+    """Smooth filled scalar field with dense, thin black streamlines.
+
+    The defaults reproduce the clean look used in flow-visualisation papers:
+    a diverging colormap (``RdBu_r``) spanning the data range, thin opaque
+    black streamlines whose small open arrowheads follow the flow direction,
+    no axes, no frame, no margins, and a figure sized to the data aspect
+    ratio so the picture fills the canvas edge to edge.
+
+    A bare ``ds.piv.streamscal()`` therefore gives a finished figure.
+
+    Parameters
+    ----------
+    data : xr.Dataset
+        Dataset with ``u``, ``v`` on ``x``, ``y`` (first frame is used unless
+        ``t_idx`` is given).
+    scalar : str or ndarray
+        Quantity shown as the colour background. ``"vorticity"`` (default),
+        ``"speed"``, ``"ke"``, ``"divergence"``, the name of any variable in
+        ``data`` (e.g. ``"u"``, ``"chc"``), or a 2D array on the data grid.
+    cmap : str or Colormap
+        Colormap, default ``"RdBu_r"``.
+    clim : (vmin, vmax), optional
+        Explicit colour limits. Otherwise limits are symmetric about zero for
+        signed quantities, or the 1st-99th percentile range for the others.
+    center : float, optional
+        Force a symmetric range about this value (e.g. a mean speed).
+    percentile : float
+        Robust percentile used for automatic limits.
+    smooth : float
+        Gaussian sigma (in grid cells) applied to the scalar before drawing.
+        NaN-aware. ``0`` disables.
+    upsample : float
+        Cubic-spline refinement factor applied to u, v and the scalar before
+        drawing, so coarse PIV grids give smooth colour and smooth streamlines.
+        ``1`` disables.
+    streamlines : bool
+        Draw streamlines.
+    density, linewidth, arrowsize, arrowstyle, minlength, maxlength, start_points
+        Forwarded to :meth:`matplotlib.axes.Axes.streamplot`. ``density=4``
+        gives the dense look; use 1-2 for a lighter figure.
+    streamline_color, streamline_alpha
+        Streamline colour (default black) and opacity (default opaque).
+    colorbar : bool
+        Draw a colorbar (off by default).
+    axes : bool
+        Show axes, ticks and labels. Default ``False`` (picture only).
+    title : str, optional
+        Title (only sensible with ``axes=True`` or a user-provided ``ax``).
+    figwidth : float
+        Figure width in inches when a new figure is created; the height
+        follows the data aspect ratio.
+    t_idx : int
+        Frame to draw for time-resolved datasets.
+    ax : Axes, optional
+        Draw into an existing axes (then no figure sizing is done).
+    **kwargs
+        Forwarded to ``pcolormesh``.
+
+    Returns
+    -------
+    fig, ax
+
+    Examples
+    --------
+    >>> fig, ax = ds.piv.streamscal()                       # finished figure
+    >>> fig, ax = ds.piv.streamscal(scalar="speed", density=2)
+    >>> fig.savefig("flow.png", dpi=300)
+    """
+    ds = _frame(data, t_idx)
+    x0 = np.asarray(ds["x"].values, dtype=float)
+    y0 = np.asarray(ds["y"].values, dtype=float)
+    u0 = np.asarray(ds["u"].values, dtype=float)
+    v0 = np.asarray(ds["v"].values, dtype=float)
+    u0 = u0.reshape(u0.shape[0], u0.shape[1])
+    v0 = v0.reshape(v0.shape[0], v0.shape[1])
+    if "chc" in ds:
+        chc = np.asarray(ds["chc"].values, dtype=float)
+        chc = chc.reshape(u0.shape)
+        u0 = np.where(chc == 0, np.nan, u0)
+        v0 = np.where(chc == 0, np.nan, v0)
+
+    sc0, sc_name, auto_cmap, signed = _scalar_field(ds, scalar, u0, v0)
+    sc0 = sc0.reshape(u0.shape)
+
+    x, y, u, v, sc = _ascending_grid(x0, y0, u0, v0, sc0)
+
+    sc = _smooth_nan_aware(sc, smooth)
+    xs, ys, scf = _upsample_field(sc, x, y, upsample)
+    xu, yu, uf = _upsample_field(u, x, y, upsample)
+    _, _, vf = _upsample_field(v, x, y, upsample)
+
+    vmin, vmax = _resolve_clim(scf, signed, clim, percentile, center)
+
+    created = ax is None
+    xmin, xmax, ymin, ymax = float(x[0]), float(x[-1]), float(y[0]), float(y[-1])
+    if created:
+        aspect = abs(ymax - ymin) / max(abs(xmax - xmin), 1e-30)
+        cbar_frac = 0.07 if colorbar else 0.0
+        if axes:
+            fig, ax = plt.subplots(figsize=(figwidth, figwidth * aspect + 0.9))
+        else:
+            fig = plt.figure(figsize=(figwidth * (1 + cbar_frac), figwidth * aspect), facecolor="white")
+            ax = fig.add_axes([0.0, 0.0, 1.0 / (1 + cbar_frac), 1.0])
+    else:
+        fig = ax.figure
+
+    mesh = ax.pcolormesh(
+        xs, ys, np.ma.masked_invalid(scf),
+        cmap=cmap if cmap is not None else auto_cmap,
+        vmin=vmin, vmax=vmax, shading="gouraud", rasterized=True, **kwargs,
+    )
+
+    if streamlines:
+        strm = ax.streamplot(
+            xu, yu,
+            np.ma.masked_invalid(uf), np.ma.masked_invalid(vf),
+            color=streamline_color,
+            linewidth=float(linewidth),
+            density=float(density),
+            arrowsize=float(arrowsize),
+            arrowstyle=arrowstyle,
+            minlength=float(minlength),
+            maxlength=float(maxlength),
+            start_points=start_points,
+            zorder=2,
+        )
+        if streamline_alpha < 1.0:
+            strm.lines.set_alpha(float(streamline_alpha))
+            strm.arrows.set_alpha(float(streamline_alpha))
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.set_aspect("equal", adjustable="box")
+    ax.margins(0)
+
+    if axes:
+        xUnits = str(getattr(ds.get("x", None), "attrs", {}).get("units", "") or "")
+        yUnits = str(getattr(ds.get("y", None), "attrs", {}).get("units", "") or "")
+        ax.set_xlabel(f"x [{xUnits}]" if xUnits else "x")
+        ax.set_ylabel(f"y [{yUnits}]" if yUnits else "y")
+    else:
+        ax.set_axis_off()
+    if title is not None:
+        ax.set_title(title)
+
+    if colorbar:
+        label = cbar_label if cbar_label is not None else sc_name
+        if created and not axes:
+            cax = fig.add_axes([1.0 / (1 + 0.07) + 0.008, 0.08, 0.018, 0.84])
+            cb = fig.colorbar(mesh, cax=cax)
+            cb.set_label(label, fontsize=9)
+            cb.ax.tick_params(labelsize=8)
+            cb.outline.set_linewidth(0.4)
+        else:
+            _compact_colorbar(fig, ax, mesh, label=label)
+
+    ax._pivpy_mappable = mesh  # handy for shared colorbars / panels
+    return fig, ax
+
+
+def streamscal_panels(
+    datasets,
+    *,
+    ncols: int | None = None,
+    gap: float = 0.006,
+    figwidth: float = 12.0,
+    clim: str | tuple[float, float] | None = "shared",
+    labels: list[str] | None = None,
+    label_kwargs: dict | None = None,
+    colorbar: bool = False,
+    cbar_label: str | None = None,
+    scalar: str | np.ndarray = "vorticity",
+    percentile: float = 99.0,
+    center: float | None = None,
+    **kwargs,
+) -> tuple[Figure, list[Axes]]:
+    """Several :func:`streamscal` panels in one tightly packed figure.
+
+    Panels sit side by side (row-major grid when ``ncols`` is smaller than
+    the number of datasets), separated by a thin white gap, all sharing one
+    colour scale by default so they can be compared directly.
+
+    Parameters
+    ----------
+    datasets : Dataset or sequence of Dataset
+        One dataset per panel. A single time-resolved Dataset is split into
+        its frames.
+    ncols : int, optional
+        Panels per row (default: all in one row).
+    gap : float
+        White gap between panels as a fraction of ``figwidth``.
+    figwidth : float
+        Total figure width in inches; height follows the panel aspect ratio.
+    clim : "shared" | (vmin, vmax) | None
+        ``"shared"`` (default) computes one robust range over all panels.
+        ``None`` lets each panel autoscale on its own.
+    labels : list of str, optional
+        Short panel labels such as ``["(a)", "(b)"]``, drawn top-left.
+    colorbar : bool
+        Add one shared colorbar on the right.
+    **kwargs
+        Forwarded to :func:`streamscal` (``density``, ``cmap``, ``linewidth``...).
+
+    Returns
+    -------
+    fig, list of Axes
+    """
+    if isinstance(datasets, xr.Dataset):
+        if "t" in datasets.dims and datasets.sizes["t"] > 1:
+            datasets = [datasets.isel(t=i) for i in range(datasets.sizes["t"])]
+        else:
+            datasets = [datasets]
+    datasets = list(datasets)
+    n = len(datasets)
+    if n == 0:
+        raise ValueError("datasets is empty")
+    ncols = n if ncols is None else max(1, min(int(ncols), n))
+    nrows = int(np.ceil(n / ncols))
+
+    t_idx = kwargs.get("t_idx", 0)
+    # Shared colour limits ---------------------------------------------------
+    cmap = kwargs.get("cmap", "RdBu_r")
+    if isinstance(clim, str) and clim == "shared":
+        smooth = kwargs.get("smooth", 1.0)
+        upsample = kwargs.get("upsample", 4.0)
+        pooled, signed_all = [], True
+        for d in datasets:
+            dd = _frame(d, t_idx)
+            u = np.asarray(dd["u"].values, dtype=float)
+            u = u.reshape(u.shape[0], u.shape[1])
+            v = np.asarray(dd["v"].values, dtype=float)
+            v = v.reshape(u.shape)
+            sc, _, _, signed = _scalar_field(dd, scalar, u, v)
+            sc = _smooth_nan_aware(sc.reshape(u.shape), smooth)
+            xx = np.asarray(dd["x"].values, dtype=float)
+            yy = np.asarray(dd["y"].values, dtype=float)
+            xx, yy, sc = _ascending_grid(xx, yy, sc)
+            _, _, sc = _upsample_field(sc, xx, yy, upsample)
+            pooled.append(sc[np.isfinite(sc)].ravel())
+            signed_all = signed_all and signed
+        allv = np.concatenate(pooled) if pooled else np.array([0.0])
+        clim_use = _resolve_clim(allv, signed_all, None, percentile, center)
+    else:
+        clim_use = clim
+
+    # Geometry -----------------------------------------------------------------
+    aspects = []
+    for d in datasets:
+        dd = _frame(d, t_idx)
+        xx = np.asarray(dd["x"].values, dtype=float)
+        yy = np.asarray(dd["y"].values, dtype=float)
+        aspects.append(abs(xx[-1] - xx[0]) / max(abs(yy[-1] - yy[0]), 1e-30))
+    col_w = [max(aspects[c::ncols]) for c in range(ncols)]  # width in units of panel height
+    gap_in = gap * figwidth
+    cbar_in = 0.0
+    if colorbar:
+        cbar_in = 0.035 * figwidth
+    avail = figwidth - (ncols - 1) * gap_in - (cbar_in + 3 * gap_in if colorbar else 0.0)
+    h_in = avail / sum(col_w)  # height of each panel row, inches
+    figheight = nrows * h_in + (nrows - 1) * gap_in
+    fig = plt.figure(figsize=(figwidth, figheight), facecolor="white")
+
+    axs: list[Axes] = []
+    for i, d in enumerate(datasets):
+        r, c = divmod(i, ncols)
+        left = sum(col_w[:c]) * h_in + c * gap_in
+        bottom = (nrows - 1 - r) * (h_in + gap_in)
+        rect = [left / figwidth, bottom / figheight, col_w[c] * h_in / figwidth, h_in / figheight]
+        ax = fig.add_axes(rect)
+        streamscal(
+            d, ax=ax, scalar=scalar, clim=clim_use, percentile=percentile,
+            center=center, **{k: v for k, v in kwargs.items() if k not in ("clim",)},
+        )
+        axs.append(ax)
+        if labels is not None and i < len(labels):
+            lk = dict(fontsize=11, fontweight="bold", va="top", ha="left",
+                      bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
+            lk.update(label_kwargs or {})
+            ax.text(0.02, 0.98, labels[i], transform=ax.transAxes, zorder=5, **lk)
+
+    if colorbar:
+        left = (sum(col_w) * h_in + (ncols - 1) * gap_in + 2 * gap_in) / figwidth
+        cax = fig.add_axes([left, 0.1, cbar_in * 0.45 / figwidth, 0.8])
+        cb = fig.colorbar(axs[0]._pivpy_mappable, cax=cax)
+        cb.set_label(cbar_label if cbar_label is not None else str(scalar), fontsize=9)
+        cb.ax.tick_params(labelsize=8)
+        cb.outline.set_linewidth(0.4)
+
+    return fig, axs
+
+
+
 def showf(data: xr.Dataset, **kwargs) -> tuple[plt.Figure, plt.Axes]:
     """Display a vector or scalar field (PIVMAT-inspired dispatcher).
 

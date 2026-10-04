@@ -205,3 +205,45 @@ def test_histvec_disp():
     fig3, ax3 = d.piv.histvec_disp(smooth=0, opt='n')
     assert fig3 is not None
     assert ax3 is not None
+
+def test_streamscal_defaults_clean():
+    """bare streamscal(): picture only - no axes, no colorbar, black opaque streamlines"""
+    import numpy as np
+    from matplotlib.collections import LineCollection
+
+    fig, ax = graphics.streamscal(_d)
+    assert not ax.axison
+    assert len(fig.axes) == 1  # no colorbar
+    lc = [c for c in ax.collections if isinstance(c, LineCollection)]
+    assert lc, "streamlines not drawn"
+    assert np.allclose(lc[0].get_color()[0][:3], 0.0)
+    assert lc[0].get_alpha() in (None, 1.0)
+    # figure is sized to the data aspect, filling the canvas edge to edge
+    pos = ax.get_position()
+    assert (pos.x0, pos.y0, pos.width, pos.height) == (0.0, 0.0, 1.0, 1.0)
+
+    # accessor, other scalars, colorbar, explicit clim
+    fig2, ax2 = _d.piv.streamscal(scalar="speed", colorbar=True, clim=(0, 5), density=1)
+    assert len(fig2.axes) == 2
+    assert ax2._pivpy_mappable.get_clim() == (0.0, 5.0)
+
+
+def test_streamscal_handles_nan_and_flipped_axes():
+    import numpy as np
+
+    d = _d.copy(deep=True)
+    chc = np.ones_like(d["chc"].values)
+    chc[:3, :3] = 0
+    d["chc"] = (d["chc"].dims, chc)
+    d = d.isel(y=slice(None, None, -1))  # descending y
+    fig, ax = graphics.streamscal(d, scalar="u")
+    assert fig is not None
+
+
+def test_streamscal_panels_shared_clim_and_gap():
+    fig, axs = graphics.streamscal_panels([_d, _d], scalar="speed", labels=["(a)", "(b)"])
+    assert len(axs) == 2
+    assert axs[0]._pivpy_mappable.get_clim() == axs[1]._pivpy_mappable.get_clim()
+    p0, p1 = axs[0].get_position(), axs[1].get_position()
+    assert p1.x0 > p0.x1  # white gap between panels
+    assert abs(p1.x1 - 1.0) < 1e-9 and p0.x0 == 0.0  # packed edge to edge

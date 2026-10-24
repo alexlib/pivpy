@@ -5857,4 +5857,173 @@ def non_uniform_spectra(
 
     return tau, R, f, S
 
-
+
+
+
+# ---------------------------------------------------------------------------
+# Temporal helpers adapted from pyTurb (https://github.com/ajpetersen25/pyTurb,
+# pyTurb/flow/flowstats.py) by Alec Petersen. Credit for the original
+# algorithms belongs to the pyTurb authors; these versions operate on
+# xarray PIV datasets (dims ``y, x, t``) rather than bare arrays.
+# ---------------------------------------------------------------------------
+
+
+def _nextpow2(i: int) -> int:
+    """Smallest power of two greater than or equal to ``i`` (FFT padding)."""
+    n = 1
+    while n < i:
+        n *= 2
+    return n
+
+
+def _esd_of_series(
+    signal: np.ndarray,
+    fs: float,
+    windows: int,
+    overlap: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Welch-style energy spectral density of a 1-D series.
+
+    Adapted from pyTurb's ``esd1d`` (Alec Petersen). The signal is detrended,
+    split into ``windows`` overlapping Hann-windowed segments, and the squared
+    magnitudes of their zero-padded FFTs are averaged. The spectrum is scaled
+    so that its integral over frequency equals the variance of the detrended
+    signal. Frequencies below ``fs / window_size`` are removed.
+
+    Deviation from pyTurb: its cutoff (``f[f >= fmin]``) was computed but never
+    applied. The mask is applied here.
+    """
+    from scipy.integrate import trapezoid
+    from scipy.signal import detrend
+
+    if windows < 1:
+        raise ValueError("windows must be >= 1")
+    if not 0 <= overlap < 1:
+        raise ValueError("overlap must be in [0, 1)")
+
+    window_size = int(np.floor(len(signal) / (windows * (1 - overlap) + overlap)))
+    if window_size < 2:
+        raise ValueError("series is too short for the requested number of windows")
+
+    signal = detrend(signal)
+    W = np.hanning(window_size)
+    on = int(np.floor(overlap * window_size))
+    nfft = 2 * _nextpow2(2 * window_size - 1)
+
+    R_hat = np.zeros((nfft, windows))
+    for i in range(windows):
+        start = i * on
+        R_hat[:, i] = np.abs(np.fft.fft(signal[start:start + window_size] * W, nfft)) ** 2
+    R_hat = np.nanmean(R_hat, axis=1)
+
+    # one-sided spectrum; the n = 0 and n = N/2 bins are not doubled
+    E = 2 * R_hat[: nfft // 2 + 1]
+    f = fs / 2 * np.linspace(0, 1, nfft // 2 + 1)
+    E = E * np.var(signal) / trapezoid(E, f)
+
+    keep = f >= fs / window_size
+    return f[keep], E[keep]
+
+
+def probe_esd(
+    ds: xr.Dataset,
+    x0: float,
+    y0: float,
+    *,
+    variable: str = "u",
+    windows: int = 8,
+    overlap: float = 0.5,
+    fs: float | None = None,
+    method: str = "linear",
+) -> xr.Dataset:
+    """Energy spectral density of a velocity component at a probe point.
+
+    Samples ``variable`` at ``(x0, y0)`` over time (as in :func:`probef`) and
+    returns its one-sided energy spectral density. Adapted from pyTurb's
+    ``esd1d`` by Alec Petersen (https://github.com/ajpetersen25/pyTurb).
+
+    Parameters
+    ----------
+    ds:
+        PIV dataset with dims ``y, x, t``.
+    x0, y0:
+        Probe location in physical units (interpolated linearly by default).
+    variable:
+        Variable to analyse, typically ``"u"`` or ``"v"``.
+    windows:
+        Number of Hann-windowed segments averaged to form the estimate.
+    overlap:
+        Fractional overlap between segments, in ``[0, 1)``.
+    fs:
+        Sampling frequency. Defaults to ``1 / mean(diff(ds.t))``, so the
+        result is in cycles per frame when ``t`` holds frame numbers.
+    method:
+        Interpolation method passed to ``DataArray.interp``.
+
+    Returns
+    -------
+    xr.Dataset
+        Data variable ``esd`` with dimension ``f`` (frequency) and attributes
+        recording the probe location, variable, and sampling frequency.
+    """
+    if variable not in ds:
+        raise KeyError(f"variable {variable!r} not in dataset")
+
+    series = ds[variable].interp(x=x0, y=y0, method=method)
+    values = np.asarray(series.values, dtype=float)
+    if not np.all(np.isfinite(values)):
+        raise ValueError("probe time series contains non-finite values; fill or clean the field first")
+
+    if fs is None:
+        t = np.asarray(ds["t"].values, dtype=float)
+        if t.size < 2:
+            raise ValueError("need at least two time steps to infer the sampling frequency")
+        fs = 1.0 / float(np.mean(np.diff(t)))
+
+    f, esd = _esd_of_series(values, float(fs), windows, overlap)
+
+    out = xr.Dataset(
+        {"esd": (("f",), esd)},
+        coords={"f": ("f", f)},
+        attrs=dict(ds.attrs),
+    )
+    out["esd"].attrs.update(
+        long_name=f"energy spectral density of {variable}",
+        probe_x=float(x0),
+        probe_y=float(y0),
+        fs=float(fs),
+        windows=int(windows),
+        overlap=float(overlap),
+        source="adapted from pyTurb esd1d (Alec Petersen)",
+    )
+    out["f"].attrs.update(units="cycles per time unit")
+    return out
+
+
+def moving_average(
+    ds: xr.Dataset,
+    window: int = 3,
+    *,
+    dim: str = "t",
+) -> xr.Dataset:
+    """Moving average along a dimension, keeping only fully-covered windows.
+
+    Equivalent to a 'valid'-mode convolution: the output has
+    ``n - window + 1`` samples along ``dim``. Adapted from pyTurb's
+    ``moving_average`` by Alec Petersen (https://github.com/ajpetersen25/pyTurb).
+
+    Parameters
+    ----------
+    ds:
+        PIV dataset (or any xarray object with ``dim``).
+    window:
+        Number of samples averaged at each position (>= 1).
+    dim:
+        Dimension to average along; defaults to time ``"t"``.
+    """
+    if window < 1:
+        raise ValueError("window must be >= 1")
+    if dim not in ds.dims:
+        raise ValueError(f"dimension {dim!r} not in dataset")
+    smoothed = ds.rolling({dim: window}, center=False).mean()
+    return smoothed.isel({dim: slice(window - 1, None)}).assign_attrs(ds.attrs)

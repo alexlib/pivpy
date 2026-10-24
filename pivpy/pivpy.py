@@ -43,6 +43,8 @@ from pivpy.compute_funcs import (
     material_acceleration as cmaterial_acceleration,
     reynolds_decomposition as creynolds_decomposition,
     energy_spectrum as cenergy_spectrum,
+    probe_esd as cprobe_esd,
+    moving_average as cmoving_average,
     spatial_correlation as cspatial_correlation,
     integral_length_scale as cintegral_length_scale,
     taylor_microscale as ctaylor_microscale,
@@ -2745,6 +2747,35 @@ class PIVAccessor(object):
     ):
         """Computes 2D and radial wavenumber energy spectra."""
         return cenergy_spectrum(self._obj, window=window, detrend=detrend, radial=radial)
+
+    def probe_esd(
+        self,
+        x0: float,
+        y0: float,
+        *,
+        variable: str = "u",
+        windows: int = 8,
+        overlap: float = 0.5,
+        fs: Optional[float] = None,
+        method: str = "linear",
+    ) -> xr.Dataset:
+        """Energy spectral density of a velocity component at a probe point.
+
+        Adapted from pyTurb's ``esd1d`` by Alec Petersen
+        (https://github.com/ajpetersen25/pyTurb).
+        """
+        return cprobe_esd(
+            self._obj, x0, y0,
+            variable=variable, windows=windows, overlap=overlap, fs=fs, method=method,
+        )
+
+    def moving_average(self, window: int = 3, *, dim: str = "t") -> xr.Dataset:
+        """Moving average along ``dim`` (valid windows only).
+
+        Adapted from pyTurb's ``moving_average`` by Alec Petersen
+        (https://github.com/ajpetersen25/pyTurb).
+        """
+        return cmoving_average(self._obj, window=window, dim=dim)
 
     def spatial_correlation(
         self,

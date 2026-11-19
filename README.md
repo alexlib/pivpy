@@ -161,6 +161,12 @@ Check whether a newer version is available on PyPI:
 
 ## PIVMat-inspired methods
 
+> In addition to PIVMat, several analysis features (TKE budget, convergence
+> analysis, vortex identification, 2D FFT spectra, stress/TKE variants, anisotropy
+> invariants) were inspired by the feature set of **uPrime** (Jibu Tom Jose and
+> Omri Ram, Technion, GPL-3.0); see "Related work and inspiration" above. PIVPy's
+> implementations are original work and are not derived from uPrime's source code.
+
 PIVPy exposes many post-processing operations via the xarray accessor `Dataset.piv`.
 Several common PIVMat toolbox methods are available with similar names/behavior:
 

@@ -2741,3 +2741,19 @@ def tke_budget_disp(budget_ds, terms=None, figsize=(12, 8), cmap="viridis"):
         axes[j].axis("off")
     fig.tight_layout()
     return fig, axes[:n]
+import matplotlib.pyplot as plt
+import numpy as np
+
+def convergence_disp(conv_ds, quantities=None, figsize=(8, 5)):
+    if quantities is None:
+        quantities = [v for v in conv_ds.data_vars]
+    fig, ax = plt.subplots(figsize=figsize)
+    n = conv_ds["n"].values
+    for q in quantities:
+        ax.plot(n, conv_ds[q].values, marker="o", label=q)
+    ax.set_xlabel("N (frames)")
+    ax.set_ylabel("value")
+    ax.set_title("Convergence analysis")
+    ax.legend()
+    fig.tight_layout()
+    return fig, ax

@@ -26,6 +26,7 @@ nav:
   - Written tutorial: pivpy_tutorial.md
   - FAQ: pivpy_faq.md
   - TKE budget: tke_budget.md
+  - Convergence analysis: convergence_analysis.md
   - API Reference: api_reference.md
 
 plugins:

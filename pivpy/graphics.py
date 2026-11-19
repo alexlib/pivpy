@@ -2802,3 +2802,16 @@ def stress_std_disp(std_ds, figsize=(8, 4)):
         ax.set_title(name)
     fig.tight_layout()
     return fig, axes
+import matplotlib.pyplot as plt
+import numpy as np
+
+def anisotropy_disp(inv_ds, figsize=(6, 5)):
+    fig, ax = plt.subplots(figsize=figsize)
+    x = inv_ds["III"].values.ravel()
+    y = inv_ds["neg_II"].values.ravel()
+    ax.scatter(x, y, s=5, alpha=0.5)
+    ax.set_xlabel("III")
+    ax.set_ylabel("-II")
+    ax.set_title("Anisotropy invariants (Lumley)")
+    fig.tight_layout()
+    return fig, ax

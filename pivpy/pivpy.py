@@ -58,6 +58,9 @@ from pivpy.compute_funcs import (
     detect_vortices as cdetect_vortices,
     spatial_vortex_probability as cspatial_vortex_probability,
     fft_spectrum_2d as cfft_spectrum_2d,
+    reynolds_stress_std as creynolds_stress_std,
+    tke_std as ctke_std,
+    stress_line_profile as cstress_line_profile,
     calc_moments as ccalc_moments,
     calc_all_products as ccalc_all_products,
     two_point_correlation as ctwo_point_correlation,
@@ -2156,6 +2159,15 @@ class PIVAccessor(object):
 
     def fft_spectrum(self, component="u", window="hann", detrend=True, azimuthal=True):
         return cfft_spectrum_2d(self._obj, component=component, window=window, detrend=detrend, azimuthal=azimuthal)
+
+    def reynolds_stress_std(self, ddof: int = 1):
+        return creynolds_stress_std(self._obj, ddof=ddof)
+
+    def tke_std(self, mode: str = "2d", ddof: int = 1):
+        return ctke_std(self._obj, mode=mode, ddof=ddof)
+
+    def stress_line_profile(self, x0, y0, x1, y1, component: str = "uu"):
+        return cstress_line_profile(self._obj, x0=x0, y0=y0, x1=x1, y1=y1, component=component)
 
     def fluct(
         self,

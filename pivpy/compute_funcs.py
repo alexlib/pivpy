@@ -12467,3 +12467,65 @@ def fft_spectrum_2d(ds, component="u", window="hann", detrend=True, azimuthal=Tr
     out = xr.Dataset(data_vars=data_vars, coords=coords, attrs=ds.attrs.copy())
     out.attrs["component"] = component
     return out
+def reynolds_stress_std(ds, ddof=1):
+    # std of Reynolds stresses across time? Compute std of uu, vv, uv over t if present
+    if "t" not in ds.dims or ds.sizes.get("t",1)<2:
+        raise ValueError("reynolds_stress_std requires multi-frame data.")
+    U = ds["u"].to_numpy(); V = ds["v"].to_numpy()
+    if U.ndim==2: U=U[:,:,None]; V=V[:,:,None]
+    nt=U.shape[2]
+    Ubar=U.mean(axis=2); Vbar=V.mean(axis=2)
+    up=U-Ubar[:,:,None]; vp=V-Vbar[:,:,None]
+    uu = (up**2)
+    vv = (vp**2)
+    uv = (up*vp)
+    # std over time of these instantaneous stresses
+    uu_std = uu.std(axis=2, ddof=ddof)
+    vv_std = vv.std(axis=2, ddof=ddof)
+    uv_std = uv.std(axis=2, ddof=ddof)
+    k_inst = 0.5*(uu+vv)
+    tke_stdv = k_inst.std(axis=2, ddof=ddof)
+    out = xr.Dataset(coords={"y": ds["y"], "x": ds["x"]})
+    out["uu_std"] = (("y","x"), uu_std)
+    out["vv_std"] = (("y","x"), vv_std)
+    out["uv_std"] = (("y","x"), uv_std)
+    out["tke_std"] = (("y","x"), tke_stdv)
+    return out
+
+def tke_std(ds, mode="2d", ddof=1):
+    out = reynolds_stress_std(ds, ddof=ddof)
+    return out["tke_std"]
+
+def stress_line_profile(ds, x0, y0, x1, y1, component="uu"):
+    # compute Reynolds stress field for component then sample along line
+    import numpy as np
+    U = ds["u"].to_numpy(); V = ds["v"].to_numpy()
+    if U.ndim==2: U=U[:,:,None]; V=V[:,:,None]
+    Ubar=U.mean(axis=2); Vbar=V.mean(axis=2)
+    up=U-Ubar[:,:,None]; vp=V-Vbar[:,:,None]
+    if component=="uu":
+        field = (up**2).mean(axis=2)
+    elif component=="vv":
+        field = (vp**2).mean(axis=2)
+    elif component=="uv":
+        field = (up*vp).mean(axis=2)
+    else:
+        field = 0.5*((up**2).mean(axis=2)+(vp**2).mean(axis=2))
+    x = np.asarray(ds["x"].values, dtype=float)
+    y = np.asarray(ds["y"].values, dtype=float)
+    n = 50
+    xs = np.linspace(x0, x1, n)
+    ys = np.linspace(y0, y1, n)
+    # nearest neighbor sampling
+    vals = []
+    for (xx,yy) in zip(xs,ys):
+        ix = int(np.argmin(np.abs(x-xx)))
+        iy = int(np.argmin(np.abs(y-yy)))
+        vals.append(field[iy, ix])
+    dist = np.sqrt((xs-xs[0])**2+(ys-ys[0])**2)
+    out = xr.Dataset(coords={"s": dist})
+    out["value"] = (("s",), np.asarray(vals))
+    out["x"] = (("s",), xs)
+    out["y"] = (("s",), ys)
+    out.attrs["component"] = component
+    return out

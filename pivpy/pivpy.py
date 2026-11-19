@@ -54,6 +54,7 @@ from pivpy.compute_funcs import (
     reynolds_stresses as creynolds_stresses,
     tke_turb as ctke_turb,
     tke_budget as ctke_budget,
+    convergence_analysis as cconvergence_analysis,
     calc_moments as ccalc_moments,
     calc_all_products as ccalc_all_products,
     two_point_correlation as ctwo_point_correlation,
@@ -2126,6 +2127,23 @@ class PIVAccessor(object):
         turbulent_transport, viscous_diffusion, residual.
         """
         return ctke_budget(self._obj, nu=nu, rho=rho, method=method)
+
+    def convergence(
+        self,
+        quantities=None,
+        kernel: str = "cumulative",
+        window=None,
+        threshold: float = 0.05,
+        point=None,
+    ):
+        return cconvergence_analysis(
+            self._obj,
+            quantities=quantities,
+            kernel=kernel,
+            window=window,
+            threshold=threshold,
+            point=point,
+        )
 
     def fluct(
         self,

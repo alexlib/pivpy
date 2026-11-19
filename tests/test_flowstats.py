@@ -3,14 +3,15 @@
 Original algorithms: pyTurb's flowstats.py by Alec Petersen
 (https://github.com/ajpetersen25/pyTurb).
 """
+
 import numpy as np
 import pytest
 import xarray as xr
 from scipy.integrate import trapezoid
 
-from pivpy.schema import build_dataset
 import pivpy.pivpy  # noqa: F401  (registers the .piv accessor)
 from pivpy.compute_funcs import moving_average, probe_esd
+from pivpy.schema import build_dataset
 
 
 def _tone_dataset(n_t=4096, fs=100.0, f0=10.0, noise=0.01, seed=0):
@@ -28,7 +29,13 @@ def _tone_dataset(n_t=4096, fs=100.0, f0=10.0, noise=0.01, seed=0):
 def _noise_dataset(n_t=2048, seed=1):
     rng = np.random.default_rng(seed)
     u = rng.standard_normal((4, 4, n_t))
-    return build_dataset(np.arange(4.0), np.arange(4.0), u, np.zeros_like(u), t=np.arange(n_t, dtype=float))
+    return build_dataset(
+        np.arange(4.0),
+        np.arange(4.0),
+        u,
+        np.zeros_like(u),
+        t=np.arange(n_t, dtype=float),
+    )
 
 
 def test_probe_esd_peak_at_tone_frequency():

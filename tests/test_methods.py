@@ -1,12 +1,10 @@
-""" tests pivpy.pivpy methods """
-import pathlib
-import numpy as np
-import importlib.resources
-import xarray as xr
-import pytest
-from pivpy import io
-import pivpy.pivpy  # Register the piv accessor for xarray.Dataset
+"""tests pivpy.pivpy methods"""
 
+import numpy as np
+import pytest
+import xarray as xr
+
+from pivpy import io
 
 FILE1 = "Run000001.T000.D000.P000.H001.L.vec"
 FILE2 = "Run000002.T000.D000.P000.H001.L.vec"
@@ -19,12 +17,12 @@ except ImportError:
 
 # For Python 3.9+
 try:
-    path = files('pivpy') / 'data'
+    path = files("pivpy") / "data"
 except NameError:
     # For Python 3.7 and 3.8
-    with resource_path('pivpy', 'data') as data_path:
+    with resource_path("pivpy", "data") as data_path:
         path = data_path
-        
+
 path = path / "Insight"
 
 
@@ -76,12 +74,12 @@ def test_vec2scal_custom_name():
     data = data.piv.vec2scal(flow_property="vorticity", name="vort")
     assert "vort" in data
     assert data["vort"].attrs["standard_name"] == "vorticity"
-    
+
     # Add another scalar with different name
     data = data.piv.vec2scal(flow_property="strain", name="strain_field")
     assert "strain_field" in data
     assert data["strain_field"].attrs["standard_name"] == "strain"
-    
+
     # Both should exist
     assert "vort" in data
     assert "strain_field" in data
@@ -183,14 +181,14 @@ def test_multiple_scalars_in_dataset():
     data = data.piv.kinetic_energy(name="ke")
     data = data.piv.tke(name="tke")
     data = data.piv.reynolds_stress(name="rey_stress")
-    
+
     # Check all are present
     assert "vort" in data
     assert "strain" in data
     assert "ke" in data
     assert "tke" in data
     assert "rey_stress" in data
-    
+
     # Check attributes are correct
     assert data["vort"].attrs["standard_name"] == "vorticity"
     assert data["strain"].attrs["standard_name"] == "strain"
@@ -205,7 +203,7 @@ def test_strain():
     data = data.piv.strain()
     assert np.allclose(data["w"].values, 0.11328125, 1e-6)
     # also after scaling
-    data.piv.set_scale(1/16) # 16 pixels is the grid
+    data.piv.set_scale(1 / 16)  # 16 pixels is the grid
     data = data.piv.strain()
     assert np.allclose(data["w"].values, 0.11328125, 1e-6)
 
@@ -216,18 +214,20 @@ def test_tke():
     data = data.piv.tke()  # now defined
     assert data["w"].attrs["standard_name"] == "TKE"
 
+
 def test_Γ1():
     """tests Γ1"""
     data = io.create_sample_Dataset(n_frames=4, rows=3, cols=2)
-    data = data.piv.Γ1(n=1)  
+    data = data.piv.Γ1(n=1)
     assert data["Γ1"].to_numpy().shape == (3, 2, 4)
     assert data["Γ1"].attrs["standard_name"] == "Gamma 1"
     assert data["Γ1"].attrs["units"] == "dimensionless"
 
+
 def test_Γ2():
     """tests Γ2"""
     data = io.create_sample_Dataset(n_frames=2, rows=3, cols=4)
-    data = data.piv.Γ2(n=1)  
+    data = data.piv.Γ2(n=1)
     assert data["Γ2"].to_numpy().shape == (3, 4, 2)
     assert data["Γ2"].attrs["standard_name"] == "Gamma 2"
     assert data["Γ2"].attrs["units"] == "dimensionless"
@@ -251,6 +251,7 @@ def test_gamma_no_empty_slice_warning():
     assert np.all(np.isfinite(out["Γ1"].to_numpy()))
     assert np.all(np.isfinite(out["Γ2"].to_numpy()))
 
+
 def test_curl():
     """tests curl that is also vorticity"""
     _c = _a.copy()
@@ -258,22 +259,23 @@ def test_curl():
 
     assert _c["w"].attrs["standard_name"] == "vorticity"
 
+
 def test_fill_nans():
-    """" tests fill_nans function """
-    ds = io.create_sample_Dataset(n_frames=1,rows=7,cols=11,noise_sigma=0.5)
-    ds["u"][1:4,1:4] = np.nan
+    """ " tests fill_nans function"""
+    ds = io.create_sample_Dataset(n_frames=1, rows=7, cols=11, noise_sigma=0.5)
+    ds["u"][1:4, 1:4] = np.nan
     # ds.sel(t=0)["u"].plot()
-    new = ds.copy(deep=True) # prepare memory for the result
-    new.piv.fill_nans() # fill nans
-    assert ds.dropna(dim='x')["v"].shape == (7, 8, 1)
-    assert new.dropna(dim='x')["v"].shape == (7, 11, 1)
+    new = ds.copy(deep=True)  # prepare memory for the result
+    new.piv.fill_nans()  # fill nans
+    assert ds.dropna(dim="x")["v"].shape == (7, 8, 1)
+    assert new.dropna(dim="x")["v"].shape == (7, 11, 1)
+
 
 def test_filterf():
-    """ tests filterf
-    """
-    dataset = io.create_sample_Dataset(n_frames=3,rows=5,cols=10)
-    dataset = dataset.piv.filterf() # no inputs
-    dataset = dataset.piv.filterf([.5, .5, 0.]) # with sigma
+    """tests filterf"""
+    dataset = io.create_sample_Dataset(n_frames=3, rows=5, cols=10)
+    dataset = dataset.piv.filterf()  # no inputs
+    dataset = dataset.piv.filterf([0.5, 0.5, 0.0])  # with sigma
     # ds["mag"] = np.hypot(ds["u"], ds["v"])
     # ds.plot.quiver(x='x',y='y',u='u',v='v',hue='mag',col='t',scale=150,cmap='RdBu')
 
@@ -294,7 +296,12 @@ def test_addnoisef_additive_reproducible():
     ds2 = ds2.piv.addnoisef(eps=0.1, opt="add", nc=0.0, seed=123)
     assert np.allclose(ds1["u"].values, ds2["u"].values)
     assert np.allclose(ds1["v"].values, ds2["v"].values)
-    assert not np.allclose(ds1["u"].values, io.create_sample_Dataset(n_frames=2, rows=5, cols=6, noise_sigma=0.0)["u"].values)
+    assert not np.allclose(
+        ds1["u"].values,
+        io.create_sample_Dataset(n_frames=2, rows=5, cols=6, noise_sigma=0.0)[
+            "u"
+        ].values,
+    )
 
 
 def test_addnoisef_multiplicative_runs():
@@ -393,8 +400,12 @@ def test_phaseaverf_integer_period_groups_frames():
     out = ds.piv.phaseaverf(2)
     assert out["u"].shape == (2, 2, 2)
     # Phase 0 averages t=0,2,4 => mean offset is 2
-    base_u = io.create_sample_Dataset(n_frames=1, rows=2, cols=2, noise_sigma=0.0)["u"].values[:, :, 0]
-    base_v = io.create_sample_Dataset(n_frames=1, rows=2, cols=2, noise_sigma=0.0)["v"].values[:, :, 0]
+    base_u = io.create_sample_Dataset(n_frames=1, rows=2, cols=2, noise_sigma=0.0)[
+        "u"
+    ].values[:, :, 0]
+    base_v = io.create_sample_Dataset(n_frames=1, rows=2, cols=2, noise_sigma=0.0)[
+        "v"
+    ].values[:, :, 0]
     assert np.allclose(out["u"].isel(t=0).values, base_u + 2.0)
     assert np.allclose(out["v"].isel(t=0).values, base_v + 4.0)
     # Phase 1 averages t=1,3,5 => mean offset is 3
@@ -507,7 +518,9 @@ def test_resamplef_linear_interpolation():
     X, Y = np.meshgrid(x, y)
     frames = []
     for ti in range(5):
-        frames.append(io.from_arrays(X, Y, np.full_like(X, float(ti)), np.zeros_like(X), frame=ti))
+        frames.append(
+            io.from_arrays(X, Y, np.full_like(X, float(ti)), np.zeros_like(X), frame=ti)
+        )
     ds = xr.concat(frames, dim="t")
 
     tini = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
@@ -535,13 +548,13 @@ def test_clip_no_by():
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
     # Sample data has u, v values around 1-5
     clipped = data.piv.clip(min=2.0, max=4.0)
-    
+
     # Check that values are clipped
     assert clipped["u"].min() >= 2.0
     assert clipped["u"].max() <= 4.0
     assert clipped["v"].min() >= 2.0
     assert clipped["v"].max() <= 4.0
-    
+
     # Check attributes are preserved by default
     assert clipped.attrs == data.attrs
 
@@ -549,13 +562,13 @@ def test_clip_no_by():
 def test_clip_by_u():
     """Tests clip by U component - masks locations where U is out of range."""
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
-    
+
     # Clip based on u component
-    clipped = data.piv.clip(min=2.0, max=4.0, by='u')
-    
+    clipped = data.piv.clip(min=2.0, max=4.0, by="u")
+
     # Check that locations where u was out of range are now NaN in all variables
     u_out_of_range = (data["u"] < 2.0) | (data["u"] > 4.0)
-    
+
     # Where u was out of range, both u and v should be NaN
     assert np.all(np.isnan(clipped["u"].values[u_out_of_range.values]))
     assert np.all(np.isnan(clipped["v"].values[u_out_of_range.values]))
@@ -564,13 +577,13 @@ def test_clip_by_u():
 def test_clip_by_v():
     """Tests clip by V component - masks locations where V is out of range."""
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
-    
+
     # Clip based on v component
-    clipped = data.piv.clip(min=2.0, max=4.0, by='v')
-    
+    clipped = data.piv.clip(min=2.0, max=4.0, by="v")
+
     # Check that locations where v was out of range are now NaN in all variables
     v_out_of_range = (data["v"] < 2.0) | (data["v"] > 4.0)
-    
+
     # Where v was out of range, both u and v should be NaN
     assert np.all(np.isnan(clipped["u"].values[v_out_of_range.values]))
     assert np.all(np.isnan(clipped["v"].values[v_out_of_range.values]))
@@ -579,16 +592,16 @@ def test_clip_by_v():
 def test_clip_by_magnitude():
     """Tests clip by velocity magnitude - masks locations where magnitude is out of range."""
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
-    
+
     # Compute magnitude for comparison
     magnitude = np.sqrt(data["u"] ** 2 + data["v"] ** 2)
-    
+
     # Clip based on magnitude
-    clipped = data.piv.clip(max=6.0, by='magnitude')
-    
+    clipped = data.piv.clip(max=6.0, by="magnitude")
+
     # Check that locations where magnitude was > 6.0 are now NaN
     mag_out_of_range = magnitude > 6.0
-    
+
     # Where magnitude was too large, both u and v should be NaN
     assert np.all(np.isnan(clipped["u"].values[mag_out_of_range.values]))
     assert np.all(np.isnan(clipped["v"].values[mag_out_of_range.values]))
@@ -597,16 +610,16 @@ def test_clip_by_magnitude():
 def test_clip_by_scalar_property():
     """Tests clip by a computed scalar property (vorticity)."""
     data = io.create_sample_Dataset(n_frames=2, rows=5, cols=5)
-    
+
     # Compute vorticity first
-    data = data.piv.vorticity(name='w')
-    
+    data = data.piv.vorticity(name="w")
+
     # Clip based on vorticity
-    clipped = data.piv.clip(min=-10, max=10, by='w')
-    
+    clipped = data.piv.clip(min=-10, max=10, by="w")
+
     # Check that locations where vorticity was out of range are now NaN
     w_out_of_range = (data["w"] < -10) | (data["w"] > 10)
-    
+
     # Where vorticity was out of range, all variables should be NaN
     assert np.all(np.isnan(clipped["u"].values[w_out_of_range.values]))
     assert np.all(np.isnan(clipped["v"].values[w_out_of_range.values]))
@@ -617,7 +630,7 @@ def test_clip_min_only():
     """Tests clip with only min parameter."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
     clipped = data.piv.clip(min=3.0)
-    
+
     # Check that values below min are clipped
     assert clipped["u"].min() >= 3.0
     assert clipped["v"].min() >= 3.0
@@ -627,7 +640,7 @@ def test_clip_max_only():
     """Tests clip with only max parameter."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
     clipped = data.piv.clip(max=3.0)
-    
+
     # Check that values above max are clipped
     assert clipped["u"].max() <= 3.0
     assert clipped["v"].max() <= 3.0
@@ -636,27 +649,29 @@ def test_clip_max_only():
 def test_clip_error_no_params():
     """Tests that clip raises error when neither min nor max is provided."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
-    
-    with pytest.raises(ValueError, match="At least one of 'min' or 'max' must be provided"):
+
+    with pytest.raises(
+        ValueError, match="At least one of 'min' or 'max' must be provided"
+    ):
         data.piv.clip()
 
 
 def test_clip_error_invalid_by():
     """Tests that clip raises error when 'by' variable doesn't exist."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
-    
+
     with pytest.raises(ValueError, match="Variable 'nonexistent' not found"):
-        data.piv.clip(min=0, by='nonexistent')
+        data.piv.clip(min=0, by="nonexistent")
 
 
 def test_clip_keep_attrs_false():
     """Tests clip with keep_attrs=False."""
     data = io.create_sample_Dataset(n_frames=1, rows=5, cols=5)
-    data.attrs['test_attr'] = 'test_value'
-    data['u'].attrs['u_attr'] = 'u_value'
-    
+    data.attrs["test_attr"] = "test_value"
+    data["u"].attrs["u_attr"] = "u_value"
+
     clipped = data.piv.clip(min=2.0, max=4.0, keep_attrs=False)
-    
+
     # Attributes should be removed
     assert len(clipped.attrs) == 0
-    assert len(clipped['u'].attrs) == 0
+    assert len(clipped["u"].attrs) == 0

@@ -1,4 +1,5 @@
 import pathlib
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -22,14 +23,7 @@ def _pivpy_data_path() -> pathlib.Path:
 
 def test_loadpivtxt_parses_header_and_grid(tmp_path: pathlib.Path):
     p = tmp_path / "export.txt"
-    p.write_text(
-        "# some header\n"
-        "Title: demo\n"
-        "0 0 1 2\n"
-        "1 0 3 4\n"
-        "0 1 5 6\n"
-        "1 1 7 8\n"
-    )
+    p.write_text("# some header\nTitle: demo\n0 0 1 2\n1 0 3 4\n0 1 5 6\n1 1 7 8\n")
 
     ds = io.loadpivtxt(p)
     assert isinstance(ds, xr.Dataset)
@@ -41,11 +35,7 @@ def test_loadpivtxt_parses_header_and_grid(tmp_path: pathlib.Path):
 
 def test_readsetfile_parses_values_and_lookup(tmp_path: pathlib.Path):
     p = tmp_path / "test.set"
-    p.write_text(
-        "delta_t = 0.01\n"
-        "FrameDt: 2\n"
-        "Name = \"Example\"\n"
-    )
+    p.write_text('delta_t = 0.01\nFrameDt: 2\nName = "Example"\n')
 
     attrs = io.readsetfile(p)
     assert attrs["delta_t"] == 0.01
@@ -96,7 +86,9 @@ def test_loadvec_bracket_expansion_and_glob(tmp_path: pathlib.Path):
     assert all("u" in d and "v" in d for d in out)
 
 
-def test_loadvec_numeric_index_selects_from_cwd(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+def test_loadvec_numeric_index_selects_from_cwd(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
     data_root = _pivpy_data_path()
     src = data_root / "openpiv_txt" / "exp1_001_b.txt"
     assert src.exists()
@@ -206,7 +198,11 @@ def test_openim_requires_lvpyio_when_missing():
     # If lvpyio is installed, these functions should attempt to read the file.
     # With a missing path, we expect an OS/file-related error (or another parsing
     # error), but NOT an ImportError.
-    for func, name in [(io.openim7, "dummy.im7"), (io.openimx, "dummy.imx"), (io.openimg, "dummy.img")]:
+    for func, name in [
+        (io.openim7, "dummy.im7"),
+        (io.openimx, "dummy.imx"),
+        (io.openimg, "dummy.img"),
+    ]:
         with pytest.raises(Exception) as excinfo:
             func(name)
         assert not isinstance(excinfo.value, ImportError)
@@ -368,7 +364,9 @@ def test_randvec_shapes_determinism_and_near_zero_divergence():
     kdot = kx2d * U + ky2d * V
 
     num = float(np.sqrt(np.mean(np.abs(kdot[mask]) ** 2)))
-    den = float(np.sqrt(np.mean((K[mask] * np.hypot(np.abs(U[mask]), np.abs(V[mask]))) ** 2)))
+    den = float(
+        np.sqrt(np.mean((K[mask] * np.hypot(np.abs(U[mask]), np.abs(V[mask]))) ** 2))
+    )
     assert num / (den + 1e-12) < 1e-10
 
 

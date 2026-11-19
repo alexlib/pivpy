@@ -16,9 +16,7 @@ Or programmatically:
 from __future__ import annotations
 
 import sys
-from typing import Any, Optional
-import matplotlib.pyplot as plt
-import numpy as np
+
 import xarray as xr
 
 try:
@@ -38,22 +36,22 @@ if HAS_MARIMO:
         import marimo as mo_inner
         import matplotlib.pyplot as plt_inner
         import numpy as np_inner
-        import pivpy.pivpy  # registers .piv
+
         from pivpy import io as io_inner
-        from pivpy.synthetic import vortex_pair as vp_inner
         from pivpy.compute_funcs import (
-            vorticity,
-            gamma1,
-            gamma2,
-            q_criterion,
-            okubo_weiss,
-            max_shear,
             acceleration,
             energy_spectrum,
-            reynolds_decomposition,
+            gamma1,
+            gamma2,
             integral_length_scale,
+            max_shear,
+            okubo_weiss,
+            q_criterion,
+            reynolds_decomposition,
             taylor_microscale,
+            vorticity,
         )
+        from pivpy.synthetic import vortex_pair as vp_inner
 
         return (
             mo_inner,
@@ -109,7 +107,14 @@ if HAS_MARIMO:
             label="Background Scalar Property",
         )
         cmap_dropdown = mo_inner.ui.dropdown(
-            options=["RdBu_r", "Spectral_r", "viridis", "coolwarm", "plasma", "inferno"],
+            options=[
+                "RdBu_r",
+                "Spectral_r",
+                "viridis",
+                "coolwarm",
+                "plasma",
+                "inferno",
+            ],
             value="RdBu_r",
             label="Colormap",
         )
@@ -132,12 +137,31 @@ if HAS_MARIMO:
         )
 
     @app.cell
-    def __(header, preset_dropdown, property_dropdown, cmap_dropdown, quiver_density_slider, quiver_scale_slider, frame_slider_ui, mo_inner):
-        controls = mo_inner.vstack([
-            header,
-            mo_inner.hstack([preset_dropdown, property_dropdown, cmap_dropdown], justify="start", gap=2),
-            mo_inner.hstack([frame_slider_ui, quiver_density_slider, quiver_scale_slider], justify="start", gap=2),
-        ])
+    def __(
+        header,
+        preset_dropdown,
+        property_dropdown,
+        cmap_dropdown,
+        quiver_density_slider,
+        quiver_scale_slider,
+        frame_slider_ui,
+        mo_inner,
+    ):
+        controls = mo_inner.vstack(
+            [
+                header,
+                mo_inner.hstack(
+                    [preset_dropdown, property_dropdown, cmap_dropdown],
+                    justify="start",
+                    gap=2,
+                ),
+                mo_inner.hstack(
+                    [frame_slider_ui, quiver_density_slider, quiver_scale_slider],
+                    justify="start",
+                    gap=2,
+                ),
+            ]
+        )
         return (controls,)
 
     @app.cell
@@ -218,13 +242,25 @@ if HAS_MARIMO:
         u = frame["u"].to_numpy()
         v = frame["v"].to_numpy()
 
-        fig, (ax1, ax2) = plt_inner.subplots(1, 2, figsize=(14, 5.5), dpi=120, gridspec_kw={"width_ratios": [1.4, 1.0]})
+        fig, (ax1, ax2) = plt_inner.subplots(
+            1, 2, figsize=(14, 5.5), dpi=120, gridspec_kw={"width_ratios": [1.4, 1.0]}
+        )
 
         # Main Quiver + Contour Plot
-        vmax = float(np_inner.nanpercentile(np_inner.abs(scalar), 98)) if np_inner.any(scalar) else 1.0
-        vmin = -vmax if prop in {"vorticity", "gamma1", "gamma2", "q_criterion", "okubo_weiss"} else 0.0
+        vmax = (
+            float(np_inner.nanpercentile(np_inner.abs(scalar), 98))
+            if np_inner.any(scalar)
+            else 1.0
+        )
+        vmin = (
+            -vmax
+            if prop in {"vorticity", "gamma1", "gamma2", "q_criterion", "okubo_weiss"}
+            else 0.0
+        )
 
-        cf = ax1.contourf(x, y, scalar, levels=50, cmap=cmap_dropdown.value, vmin=vmin, vmax=vmax)
+        cf = ax1.contourf(
+            x, y, scalar, levels=50, cmap=cmap_dropdown.value, vmin=vmin, vmax=vmax
+        )
         cb = fig.colorbar(cf, ax=ax1, shrink=0.85, pad=0.02)
         cb.set_label(label, fontsize=10)
 
@@ -242,7 +278,11 @@ if HAS_MARIMO:
             scale=scale_fac,
             width=0.0035,
         )
-        ax1.set_title(f"Field Overview at t = {t_idx} (Grid {len(x)}x{len(y)})", fontsize=12, pad=8)
+        ax1.set_title(
+            f"Field Overview at t = {t_idx} (Grid {len(x)}x{len(y)})",
+            fontsize=12,
+            pad=8,
+        )
         ax1.set_xlabel("x [mm]")
         ax1.set_ylabel("y [mm]")
 
@@ -250,13 +290,17 @@ if HAS_MARIMO:
         spec_ds = energy_spectrum(frame, radial=True)
         k = spec_ds["k"].to_numpy()
         E_rad = spec_ds["E_radial"].to_numpy()
-        ax2.loglog(k[1:], E_rad[1:], "o-", color="royalblue", lw=1.8, ms=4, label=r"$E(k)$")
-        
+        ax2.loglog(
+            k[1:], E_rad[1:], "o-", color="royalblue", lw=1.8, ms=4, label=r"$E(k)$"
+        )
+
         # Reference Kolmogorov -5/3 slope
         if len(k) > 4:
             k_ref = k[1 : len(k) // 2 + 1]
             E_ref = E_rad[1] * (k_ref / k_ref[0]) ** (-5.0 / 3.0)
-            ax2.loglog(k_ref, E_ref, "--", color="crimson", lw=1.5, label=r"$k^{-5/3}$ Slope")
+            ax2.loglog(
+                k_ref, E_ref, "--", color="crimson", lw=1.5, label=r"$k^{-5/3}$ Slope"
+            )
 
         ax2.set_title("Radial Energy Spectrum E(k)", fontsize=12, pad=8)
         ax2.set_xlabel(r"Wavenumber $k$ [rad/m]")
@@ -270,7 +314,11 @@ if HAS_MARIMO:
         L11 = integral_length_scale(frame, component="u", dim="x")
         lambda_T = taylor_microscale(frame, component="u", dim="x", method="curvature")
         u_mean_mag = float(np_inner.mean(np_inner.sqrt(u**2 + v**2)))
-        max_vort = float(np_inner.max(np_inner.abs(scalar))) if prop == "vorticity" else float(np_inner.max(np_inner.abs(vorticity(frame)["w"].to_numpy())))
+        max_vort = (
+            float(np_inner.max(np_inner.abs(scalar)))
+            if prop == "vorticity"
+            else float(np_inner.max(np_inner.abs(vorticity(frame)["w"].to_numpy())))
+        )
 
         stats_card = mo_inner.md(f"""
         ### 📊 Instant Diagnostics Summary
@@ -282,23 +330,24 @@ if HAS_MARIMO:
         | **Taylor Microscale $\\lambda_T$** | `{lambda_T:.3f}` | length units |
         """)
 
-        dashboard = mo_inner.vstack([
-            controls,
-            mo_inner.ui.matplotlib(fig),
-            stats_card,
-        ])
+        dashboard = mo_inner.vstack(
+            [
+                controls,
+                mo_inner.ui.matplotlib(fig),
+                stats_card,
+            ]
+        )
         return (dashboard,)
 
     @app.cell
     def __(dashboard):
         dashboard
-        return
 else:
     app = None
 
 
 def launch_app(
-    dataset: Optional[xr.Dataset] = None,
+    dataset: xr.Dataset | None = None,
     port: int = 8000,
     host: str = "127.0.0.1",
     open_browser: bool = True,
@@ -317,10 +366,23 @@ def launch_app(
         If True, opens the default web browser on launch.
     """
     if not HAS_MARIMO:
-        raise ImportError("Marimo is required to run the interactive explorer. Install via `pip install marimo`.")
+        raise ImportError(
+            "Marimo is required to run the interactive explorer. Install via `pip install marimo`."
+        )
 
     import subprocess
-    cmd = [sys.executable, "-m", "marimo", "run", __file__, "--port", str(port), "--host", host]
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "marimo",
+        "run",
+        __file__,
+        "--port",
+        str(port),
+        "--host",
+        host,
+    ]
     if not open_browser:
         cmd.append("--no-browser")
     subprocess.run(cmd)
@@ -330,4 +392,6 @@ if __name__ == "__main__":
     if HAS_MARIMO:
         app.run()
     else:
-        print("Marimo is required to run pivpy.app. Please install marimo via `pip install marimo`.")
+        print(
+            "Marimo is required to run pivpy.app. Please install marimo via `pip install marimo`."
+        )

@@ -1,18 +1,17 @@
 """Unit tests for Work Package 4: Advanced Turbulence Statistics & Energy Spectra."""
+
 import numpy as np
 import pytest
-import xarray as xr
 
-from pivpy.schema import build_dataset
-from pivpy.synthetic import multivortex, vortex
 import pivpy.pivpy  # noqa: F401
+from pivpy.synthetic import multivortex
 
 
 def test_reynolds_decomposition_multi_frame():
     """Verify Reynolds decomposition separates mean from fluctuations and computes Reynolds stresses."""
     # Generate 16 frames of synthetic turbulence
     ds = multivortex(n_frames=16, n=32, n_vortices=4, seed=42)
-    
+
     decomp = ds.piv.reynolds_decomposition()
     assert "u_mean" in decomp.data_vars
     assert "v_mean" in decomp.data_vars
@@ -81,7 +80,7 @@ def test_spatial_correlation_properties():
     corr_x = ds.piv.spatial_correlation(component="u", dim="x", normalize=True)
     assert "R" in corr_x.data_vars
     assert "r" in corr_x.coords
-    
+
     R_vals = corr_x["R"].values
     # R(0) = 1.0
     np.testing.assert_allclose(R_vals[0], 1.0, atol=1e-7)

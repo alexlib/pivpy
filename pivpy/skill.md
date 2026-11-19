@@ -105,18 +105,32 @@ frame_a = np.asarray(buffer.as_masked_array(0).data)
 frame_b = np.asarray(buffer.as_masked_array(1).data)
 
 u, v, s2n = pyprocess.extended_search_area_piv(
-    frame_a.astype(np.int32), frame_b.astype(np.int32),
-    window_size=64, overlap=32, search_area_size=96, dt=dt,
+    frame_a.astype(np.int32),
+    frame_b.astype(np.int32),
+    window_size=64,
+    overlap=32,
+    search_area_size=96,
+    dt=dt,
     sig2noise_method="peak2peak",
 )
-x, y = pyprocess.get_coordinates(image_size=frame_a.shape, search_area_size=96, overlap=32)
+x, y = pyprocess.get_coordinates(
+    image_size=frame_a.shape, search_area_size=96, overlap=32
+)
 invalid = validation.sig2noise_val(s2n, threshold=1.3)
-u, v = filters.replace_outliers(u, v, invalid, method="localmean", max_iter=10, kernel_size=3)
-x, y, u, v = scaling.uniform(x, y, u, v, scaling_factor=173.4)  # px/mm from calibration, not a guess
+u, v = filters.replace_outliers(
+    u, v, invalid, method="localmean", max_iter=10, kernel_size=3
+)
+x, y, u, v = scaling.uniform(
+    x, y, u, v, scaling_factor=173.4
+)  # px/mm from calibration, not a guess
 x, y, u, v = tools.transform_coordinates(x, y, u, v)
 
 ds = xr.Dataset(
-    data_vars={"u": (("y", "x"), u), "v": (("y", "x"), v), "chc": (("y", "x"), (~invalid).astype(float))},
+    data_vars={
+        "u": (("y", "x"), u),
+        "v": (("y", "x"), v),
+        "chc": (("y", "x"), (~invalid).astype(float)),
+    },
     coords={"x": x[0, :], "y": y[:, 0]},
 )
 ```
@@ -136,10 +150,10 @@ analysis reloads in under a second instead of re-running PIV.
 # Westerweel & Scarano (2005) Normalized Median Test + Harmonic Inpainting
 ds_clean = ds.piv.clean(
     method="normalized_median",
-    threshold=2.0,       # Residual threshold (typically 2.0)
-    epsilon=0.1,         # Velocity noise floor
-    inpaint_method=0,    # 0 = harmonic Laplacian, 1 = nearest, 2 = linear
-    radius=1,            # 3x3 stencil (radius=1) or 5x5 stencil (radius=2)
+    threshold=2.0,  # Residual threshold (typically 2.0)
+    epsilon=0.1,  # Velocity noise floor
+    inpaint_method=0,  # 0 = harmonic Laplacian, 1 = nearest, 2 = linear
+    radius=1,  # 3x3 stencil (radius=1) or 5x5 stencil (radius=2)
 )
 ```
 
@@ -239,12 +253,12 @@ fig, ax = plt.subplots(figsize=(7, 5), dpi=300)
 
 ds.piv.plot(
     flow_property="vorticity",  # Background scalar
-    cmap="RdBu_r",              # Diverging colormap
-    clim=(-15, 15),             # Symmetric color limits
+    cmap="RdBu_r",  # Diverging colormap
+    clim=(-15, 15),  # Symmetric color limits
     cbar=True,
     cbar_label=r"Vorticity $\omega_z$ [s$^{-1}$]",
-    quiver_scale=1.0,           # Optimized arrow scaling
-    quiver_density=2,           # Subsample grid for clear arrow visibility
+    quiver_scale=1.0,  # Optimized arrow scaling
+    quiver_density=2,  # Subsample grid for clear arrow visibility
     quiver_color="k",
     quiver_width=0.003,
     quiver_alpha=0.75,
@@ -268,12 +282,15 @@ them), use `background="image"` with `color_by=`:
 
 ```python
 fig, ax = ds.piv.plot(
-    background="image", image=frame_a,       # raw grayscale camera frame (2D array)
-    image_extent=None,                       # None -> uses ds's x/y range
-    image_cmap="gray", image_alpha=0.6,
-    color_by="v",                            # or "u", "mag"/"speed", any var name
-    cmap="viridis",                          # colormap for the arrows (color_by only)
-    streamlines=False, quiver_key=False,
+    background="image",
+    image=frame_a,  # raw grayscale camera frame (2D array)
+    image_extent=None,  # None -> uses ds's x/y range
+    image_cmap="gray",
+    image_alpha=0.6,
+    color_by="v",  # or "u", "mag"/"speed", any var name
+    cmap="viridis",  # colormap for the arrows (color_by only)
+    streamlines=False,
+    quiver_key=False,
 )
 ```
 
@@ -284,7 +301,11 @@ direction update per frame:
 
 ```python
 anim = ds.piv.animate(
-    background="image", image=frame_a, color_by="v", cmap="viridis", interval=100,
+    background="image",
+    image=frame_a,
+    color_by="v",
+    cmap="viridis",
+    interval=100,
 )
 anim.save("flow_overlay.gif", writer="pillow", fps=10)
 ```

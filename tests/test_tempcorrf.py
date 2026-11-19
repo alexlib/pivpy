@@ -1,8 +1,6 @@
 import numpy as np
 import xarray as xr
 
-import pivpy.pivpy  # registers accessor
-
 
 def test_tempcorrf_scalar_matches_hand_calc():
     # w(t) = [1,2,3,4]
@@ -18,7 +16,9 @@ def test_tempcorrf_scalar_matches_hand_calc():
     expected2 = (1.0 * 3.0 + 2.0 * 4.0) / 2.0
     expected3 = (1.0 * 4.0) / 1.0
 
-    np.testing.assert_allclose(out["f"].values, [expected0, expected1, expected2, expected3])
+    np.testing.assert_allclose(
+        out["f"].values, [expected0, expected1, expected2, expected3]
+    )
 
 
 def test_tempcorrf_normalize_sets_c0_to_1():
@@ -32,7 +32,9 @@ def test_tempcorrf_normalize_sets_c0_to_1():
 def test_tempcorrf_vector_defaults_sum_components():
     u = np.array([1.0, 0.0, 1.0, 0.0])
     v = np.array([0.0, 2.0, 0.0, 2.0])
-    ds = xr.Dataset({"u": ("t", u), "v": ("t", v)}, coords={"t": np.arange(u.size, dtype=float)})
+    ds = xr.Dataset(
+        {"u": ("t", u), "v": ("t", v)}, coords={"t": np.arange(u.size, dtype=float)}
+    )
 
     # Default excludes zeros, so only products where both are non-zero count.
     out_excl = ds.piv.tempcorrf(normalize=False)

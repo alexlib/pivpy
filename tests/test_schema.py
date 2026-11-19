@@ -6,9 +6,9 @@ import pytest
 from pivpy import io, schema
 
 try:
-    path = importlib.resources.files('pivpy') / 'data'
+    path = importlib.resources.files("pivpy") / "data"
 except NameError:  # pragma: no cover
-    with importlib.resources.path('pivpy', 'data') as data_path:
+    with importlib.resources.path("pivpy", "data") as data_path:
         path = data_path
 
 VEC_FILE = path / "Insight" / "Run000002.T000.D000.P000.H001.L.vec"
@@ -43,7 +43,12 @@ def test_vc7_reader_output_matches_schema():
 
 
 def test_openpiv_reader_folds_mask_into_chc():
-    mask_file = path / "openpiv_txt" / "Gamma1_Gamma2_tutorial_notebook" / "OpenPIVtxtFilePair0.txt"
+    mask_file = (
+        path
+        / "openpiv_txt"
+        / "Gamma1_Gamma2_tutorial_notebook"
+        / "OpenPIVtxtFilePair0.txt"
+    )
     ds = io.OpenPIVReader().read(mask_file)
     assert "mask" not in ds
     schema.validate(ds)

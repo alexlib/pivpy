@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 import xarray as xr
 
-import pivpy.pivpy  # registers accessor
 from pivpy.compute_funcs import _corrf_scales
 
 

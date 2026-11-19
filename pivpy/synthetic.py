@@ -16,24 +16,25 @@ Supported flow models:
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import Literal
+
 import numpy as np
 import xarray as xr
 
 from pivpy.schema import (
     DELTA_T,
     build_dataset,
-    set_default_attrs,
 )
 
 
 def vortex(
-    n: Union[int, Tuple[int, int]] = 128,
+    n: int | tuple[int, int] = 128,
     r0: float = 10.0,
     vorticity: float = 1.0,
     mode: Literal["burgers", "lamb", "rankine", "vatistas"] = "burgers",
     diver: float = 0.0,
-    center: Optional[Tuple[float, float]] = None,
+    center: tuple[float, float] | None = None,
     dx: float = 1.0,
     dy: float = 1.0,
     frame: int = 0,
@@ -125,12 +126,16 @@ def vortex(
         v[outside] = circ_factor * rx[outside]
 
     elif mode_lower == "vatistas":
-        factor = omega / ((1.0 + (radius / r0) ** (2.0 * n_vatistas)) ** (1.0 / n_vatistas))
+        factor = omega / (
+            (1.0 + (radius / r0) ** (2.0 * n_vatistas)) ** (1.0 / n_vatistas)
+        )
         u = -factor * ry
         v = factor * rx
 
     else:
-        raise ValueError(f"Unknown vortex mode '{mode}'. Choose from 'burgers', 'lamb', 'rankine', 'vatistas'.")
+        raise ValueError(
+            f"Unknown vortex mode '{mode}'. Choose from 'burgers', 'lamb', 'rankine', 'vatistas'."
+        )
 
     chc = np.ones_like(u, dtype=float)
 
@@ -154,13 +159,13 @@ def vortex(
 
 def multivortex(
     n_frames: int = 1,
-    n: Union[int, Tuple[int, int]] = 128,
+    n: int | tuple[int, int] = 128,
     n_vortices: int = 8,
     two_d: bool = True,
     asym: bool = False,
     dx: float = 1.0,
     dy: float = 1.0,
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> xr.Dataset:
     """Generate 2D synthetic turbulence fields composed of multiple random Burgers vortices.
 
@@ -210,11 +215,17 @@ def multivortex(
         xc = x_coords[0] + domain_w * (3.0 * rng.random(n_total_vortices) - 1.0)
         yc = y_coords[0] + domain_h * (3.0 * rng.random(n_total_vortices) - 1.0)
 
-        omega = rng.choice([-1.0, 1.0], size=n_total_vortices) * (2.0 + rng.standard_normal(n_total_vortices))
+        omega = rng.choice([-1.0, 1.0], size=n_total_vortices) * (
+            2.0 + rng.standard_normal(n_total_vortices)
+        )
         if asym:
             omega = np.abs(omega)
 
-        div = np.zeros(n_total_vortices, dtype=float) if two_d else 0.5 * rng.standard_normal(n_total_vortices)
+        div = (
+            np.zeros(n_total_vortices, dtype=float)
+            if two_d
+            else 0.5 * rng.standard_normal(n_total_vortices)
+        )
         core = 0.015 * (4.0 + rng.standard_normal(n_total_vortices)) * diag
         core = np.maximum(core, 2.0 * min(dx, dy))
 
@@ -251,8 +262,8 @@ def multivortex(
 
 def vortex_pair(
     n_frames: int = 30,
-    n: Union[int, Tuple[int, int]] = 128,
-    r0: Optional[float] = None,
+    n: int | tuple[int, int] = 128,
+    r0: float | None = None,
     dx: float = 1.0,
     dy: float = 1.0,
 ) -> xr.Dataset:
@@ -340,15 +351,15 @@ def vortex_pair(
 
 
 def freestream_vortex_pair(
-    n: Union[int, Tuple[int, int]] = 80,
+    n: int | tuple[int, int] = 80,
     u_inf: float = 1.0,
-    vortex_positions: Optional[Sequence[Tuple[float, float]]] = None,
-    vortex_strengths: Optional[Sequence[float]] = None,
-    r0: Optional[float] = None,
+    vortex_positions: Sequence[tuple[float, float]] | None = None,
+    vortex_strengths: Sequence[float] | None = None,
+    r0: float | None = None,
     noise_std: float = 0.0,
     dx: float = 1.0,
     dy: float = 1.0,
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> xr.Dataset:
     """Generate a uniform freestream with one or more superimposed regularized
     point vortices - a wake-like pattern (e.g. a counter-rotating vortex pair
@@ -425,7 +436,9 @@ def freestream_vortex_pair(
         # u_inf instead of overwhelming it near the cores.
         vortex_strengths = [2.4, -1.8]
     if len(vortex_positions) != len(vortex_strengths):
-        raise ValueError("vortex_positions and vortex_strengths must have the same length")
+        raise ValueError(
+            "vortex_positions and vortex_strengths must have the same length"
+        )
 
     u_frame = np.full((rows, cols), float(u_inf), dtype=float)
     v_frame = np.zeros((rows, cols), dtype=float)
@@ -460,14 +473,14 @@ def freestream_vortex_pair(
 
 
 def randvec(
-    n: Union[int, Tuple[int, int]] = 128,
+    n: int | tuple[int, int] = 128,
     n_frames: int = 1,
     slope: float = 5.0 / 3.0,
     nc: float = 3.0,
-    nl: Optional[float] = None,
+    nl: float | None = None,
     dx: float = 1.0,
     dy: float = 1.0,
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> xr.Dataset:
     """Generate divergence-free 2D random velocity fields with prescribed power spectrum.
 
@@ -514,7 +527,12 @@ def randvec(
     k_c = 2.0 * np.pi / (nc * max(dx, dy))
     k_l = 2.0 * np.pi / (nl * min(dx, dy))
 
-    spec = np.exp(-((k_mag / k_c) ** 2)) * (k_mag**2) / np.sqrt(1.0 + (k_mag / k_l) ** (2.0 * slope + 4.0)) / safe_k
+    spec = (
+        np.exp(-((k_mag / k_c) ** 2))
+        * (k_mag**2)
+        / np.sqrt(1.0 + (k_mag / k_l) ** (2.0 * slope + 4.0))
+        / safe_k
+    )
     spec[k_mag == 0.0] = 0.0
     amp = np.sqrt(spec)
 
@@ -650,8 +668,19 @@ def shear_layer(
     v = np.zeros_like(u, dtype=float)
 
     if perturbation > 0.0:
-        pert_v = perturbation * u0 * np.sin(k_pert * x2d) * np.exp(-(((y2d - y_c) / (2.0 * delta)) ** 2))
-        pert_u = -perturbation * u0 * np.cos(k_pert * x2d) * ((y2d - y_c) / delta) * np.exp(-(((y2d - y_c) / (2.0 * delta)) ** 2))
+        pert_v = (
+            perturbation
+            * u0
+            * np.sin(k_pert * x2d)
+            * np.exp(-(((y2d - y_c) / (2.0 * delta)) ** 2))
+        )
+        pert_u = (
+            -perturbation
+            * u0
+            * np.cos(k_pert * x2d)
+            * ((y2d - y_c) / delta)
+            * np.exp(-(((y2d - y_c) / (2.0 * delta)) ** 2))
+        )
         u += pert_u
         v += pert_v
 

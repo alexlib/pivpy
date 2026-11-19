@@ -13,9 +13,9 @@ Important behavioral expectations (tests rely on these):
 
 from __future__ import annotations
 
-import warnings
-import pathlib
 import glob
+import pathlib
+import warnings
 from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
@@ -26,7 +26,7 @@ from scipy.ndimage import gaussian_filter
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from matplotlib.quiver import Quiver
+
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
@@ -183,13 +183,21 @@ def plot(
     tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
         Figure and axes objects containing the plot.
     """
-    data_slice = data.isel(t=t_idx) if ("t" in data.dims and data.sizes.get("t", 1) > 1) else (data.isel(t=0) if "t" in data.dims else data)
+    data_slice = (
+        data.isel(t=t_idx)
+        if ("t" in data.dims and data.sizes.get("t", 1) > 1)
+        else (data.isel(t=0) if "t" in data.dims else data)
+    )
 
     x_arr = np.asarray(data_slice["x"].values, dtype=float)
     y_arr = np.asarray(data_slice["y"].values, dtype=float)
     X, Y = np.meshgrid(x_arr, y_arr)
-    xUnits = str(getattr(data_slice.get("x", None), "attrs", {}).get("units", "mm") or "mm")
-    yUnits = str(getattr(data_slice.get("y", None), "attrs", {}).get("units", "mm") or "mm")
+    xUnits = str(
+        getattr(data_slice.get("x", None), "attrs", {}).get("units", "mm") or "mm"
+    )
+    yUnits = str(
+        getattr(data_slice.get("y", None), "attrs", {}).get("units", "mm") or "mm"
+    )
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(8.5, 6.8))
@@ -211,18 +219,37 @@ def plot(
         # scalar colorbar is actually drawn for it - lets the quiver colorbar
         # skip itself if color_by requests the same quantity (see Quiver Layer).
         # Background Layer
-        if background is not None and background is not False and str(background).lower() not in ("off", "none", ""):
-            bg_str = str(background).lower() if isinstance(background, str) else "vorticity"
+        if (
+            background is not None
+            and background is not False
+            and str(background).lower() not in ("off", "none", "")
+        ):
+            bg_str = (
+                str(background).lower() if isinstance(background, str) else "vorticity"
+            )
             bg_val = None
             default_cmap = "RdBu_r"
             default_cbar_label = ""
             symmetric_clim = True
 
             if bg_str == "image" and image is not None:
-                extent = image_extent if image_extent is not None else (
-                    float(x_arr.min()), float(x_arr.max()), float(y_arr.min()), float(y_arr.max())
+                extent = (
+                    image_extent
+                    if image_extent is not None
+                    else (
+                        float(x_arr.min()),
+                        float(x_arr.max()),
+                        float(y_arr.min()),
+                        float(y_arr.max()),
+                    )
                 )
-                ax.imshow(image, cmap=image_cmap, extent=extent, origin="upper", alpha=float(image_alpha))
+                ax.imshow(
+                    image,
+                    cmap=image_cmap,
+                    extent=extent,
+                    origin="upper",
+                    alpha=float(image_alpha),
+                )
                 bg_drawn = True
 
             elif bg_str in ("vorticity", "vort", "curl", "w"):
@@ -231,7 +258,6 @@ def plot(
                 elif "vorticity" in data_slice:
                     bg_val = np.asarray(data_slice["vorticity"].values, dtype=float)
                 else:
-                    import pivpy.pivpy
                     ds_temp = data_slice.piv.vorticity(name="__bg_w")
                     bg_val = np.asarray(ds_temp["__bg_w"].values, dtype=float)
                 default_cmap = "RdBu_r"
@@ -241,7 +267,9 @@ def plot(
             elif bg_str in ("mag", "magnitude", "speed"):
                 bg_val = np.sqrt(u_arr**2 + v_arr**2)
                 default_cmap = "viridis"
-                default_cbar_label = r"Velocity Magnitude $||\mathbf{u}||\; [\mathrm{m/s}]$"
+                default_cbar_label = (
+                    r"Velocity Magnitude $||\mathbf{u}||\; [\mathrm{m/s}]$"
+                )
                 symmetric_clim = False
 
             elif bg_str in ("ke", "ken", "kinetic_energy"):
@@ -251,11 +279,12 @@ def plot(
                 symmetric_clim = False
 
             elif bg_str in ("divergence", "div"):
-                import pivpy.pivpy
                 ds_temp = data_slice.piv.divergence(name="__bg_div")
                 bg_val = np.asarray(ds_temp["__bg_div"].values, dtype=float)
                 default_cmap = "RdBu_r"
-                default_cbar_label = r"Divergence $\nabla \cdot \mathbf{u}\; [\mathrm{s}^{-1}]$"
+                default_cbar_label = (
+                    r"Divergence $\nabla \cdot \mathbf{u}\; [\mathrm{s}^{-1}]$"
+                )
                 symmetric_clim = True
 
             elif str(background) in data_slice:
@@ -268,7 +297,9 @@ def plot(
                 # Apply Gaussian filter smoothing if requested
                 if blur and float(blur) > 0.0:
                     if np.any(np.isnan(bg_val)):
-                        bg_val_clean = np.nan_to_num(bg_val, nan=float(np.nanmedian(bg_val)))
+                        bg_val_clean = np.nan_to_num(
+                            bg_val, nan=float(np.nanmedian(bg_val))
+                        )
                         bg_val = gaussian_filter(bg_val_clean, sigma=float(blur))
                     else:
                         bg_val = gaussian_filter(bg_val, sigma=float(blur))
@@ -278,26 +309,49 @@ def plot(
                     vmin, vmax = float(clim[0]), float(clim[1])
                 elif symmetric_clim:
                     finite_vals = bg_val[np.isfinite(bg_val)]
-                    val_max = float(np.nanpercentile(np.abs(finite_vals), 99)) if finite_vals.size else 1.0
+                    val_max = (
+                        float(np.nanpercentile(np.abs(finite_vals), 99))
+                        if finite_vals.size
+                        else 1.0
+                    )
                     val_max = max(val_max, 1e-9)
                     vmin, vmax = -val_max, val_max
                 else:
                     finite_vals = bg_val[np.isfinite(bg_val)]
                     vmin = float(np.nanmin(finite_vals)) if finite_vals.size else 0.0
-                    vmax = float(np.nanpercentile(finite_vals, 99)) if finite_vals.size else 1.0
+                    vmax = (
+                        float(np.nanpercentile(finite_vals, 99))
+                        if finite_vals.size
+                        else 1.0
+                    )
                     if vmin == vmax:
                         vmax = vmin + 1.0
 
-                cf = ax.contourf(X, Y, bg_val, levels=int(levels), cmap=use_cmap, vmin=vmin, vmax=vmax, extend="both")
+                cf = ax.contourf(
+                    X,
+                    Y,
+                    bg_val,
+                    levels=int(levels),
+                    cmap=use_cmap,
+                    vmin=vmin,
+                    vmax=vmax,
+                    extend="both",
+                )
                 if colorbar:
-                    cbar_lbl = cbar_label if cbar_label is not None else default_cbar_label
+                    cbar_lbl = (
+                        cbar_label if cbar_label is not None else default_cbar_label
+                    )
                     _compact_colorbar(fig, ax, cf, label=cbar_lbl or None)
                     bg_scalar_key = bg_str
                 bg_drawn = True
 
         # Streamlines Layer
         if streamlines:
-            strm_color = streamline_color if streamline_color is not None else ("white" if bg_drawn else "#333333")
+            strm_color = (
+                streamline_color
+                if streamline_color is not None
+                else ("white" if bg_drawn else "#333333")
+            )
             try:
                 x_s = x_arr.copy()
                 y_s = y_arr.copy()
@@ -362,15 +416,23 @@ def plot(
                 if cb_str in ("mag", "magnitude", "speed"):
                     color_arr = speed_arr
                 elif str(color_by) in data_slice:
-                    color_arr = np.asarray(data_slice[str(color_by)].values, dtype=float)
+                    color_arr = np.asarray(
+                        data_slice[str(color_by)].values, dtype=float
+                    )
                     if "chc" in data_slice:
                         color_arr = np.where(invalid, np.nan, color_arr)
                 else:
-                    warnings.warn(f"color_by={color_by!r} not found in dataset; using arrow_color instead")
+                    warnings.warn(
+                        f"color_by={color_by!r} not found in dataset; using arrow_color instead"
+                    )
 
-            quiver_extra = {"color": arrow_color} if color_arr is None else {
-                "cmap": cmap if cmap is not None else "viridis",
-            }
+            quiver_extra = (
+                {"color": arrow_color}
+                if color_arr is None
+                else {
+                    "cmap": cmap if cmap is not None else "viridis",
+                }
+            )
             Q = ax.quiver(
                 X[::step_y, ::step_x],
                 Y[::step_y, ::step_x],
@@ -401,15 +463,26 @@ def plot(
                 and str(color_by).lower() == bg_scalar_key
             )
             if color_arr is not None and colorbar and not _redundant_cbar:
-                _compact_colorbar(fig, ax, Q, label=cbar_label if cbar_label is not None else str(color_by))
+                _compact_colorbar(
+                    fig,
+                    ax,
+                    Q,
+                    label=cbar_label if cbar_label is not None else str(color_by),
+                )
 
             if quiver_key:
-                key_val = round(med_speed, 1) if med_speed >= 1.0 else round(med_speed, 2)
+                key_val = (
+                    round(med_speed, 1) if med_speed >= 1.0 else round(med_speed, 2)
+                )
                 if key_val == 0.0:
                     key_val = 1.0
                 if isinstance(quiver_key, (int, float)):
                     key_val = float(quiver_key)
-                key_label = f"${key_val}\\,\\mathrm{{m/s}}$" if quiver_key is True else str(quiver_key)
+                key_label = (
+                    f"${key_val}\\,\\mathrm{{m/s}}$"
+                    if quiver_key is True
+                    else str(quiver_key)
+                )
                 ax.quiverkey(
                     Q,
                     X=0.82,
@@ -423,25 +496,52 @@ def plot(
 
     else:
         # Scalar Dataset
-        scalar_name = str(background) if (background and str(background) in data_slice) else ("w" if "w" in data_slice else list(data_slice.data_vars.keys())[0])
+        scalar_name = (
+            str(background)
+            if (background and str(background) in data_slice)
+            else ("w" if "w" in data_slice else list(data_slice.data_vars.keys())[0])
+        )
         sc_val = np.asarray(data_slice[scalar_name].values, dtype=float)
         if blur and float(blur) > 0.0:
             sc_val = gaussian_filter(sc_val, sigma=float(blur))
-        use_cmap = cmap if cmap is not None else ("RdBu_r" if scalar_name in ("w", "vorticity", "curl", "div", "divergence") else "viridis")
+        use_cmap = (
+            cmap
+            if cmap is not None
+            else (
+                "RdBu_r"
+                if scalar_name in ("w", "vorticity", "curl", "div", "divergence")
+                else "viridis"
+            )
+        )
         finite_vals = sc_val[np.isfinite(sc_val)]
         if clim is not None:
             vmin, vmax = float(clim[0]), float(clim[1])
         elif use_cmap == "RdBu_r":
-            val_max = float(np.nanpercentile(np.abs(finite_vals), 99)) if finite_vals.size else 1.0
+            val_max = (
+                float(np.nanpercentile(np.abs(finite_vals), 99))
+                if finite_vals.size
+                else 1.0
+            )
             val_max = max(val_max, 1e-9)
             vmin, vmax = -val_max, val_max
         else:
             vmin = float(np.nanmin(finite_vals)) if finite_vals.size else 0.0
             vmax = float(np.nanpercentile(finite_vals, 99)) if finite_vals.size else 1.0
 
-        cf = ax.contourf(X, Y, sc_val, levels=int(levels), cmap=use_cmap, vmin=vmin, vmax=vmax, extend="both")
+        cf = ax.contourf(
+            X,
+            Y,
+            sc_val,
+            levels=int(levels),
+            cmap=use_cmap,
+            vmin=vmin,
+            vmax=vmax,
+            extend="both",
+        )
         if colorbar:
-            _compact_colorbar(fig, ax, cf, label=cbar_label if cbar_label is not None else scalar_name)
+            _compact_colorbar(
+                fig, ax, cf, label=cbar_label if cbar_label is not None else scalar_name
+            )
 
     ax.set_aspect(aspect)
     ax.set_xlabel(f"x [{xUnits}]", fontsize=11)
@@ -454,7 +554,7 @@ def plot(
 
 def quiver(
     data: xr.Dataset,
-    quiverKey: str | float | int = "Q",
+    quiverKey: str | float = "Q",
     scalingFactor: float = 1.0,
     widthFactor: float = 0.002,
     ax: Axes | None = None,
@@ -586,15 +686,28 @@ def quiver(
     if streamlines:
         try:
             # Use any remaining streamplot-like kwargs if provided.
-            sp_density = float(kwargs.pop("density", 1.0)) if "density" in kwargs else 1.0
-            sp_linewidth = float(kwargs.pop("linewidth", 1.0)) if "linewidth" in kwargs else 1.0
-            sp_arrowsize = float(kwargs.pop("arrowsize", 1.0)) if "arrowsize" in kwargs else 1.0
-            streamplot(data, density=sp_density, linewidth=sp_linewidth, arrowsize=sp_arrowsize, ax=ax)
+            sp_density = (
+                float(kwargs.pop("density", 1.0)) if "density" in kwargs else 1.0
+            )
+            sp_linewidth = (
+                float(kwargs.pop("linewidth", 1.0)) if "linewidth" in kwargs else 1.0
+            )
+            sp_arrowsize = (
+                float(kwargs.pop("arrowsize", 1.0)) if "arrowsize" in kwargs else 1.0
+            )
+            streamplot(
+                data,
+                density=sp_density,
+                linewidth=sp_linewidth,
+                arrowsize=sp_arrowsize,
+                ax=ax,
+            )
         except Exception:
             # Keep quiver usable even if streamplot fails.
             pass
 
     return fig, ax
+
 
 def statvec_disp(stat_u: dict, stat_v: dict, ax=None, title: str | None = None):
     """Display vector statistics returned by ``statf`` (PIVMAT-style helper)."""
@@ -728,7 +841,12 @@ def showscal(
 
     x, y, _, _ = dataset_to_array(ds)
     if property in ds:
-        plt.pcolormesh(x, y, ds[property].isel(t=0) if "t" in ds[property].dims else ds[property], **kwargs)
+        plt.pcolormesh(
+            x,
+            y,
+            ds[property].isel(t=0) if "t" in ds[property].dims else ds[property],
+            **kwargs,
+        )
         plt.colorbar(label=property)
         plt.axis("equal")
     else:
@@ -742,7 +860,7 @@ def streamplot(
     arrowsize: float = 1.0,
     ax: plt.Axes | None = None,
     **kwargs,
-) -> tuple["Figure", "Axes"]:
+) -> tuple[Figure, Axes]:
     """
     streamplot plots the streamlines of the vector field
 
@@ -878,15 +996,22 @@ def _upsample_field(a: np.ndarray, x: np.ndarray, y: np.ndarray, factor: float):
 def _scalar_field(ds: xr.Dataset, scalar, u: np.ndarray, v: np.ndarray):
     """Resolve ``scalar`` to (2D array, name, cmap, signed)."""
     if isinstance(scalar, np.ndarray):
-        return np.asarray(scalar, dtype=float), "scalar", "RdBu_r", bool(np.nanmin(scalar) < 0 < np.nanmax(scalar))
+        return (
+            np.asarray(scalar, dtype=float),
+            "scalar",
+            "RdBu_r",
+            bool(np.nanmin(scalar) < 0 < np.nanmax(scalar)),
+        )
     key = str(scalar).lower()
     if key in ("vorticity", "vort", "curl", "w"):
         if "w" in ds:
             arr = np.asarray(ds["w"].values, dtype=float)
         else:
-            import pivpy.pivpy  # noqa: F401  (registers the .piv accessor)
+            import pivpy.pivpy
 
-            arr = np.asarray(ds.copy().piv.vorticity(name="__w")["__w"].values, dtype=float)
+            arr = np.asarray(
+                ds.copy().piv.vorticity(name="__w")["__w"].values, dtype=float
+            )
         return arr, "vorticity", "RdBu_r", True
     if key in ("speed", "mag", "magnitude"):
         return np.hypot(u, v), "speed", "RdBu_r", False
@@ -895,14 +1020,18 @@ def _scalar_field(ds: xr.Dataset, scalar, u: np.ndarray, v: np.ndarray):
     if key in ("divergence", "div"):
         import pivpy.pivpy  # noqa: F401
 
-        arr = np.asarray(ds.copy().piv.divergence(name="__div")["__div"].values, dtype=float)
+        arr = np.asarray(
+            ds.copy().piv.divergence(name="__div")["__div"].values, dtype=float
+        )
         return arr, "divergence", "RdBu_r", True
     if str(scalar) in ds:
         arr = np.asarray(ds[str(scalar)].values, dtype=float)
         while arr.ndim > 2:
             arr = arr[..., 0] if arr.shape[-1] == 1 else arr[0]
         return arr, str(scalar), "RdBu_r", key in _SIGNED_SCALARS
-    raise KeyError(f"scalar={scalar!r} is not a known quantity or a variable of the dataset")
+    raise KeyError(
+        f"scalar={scalar!r} is not a known quantity or a variable of the dataset"
+    )
 
 
 def _frame(ds: xr.Dataset, t_idx: int) -> xr.Dataset:
@@ -1066,21 +1195,32 @@ def streamscal(
         if axes:
             fig, ax = plt.subplots(figsize=(figwidth, figwidth * aspect + 0.9))
         else:
-            fig = plt.figure(figsize=(figwidth * (1 + cbar_frac), figwidth * aspect), facecolor="white")
+            fig = plt.figure(
+                figsize=(figwidth * (1 + cbar_frac), figwidth * aspect),
+                facecolor="white",
+            )
             ax = fig.add_axes([0.0, 0.0, 1.0 / (1 + cbar_frac), 1.0])
     else:
         fig = ax.figure
 
     mesh = ax.pcolormesh(
-        xs, ys, np.ma.masked_invalid(scf),
+        xs,
+        ys,
+        np.ma.masked_invalid(scf),
         cmap=cmap if cmap is not None else auto_cmap,
-        vmin=vmin, vmax=vmax, shading="gouraud", rasterized=True, **kwargs,
+        vmin=vmin,
+        vmax=vmax,
+        shading="gouraud",
+        rasterized=True,
+        **kwargs,
     )
 
     if streamlines:
         strm = ax.streamplot(
-            xu, yu,
-            np.ma.masked_invalid(uf), np.ma.masked_invalid(vf),
+            xu,
+            yu,
+            np.ma.masked_invalid(uf),
+            np.ma.masked_invalid(vf),
             color=streamline_color,
             linewidth=float(linewidth),
             density=float(density),
@@ -1217,12 +1357,16 @@ def streamscal_panels(
         xx = np.asarray(dd["x"].values, dtype=float)
         yy = np.asarray(dd["y"].values, dtype=float)
         aspects.append(abs(xx[-1] - xx[0]) / max(abs(yy[-1] - yy[0]), 1e-30))
-    col_w = [max(aspects[c::ncols]) for c in range(ncols)]  # width in units of panel height
+    col_w = [
+        max(aspects[c::ncols]) for c in range(ncols)
+    ]  # width in units of panel height
     gap_in = gap * figwidth
     cbar_in = 0.0
     if colorbar:
         cbar_in = 0.035 * figwidth
-    avail = figwidth - (ncols - 1) * gap_in - (cbar_in + 3 * gap_in if colorbar else 0.0)
+    avail = (
+        figwidth - (ncols - 1) * gap_in - (cbar_in + 3 * gap_in if colorbar else 0.0)
+    )
     h_in = avail / sum(col_w)  # height of each panel row, inches
     figheight = nrows * h_in + (nrows - 1) * gap_in
     fig = plt.figure(figsize=(figwidth, figheight), facecolor="white")
@@ -1232,16 +1376,31 @@ def streamscal_panels(
         r, c = divmod(i, ncols)
         left = sum(col_w[:c]) * h_in + c * gap_in
         bottom = (nrows - 1 - r) * (h_in + gap_in)
-        rect = [left / figwidth, bottom / figheight, col_w[c] * h_in / figwidth, h_in / figheight]
+        rect = [
+            left / figwidth,
+            bottom / figheight,
+            col_w[c] * h_in / figwidth,
+            h_in / figheight,
+        ]
         ax = fig.add_axes(rect)
         streamscal(
-            d, ax=ax, scalar=scalar, clim=clim_use, percentile=percentile,
-            center=center, **{k: v for k, v in kwargs.items() if k not in ("clim",)},
+            d,
+            ax=ax,
+            scalar=scalar,
+            clim=clim_use,
+            percentile=percentile,
+            center=center,
+            **{k: v for k, v in kwargs.items() if k not in ("clim",)},
         )
         axs.append(ax)
         if labels is not None and i < len(labels):
-            lk = dict(fontsize=11, fontweight="bold", va="top", ha="left",
-                      bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85))
+            lk = dict(
+                fontsize=11,
+                fontweight="bold",
+                va="top",
+                ha="left",
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85),
+            )
             lk.update(label_kwargs or {})
             ax.text(0.02, 0.98, labels[i], transform=ax.transAxes, zorder=5, **lk)
 
@@ -1254,7 +1413,6 @@ def streamscal_panels(
         cb.outline.set_linewidth(0.4)
 
     return fig, axs
-
 
 
 def showf(data: xr.Dataset, **kwargs) -> tuple[plt.Figure, plt.Axes]:
@@ -1296,12 +1454,22 @@ def showf(data: xr.Dataset, **kwargs) -> tuple[plt.Figure, plt.Axes]:
 
     is_vector = "u" in data and "v" in data
     if is_vector:
-        if background is None or str(background).strip() == "" or str(background).lower() == "off":
+        if (
+            background is None
+            or str(background).strip() == ""
+            or str(background).lower() == "off"
+        ):
             return quiver(data, ax=ax, **kwargs)
         # Vector field with scalar background
         fig, ax = quiver(data, ax=ax, **kwargs)
         try:
-            _plot_scalar_background(ax, data, background=background, clim=kwargs.get("clim", None), cmap=kwargs.get("cmap", None))
+            _plot_scalar_background(
+                ax,
+                data,
+                background=background,
+                clim=kwargs.get("clim", None),
+                cmap=kwargs.get("cmap", None),
+            )
         except Exception:
             # Keep showf usable even if background fails.
             pass
@@ -1353,7 +1521,7 @@ def _plot_scalar_background(
     background: str,
     clim: tuple[float, float] | str | None,
     cmap: str | None,
-) -> "plt.collections.QuadMesh":
+) -> plt.collections.QuadMesh:
     from pivpy.graphics_utils import dataset_to_array
 
     ds = data
@@ -1362,8 +1530,6 @@ def _plot_scalar_background(
         bg_var = bg
         ds_bg = ds
     else:
-        import pivpy.pivpy  # registers the .piv accessor
-
         ds_bg = ds.copy()
         ds_bg = ds_bg.piv.vec2scal(bg, name="__bg")
         bg_var = "__bg"
@@ -1452,19 +1618,32 @@ class _VectorMovieRenderer:
             v = v[::step, ::step]
 
         self._bg_mesh = None
-        if background is not None and str(background).strip() != "" and str(background).lower() != "off":
+        if (
+            background is not None
+            and str(background).strip() != ""
+            and str(background).lower() != "off"
+        ):
             try:
-                self._bg_mesh = _plot_scalar_background(self.ax, first, background=str(background), clim=clim, cmap=cmap)
+                self._bg_mesh = _plot_scalar_background(
+                    self.ax, first, background=str(background), clim=clim, cmap=cmap
+                )
             except Exception:
                 self._bg_mesh = None
 
-        quiver_plot_kwargs: dict = {"scale": self.scalingFactor, "width": self.widthFactor}
+        quiver_plot_kwargs: dict = {
+            "scale": self.scalingFactor,
+            "width": self.widthFactor,
+        }
         if self.colorbar:
             mag = np.sqrt(u**2 + v**2)
-            self._Q = self.ax.quiver(x, y, u, v, mag, cmap=cmap, **quiver_plot_kwargs, **quiver_kwargs)
+            self._Q = self.ax.quiver(
+                x, y, u, v, mag, cmap=cmap, **quiver_plot_kwargs, **quiver_kwargs
+            )
             plt.colorbar(self._Q, ax=self.ax, orientation=self.colorbar_orient)
         else:
-            self._Q = self.ax.quiver(x, y, u, v, color=self.arrowColor, **quiver_plot_kwargs, **quiver_kwargs)
+            self._Q = self.ax.quiver(
+                x, y, u, v, color=self.arrowColor, **quiver_plot_kwargs, **quiver_kwargs
+            )
 
         if self.aspectratio is None:
             self.ax.set_aspect("equal")
@@ -1478,7 +1657,15 @@ class _VectorMovieRenderer:
 
         if self.add_guide:
             try:
-                self.ax.quiverkey(self._Q, 0.9, 0.9, 1, str(self.quiverKey), labelpos="E", coordinates="figure")
+                self.ax.quiverkey(
+                    self._Q,
+                    0.9,
+                    0.9,
+                    1,
+                    str(self.quiverKey),
+                    labelpos="E",
+                    coordinates="figure",
+                )
             except Exception:
                 pass
 
@@ -1510,8 +1697,6 @@ class _VectorMovieRenderer:
                     da = ds[bg]
                     z = np.asarray(da.isel(t=0).values if "t" in da.dims else da.values)
                 else:
-                    import pivpy.pivpy  # registers the .piv accessor
-
                     tmp = ds.copy()
                     tmp = tmp.piv.vec2scal(bg, name="__bg")
                     da = tmp["__bg"]
@@ -1525,7 +1710,9 @@ class _VectorMovieRenderer:
                 if isinstance(self.clim, str) and self.clim.lower() == "each":
                     finite = z[np.isfinite(z)]
                     if finite.size:
-                        self._bg_mesh.set_clim(float(np.min(finite)), float(np.max(finite)))
+                        self._bg_mesh.set_clim(
+                            float(np.min(finite)), float(np.max(finite))
+                        )
             except Exception:
                 pass
 
@@ -1630,7 +1817,11 @@ class _ScalarMovieRenderer:
 
 
 def _resolve_files(pattern: str | list[str] | tuple[str, ...]) -> list[pathlib.Path]:
-    pats = [str(p) for p in pattern] if isinstance(pattern, (list, tuple)) else [str(pattern)]
+    pats = (
+        [str(p) for p in pattern]
+        if isinstance(pattern, (list, tuple))
+        else [str(pattern)]
+    )
 
     expanded: list[str] = []
     for pat in pats:
@@ -1662,7 +1853,7 @@ def _resolve_files(pattern: str | list[str] | tuple[str, ...]) -> list[pathlib.P
 
 
 def _movie_from_iter(
-    datasets: "Iterable[tuple[xr.Dataset, str | None]]",
+    datasets: Iterable[tuple[xr.Dataset, str | None]],
     *,
     output: str | pathlib.Path | None,
     show: str = "auto",
@@ -1698,7 +1889,18 @@ def _movie_from_iter(
     if mode == "scalar":
         # pcolormesh accepts lots of kwargs; don't forward quiver compat kwargs.
         for k in list(quiver_kwargs.keys()):
-            if k in {"nthArr", "aspectratio", "add_guide", "streamlines", "colorbar", "colorbar_orient", "arrowColor", "scalingFactor", "widthFactor", "quiverKey"}:
+            if k in {
+                "nthArr",
+                "aspectratio",
+                "add_guide",
+                "streamlines",
+                "colorbar",
+                "colorbar_orient",
+                "arrowColor",
+                "scalingFactor",
+                "widthFactor",
+                "quiverKey",
+            }:
                 quiver_kwargs.pop(k)
         pcolormesh_kwargs = quiver_kwargs
         quiver_kwargs = {}
@@ -1936,8 +2138,8 @@ def animate(
     matplotlib.animation.FuncAnimation
         The animation object (viewable in Jupyter/Marimo or saved via ``anim.save('flow.gif')``).
     """
-    from matplotlib.animation import FuncAnimation
     import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
     from scipy.ndimage import gaussian_filter
 
     n_frames = int(data.sizes.get("t", 1))
@@ -1953,15 +2155,32 @@ def animate(
     x2d, y2d = np.meshgrid(x_arr, y_arr)
 
     # Pre-extract or compute scalar background for all frames
-    bg_str = str(background).lower() if (background is not None and not isinstance(background, bool)) else ("vorticity" if background is True or background == "vorticity" else None)
+    bg_str = (
+        str(background).lower()
+        if (background is not None and not isinstance(background, bool))
+        else ("vorticity" if background is True or background == "vorticity" else None)
+    )
     has_bg = bg_str is not None and bg_str not in {"none", "false", "off"}
 
     if bg_str == "image" and image is not None:
-        extent = image_extent if image_extent is not None else (
-            float(x_arr.min()), float(x_arr.max()), float(y_arr.min()), float(y_arr.max())
+        extent = (
+            image_extent
+            if image_extent is not None
+            else (
+                float(x_arr.min()),
+                float(x_arr.max()),
+                float(y_arr.min()),
+                float(y_arr.max()),
+            )
         )
-        target_ax.imshow(image, cmap=image_cmap, extent=extent, origin="upper",
-                          alpha=float(image_alpha), zorder=1)
+        target_ax.imshow(
+            image,
+            cmap=image_cmap,
+            extent=extent,
+            origin="upper",
+            alpha=float(image_alpha),
+            zorder=1,
+        )
         has_bg = False  # static image, not a per-frame pcolormesh
 
     bg_frames = []
@@ -1973,7 +2192,7 @@ def animate(
             ds_fi = data.isel(t=fi) if "t" in data.dims else data
             u_fi = np.asarray(ds_fi["u"].values, dtype=float)
             v_fi = np.asarray(ds_fi["v"].values, dtype=float)
-            
+
             if bg_str in {"vorticity", "curl", "w"}:
                 if "w" in ds_fi:
                     sc = np.asarray(ds_fi["w"].values, dtype=float)
@@ -2013,17 +2232,32 @@ def animate(
         if clim is not None:
             vmin, vmax = float(clim[0]), float(clim[1])
         elif use_cmap == "RdBu_r":
-            all_finite = np.concatenate([f[np.isfinite(f)] for f in bg_frames if f.size])
-            v_max = float(np.nanpercentile(np.abs(all_finite), 99)) if all_finite.size else 1.0
+            all_finite = np.concatenate(
+                [f[np.isfinite(f)] for f in bg_frames if f.size]
+            )
+            v_max = (
+                float(np.nanpercentile(np.abs(all_finite), 99))
+                if all_finite.size
+                else 1.0
+            )
             v_max = max(v_max, 1e-9)
             vmin, vmax = -v_max, v_max
         else:
-            all_finite = np.concatenate([f[np.isfinite(f)] for f in bg_frames if f.size])
+            all_finite = np.concatenate(
+                [f[np.isfinite(f)] for f in bg_frames if f.size]
+            )
             vmin = float(np.nanmin(all_finite)) if all_finite.size else 0.0
             vmax = float(np.nanpercentile(all_finite, 99)) if all_finite.size else 1.0
 
         bg_mesh = target_ax.pcolormesh(
-            x2d, y2d, bg_frames[0], cmap=use_cmap, shading="gouraud", vmin=vmin, vmax=vmax, zorder=1
+            x2d,
+            y2d,
+            bg_frames[0],
+            cmap=use_cmap,
+            shading="gouraud",
+            vmin=vmin,
+            vmax=vmax,
+            zorder=1,
         )
         cbar = fig.colorbar(bg_mesh, ax=target_ax, fraction=0.046, pad=0.04)
         if bg_str in {"vorticity", "curl", "w"}:
@@ -2070,16 +2304,22 @@ def animate(
             arr = np.sqrt(u_t**2 + v_t**2)
         elif str(color_by) in ds_t:
             arr = np.asarray(ds_t[str(color_by)].values, dtype=float)
-            arr, = _apply_chc_mask(ds_t, arr)
+            (arr,) = _apply_chc_mask(ds_t, arr)
         else:
-            warnings.warn(f"color_by={color_by!r} not found in dataset; using arrow_color instead")
+            warnings.warn(
+                f"color_by={color_by!r} not found in dataset; using arrow_color instead"
+            )
             return None
         return arr
 
     color0 = color_frame(ds0, u0, v0) if color_by is not None else None
-    quiver_extra = {"color": arrow_color} if color0 is None else {
-        "cmap": use_cmap if use_cmap is not None else "viridis",
-    }
+    quiver_extra = (
+        {"color": arrow_color}
+        if color0 is None
+        else {
+            "cmap": use_cmap if use_cmap is not None else "viridis",
+        }
+    )
 
     if quiver:
         Q = target_ax.quiver(
@@ -2102,13 +2342,23 @@ def animate(
             **quiver_extra,
         )
         if color0 is not None:
-            fig.colorbar(Q, ax=target_ax, fraction=0.046, pad=0.04).set_label(str(color_by), fontsize=10)
+            fig.colorbar(Q, ax=target_ax, fraction=0.046, pad=0.04).set_label(
+                str(color_by), fontsize=10
+            )
     else:
         Q = None
 
     target_ax.set_aspect("equal")
-    x_units = str(data.attrs.get("spatial_units", data.coords.get("x", {}).attrs.get("units", "mm")))
-    y_units = str(data.attrs.get("spatial_units", data.coords.get("y", {}).attrs.get("units", "mm")))
+    x_units = str(
+        data.attrs.get(
+            "spatial_units", data.coords.get("x", {}).attrs.get("units", "mm")
+        )
+    )
+    y_units = str(
+        data.attrs.get(
+            "spatial_units", data.coords.get("y", {}).attrs.get("units", "mm")
+        )
+    )
     target_ax.set_xlabel(f"x [{x_units}]", fontsize=10)
     target_ax.set_ylabel(f"y [{y_units}]", fontsize=10)
 
@@ -2121,7 +2371,7 @@ def animate(
         if bg_mesh is not None and frame_i < len(bg_frames):
             bg_mesh.set_array(bg_frames[frame_i].ravel())
             artists.append(bg_mesh)
-        
+
         ds_t = data.isel(t=frame_i) if "t" in data.dims else data
         if Q is not None:
             u_t = np.asarray(ds_t["u"].values, dtype=float)
@@ -2129,13 +2379,23 @@ def animate(
             u_t, v_t = _apply_chc_mask(ds_t, u_t, v_t)
             if color0 is not None:
                 c_t = color_frame(ds_t, u_t, v_t)
-                Q.set_UVC(u_t[::step_y, ::step_x], v_t[::step_y, ::step_x], c_t[::step_y, ::step_x])
+                Q.set_UVC(
+                    u_t[::step_y, ::step_x],
+                    v_t[::step_y, ::step_x],
+                    c_t[::step_y, ::step_x],
+                )
             else:
                 Q.set_UVC(u_t[::step_y, ::step_x], v_t[::step_y, ::step_x])
             artists.append(Q)
 
-        t_coord = float(ds_t["t"].values) if ("t" in ds_t.coords and ds_t["t"].size) else float(frame_i)
-        target_ax.set_title(title_fmt.format(t=t_coord, i=frame_i), fontsize=11, fontweight="bold")
+        t_coord = (
+            float(ds_t["t"].values)
+            if ("t" in ds_t.coords and ds_t["t"].size)
+            else float(frame_i)
+        )
+        target_ax.set_title(
+            title_fmt.format(t=t_coord, i=frame_i), fontsize=11, fontweight="bold"
+        )
         return artists if blit else []
 
     anim = FuncAnimation(
@@ -2355,7 +2615,9 @@ def contour_plot(
     return fig, ax
 
 
-def histogram(data: xr.Dataset, bins: int = 50, ax: plt.Axes | None = None, **kwargs) -> tuple[plt.Figure, plt.Axes]:
+def histogram(
+    data: xr.Dataset, bins: int = 50, ax: plt.Axes | None = None, **kwargs
+) -> tuple[plt.Figure, plt.Axes]:
     """Plot histograms of u and v for quick diagnostics."""
 
     # Backwards compatibility: matplotlib removed `normed` in favor of `density`.
@@ -2447,7 +2709,9 @@ def histscal_disp(
         t1 = (chunk + 1) * smooth_i
         sub = ds.isel(t=slice(t0, t1)) if "t" in ds.dims else ds
 
-        hds = sub.piv.histf(variable=variable, bin=bin, opt="0" if include_zeros else "")
+        hds = sub.piv.histf(
+            variable=variable, bin=bin, opt="0" if include_zeros else ""
+        )
         centers = np.asarray(hds["bin"].values, dtype=float)
         counts = np.asarray(hds["h"].values, dtype=float)
 
@@ -2492,11 +2756,13 @@ def histscal_disp(
 
         if gaussian:
             xg = np.linspace(float(centers[0]), float(centers[-1]), 2000)
-            gauss = 1.0 / (np.sqrt(2.0 * np.pi) * std) * np.exp(-0.5 * (xg**2) / (std**2))
+            gauss = (
+                1.0 / (np.sqrt(2.0 * np.pi) * std) * np.exp(-0.5 * (xg**2) / (std**2))
+            )
             use_ax.plot(xg, gauss, "b-", label="gauss")
 
         if "t" in ds.dims:
-            use_ax.set_title(f"{variable}: frames {t0}..{t1-1}")
+            use_ax.set_title(f"{variable}: frames {t0}..{t1 - 1}")
         else:
             use_ax.set_title(f"{variable} histogram")
 
@@ -2624,7 +2890,7 @@ def histvec_disp(
             use_ax.plot(xg, gy, "b-", linewidth=1.0)
 
         if "t" in ds.dims:
-            use_ax.set_title(f"vector hist: frames {t0}..{t1-1}")
+            use_ax.set_title(f"vector hist: frames {t0}..{t1 - 1}")
         else:
             use_ax.set_title("vector histogram")
 
@@ -2684,7 +2950,7 @@ def display_vector_field(
     arrowColor: str = "k",
     arrowScale: float = 1.0,
     arrowWidth: float = 0.002,
-) -> tuple["Figure", "Axes"]:
+) -> tuple[Figure, Axes]:
     """
     display_vector_field is a wrapper for quiver() for backwards compatibility
 
@@ -2716,12 +2982,18 @@ def display_vector_field(
         scalingFactor=arrowScale,
         widthFactor=arrowWidth,
     )
-import matplotlib.pyplot as plt
-import numpy as np
+
 
 def tke_budget_disp(budget_ds, terms=None, figsize=(12, 8), cmap="viridis"):
     if terms is None:
-        terms = ["k", "production", "dissipation", "advection", "turbulent_transport", "residual"]
+        terms = [
+            "k",
+            "production",
+            "dissipation",
+            "advection",
+            "turbulent_transport",
+            "residual",
+        ]
     n = len(terms)
     ncols = 3
     nrows = (n + ncols - 1) // ncols
@@ -2735,14 +3007,14 @@ def tke_budget_disp(budget_ds, terms=None, figsize=(12, 8), cmap="viridis"):
         Z = budget_ds[t].values
         cf = ax.contourf(X, Y, Z, levels=20, cmap=cmap)
         ax.set_title(t)
-        ax.set_xlabel("x"); ax.set_ylabel("y")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
         fig.colorbar(cf, ax=ax, shrink=0.7)
-    for j in range(i+1, len(axes)):
+    for j in range(i + 1, len(axes)):
         axes[j].axis("off")
     fig.tight_layout()
     return fig, axes[:n]
-import matplotlib.pyplot as plt
-import numpy as np
+
 
 def convergence_disp(conv_ds, quantities=None, figsize=(8, 5)):
     if quantities is None:
@@ -2757,8 +3029,7 @@ def convergence_disp(conv_ds, quantities=None, figsize=(8, 5)):
     ax.legend()
     fig.tight_layout()
     return fig, ax
-import matplotlib.pyplot as plt
-import numpy as np
+
 
 def vortex_disp(prob_da, vortices=None, figsize=(6, 5), cmap="viridis"):
     fig, ax = plt.subplots(figsize=figsize)
@@ -2774,8 +3045,7 @@ def vortex_disp(prob_da, vortices=None, figsize=(6, 5), cmap="viridis"):
     fig.colorbar(cf, ax=ax)
     fig.tight_layout()
     return fig, ax
-import matplotlib.pyplot as plt
-import numpy as np
+
 
 def fft_spectrum_disp(spec_ds, figsize=(6, 4)):
     fig, ax = plt.subplots(figsize=figsize)
@@ -2785,8 +3055,7 @@ def fft_spectrum_disp(spec_ds, figsize=(6, 4)):
     ax.set_title("2D FFT spectrum")
     fig.tight_layout()
     return fig, ax
-import matplotlib.pyplot as plt
-import numpy as np
+
 
 def stress_std_disp(std_ds, figsize=(8, 4)):
     fig, axes = plt.subplots(1, 4, figsize=figsize)
@@ -2802,8 +3071,7 @@ def stress_std_disp(std_ds, figsize=(8, 4)):
         ax.set_title(name)
     fig.tight_layout()
     return fig, axes
-import matplotlib.pyplot as plt
-import numpy as np
+
 
 def anisotropy_disp(inv_ds, figsize=(6, 5)):
     fig, ax = plt.subplots(figsize=figsize)

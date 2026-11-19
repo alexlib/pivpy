@@ -3,7 +3,6 @@ import pytest
 
 from pivpy import io
 
-
 pytest.importorskip("scipy", reason="requires SciPy")
 pytest.importorskip("scipy.signal", reason="requires scipy.signal")
 

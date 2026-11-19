@@ -1,14 +1,16 @@
-# -*- coding: utf-8 -*-
 """
 Created on Tue Jul 23 19:33:20 2019
 
 @author: lior
 """
-import numpy as np
-import xarray as xr
+
 import os
+
+import numpy as np
 import ReadIM
-from pivpy.io import parse_header, loadvec
+import xarray as xr
+
+from pivpy.io import loadvec, parse_header
 
 
 def ReadDavis(path, time=0):

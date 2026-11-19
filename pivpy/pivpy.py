@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 """
@@ -7,92 +6,191 @@ This script extends the functionality of xarray.Dataset by adding a new accessor
 
 @author: Ron, Alex, Lior
 """
-from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
-import warnings
+from collections.abc import Sequence
+from typing import Literal
 
 import numpy as np
 import xarray as xr
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 
-from pivpy.graphics import plot as gplot
+from pivpy.compute_funcs import (
+    _detect_time_dim,
+    bwfilter2d,
+    corrf,
+    corrm,
+    filter2d,
+    filter2d_kernel,
+    gradientf,
+    histf,
+    interpolat_zeros_2d,
+    warn_if_overwriting_scalar,
+)
+from pivpy.compute_funcs import (
+    add_quadrants as cadd_quadrants,
+)
+from pivpy.compute_funcs import (
+    anisotropy_invariants as canisotropy_invariants,
+)
+from pivpy.compute_funcs import (
+    anisotropy_tensor as canisotropy_tensor,
+)
+from pivpy.compute_funcs import (
+    barycentric_map as cbarycentric_map,
+)
+from pivpy.compute_funcs import (
+    calc_all_products as ccalc_all_products,
+)
+from pivpy.compute_funcs import (
+    calc_moments as ccalc_moments,
+)
+from pivpy.compute_funcs import (
+    calc_quadrant_duration as ccalc_quadrant_duration,
+)
+from pivpy.compute_funcs import (
+    calc_quadrant_fraction as ccalc_quadrant_fraction,
+)
+from pivpy.compute_funcs import (
+    calc_quadrant_mean as ccalc_quadrant_mean,
+)
+from pivpy.compute_funcs import (
+    calculate_product as ccalculate_product,
+)
+from pivpy.compute_funcs import (
+    clean as cclean,
+)
+from pivpy.compute_funcs import (
+    compute_length_scale as ccompute_length_scale,
+)
+from pivpy.compute_funcs import (
+    convergence_analysis as cconvergence_analysis,
+)
+from pivpy.compute_funcs import (
+    detect_vortices as cdetect_vortices,
+)
+from pivpy.compute_funcs import (
+    dissipation as cdissipation,
+)
+from pivpy.compute_funcs import (
+    energy_spectrum as cenergy_spectrum,
+)
+from pivpy.compute_funcs import (
+    fft_spectrum_2d as cfft_spectrum_2d,
+)
+from pivpy.compute_funcs import (
+    fluct as cfluct,
+)
+from pivpy.compute_funcs import (
+    gamma1 as cgamma1,
+)
+from pivpy.compute_funcs import (
+    gamma2 as cgamma2,
+)
+from pivpy.compute_funcs import (
+    gradient_tensor as cgradient_tensor,
+)
+from pivpy.compute_funcs import (
+    integral_length_scale as cintegral_length_scale,
+)
+from pivpy.compute_funcs import (
+    interpf as cinterpf,
+)
+from pivpy.compute_funcs import (
+    jpdfscal as cjpdfscal,
+)
+from pivpy.compute_funcs import (
+    material_acceleration as cmaterial_acceleration,
+)
+from pivpy.compute_funcs import (
+    moving_average as cmoving_average,
+)
+from pivpy.compute_funcs import (
+    non_uniform_spectra as cnon_uniform_spectra,
+)
+from pivpy.compute_funcs import (
+    normalized_median_test as cnormalized_median_test,
+)
+from pivpy.compute_funcs import (
+    okubo_weiss as cokubo_weiss,
+)
+from pivpy.compute_funcs import (
+    probe_esd as cprobe_esd,
+)
+from pivpy.compute_funcs import (
+    probeaverf as cprobeaverf,
+)
+from pivpy.compute_funcs import (
+    probef as cprobef,
+)
+from pivpy.compute_funcs import (
+    q_criterion as cq_criterion,
+)
+from pivpy.compute_funcs import (
+    quadrant_analysis as cquadrant_analysis,
+)
+from pivpy.compute_funcs import (
+    reynolds_decomposition as creynolds_decomposition,
+)
+from pivpy.compute_funcs import (
+    reynolds_stress_std as creynolds_stress_std,
+)
+from pivpy.compute_funcs import (
+    reynolds_stresses as creynolds_stresses,
+)
+from pivpy.compute_funcs import (
+    smooth as csmooth,
+)
+from pivpy.compute_funcs import (
+    smooth_savgol as csmooth_savgol,
+)
+from pivpy.compute_funcs import (
+    smooth_spline as csmooth_spline,
+)
+from pivpy.compute_funcs import (
+    spatial_correlation as cspatial_correlation,
+)
+from pivpy.compute_funcs import (
+    spatial_vortex_probability as cspatial_vortex_probability,
+)
+from pivpy.compute_funcs import (
+    spatiotempf as cspatiotempf,
+)
+from pivpy.compute_funcs import (
+    stress_line_profile as cstress_line_profile,
+)
+from pivpy.compute_funcs import (
+    subsbr as csubsbr,
+)
+from pivpy.compute_funcs import (
+    taylor_microscale as ctaylor_microscale,
+)
+from pivpy.compute_funcs import (
+    tempcorrf as ctempcorrf,
+)
+from pivpy.compute_funcs import (
+    tke_budget as ctke_budget,
+)
+from pivpy.compute_funcs import (
+    tke_std as ctke_std,
+)
+from pivpy.compute_funcs import (
+    two_point_correlation as ctwo_point_correlation,
+)
+from pivpy.compute_funcs import (
+    vorticity_circulation as cvorticity_circulation,
+)
 from pivpy.graphics import animate as ganimate
+from pivpy.graphics import autocorrelation_plot as gautocorrelation_plot
+from pivpy.graphics import histscal_disp as ghistscal_disp
+from pivpy.graphics import histvec_disp as ghistvec_disp
+from pivpy.graphics import jpdfscal_disp as gjpdfscal_disp
+from pivpy.graphics import plot as gplot
 from pivpy.graphics import quiver as gquiver
 from pivpy.graphics import showf as gshowf
 from pivpy.graphics import showscal as gshowscal
 from pivpy.graphics import streamplot as gstreamplot
 from pivpy.graphics import streamscal as gstreamscal
-from pivpy.graphics import autocorrelation_plot as gautocorrelation_plot
-from pivpy.graphics import histscal_disp as ghistscal_disp
-from pivpy.graphics import histvec_disp as ghistvec_disp
 from pivpy.graphics import to_movie as gto_movie
-from pivpy.graphics import jpdfscal_disp as gjpdfscal_disp
-from pivpy.compute_funcs import (
-    Γ1_moving_window_function,
-    Γ2_moving_window_function,
-    gamma1 as cgamma1,
-    gamma2 as cgamma2,
-    vorticity_circulation as cvorticity_circulation,
-    q_criterion as cq_criterion,
-    okubo_weiss as cokubo_weiss,
-    subsbr as csubsbr,
-    clean as cclean,
-    smooth as csmooth,
-    normalized_median_test as cnormalized_median_test,
-    gradient_tensor as cgradient_tensor,
-    material_acceleration as cmaterial_acceleration,
-    reynolds_decomposition as creynolds_decomposition,
-    energy_spectrum as cenergy_spectrum,
-    probe_esd as cprobe_esd,
-    moving_average as cmoving_average,
-    spatial_correlation as cspatial_correlation,
-    integral_length_scale as cintegral_length_scale,
-    taylor_microscale as ctaylor_microscale,
-    dissipation as cdissipation,
-    fluct as cfluct,
-    calculate_product as ccalculate_product,
-    reynolds_stresses as creynolds_stresses,
-    tke_turb as ctke_turb,
-    tke_budget as ctke_budget,
-    convergence_analysis as cconvergence_analysis,
-    detect_vortices as cdetect_vortices,
-    spatial_vortex_probability as cspatial_vortex_probability,
-    fft_spectrum_2d as cfft_spectrum_2d,
-    reynolds_stress_std as creynolds_stress_std,
-    tke_std as ctke_std,
-    stress_line_profile as cstress_line_profile,
-    anisotropy_tensor as canisotropy_tensor,
-    anisotropy_invariants as canisotropy_invariants,
-    barycentric_map as cbarycentric_map,
-    calc_moments as ccalc_moments,
-    calc_all_products as ccalc_all_products,
-    two_point_correlation as ctwo_point_correlation,
-    compute_length_scale as ccompute_length_scale,
-    add_quadrants as cadd_quadrants,
-    calc_quadrant_mean as ccalc_quadrant_mean,
-    calc_quadrant_fraction as ccalc_quadrant_fraction,
-    calc_quadrant_duration as ccalc_quadrant_duration,
-    quadrant_analysis as cquadrant_analysis,
-    smooth_savgol as csmooth_savgol,
-    smooth_spline as csmooth_spline,
-    non_uniform_spectra as cnon_uniform_spectra,
-    _detect_time_dim,
-    bwfilter2d,
-    corrf,
-    corrm,
-    gradientf,
-    histf,
-    filter2d,
-    filter2d_kernel,
-    interpolat_zeros_2d,
-    interpf as cinterpf,
-    jpdfscal as cjpdfscal,
-    probef as cprobef,
-    probeaverf as cprobeaverf,
-    spatiotempf as cspatiotempf,
-    tempcorrf as ctempcorrf,
-    warn_if_overwriting_scalar,
-)
 
 # """ learn from this example
 # import xarray as xr
@@ -132,7 +230,7 @@ from pivpy.compute_funcs import (
 
 
 @xr.register_dataset_accessor("piv")
-class PIVAccessor(object):
+class PIVAccessor:
     """extends xarray Dataset with PIVPy properties
 
     Return-type contract, by method category (documentation of an existing,
@@ -183,25 +281,25 @@ class PIVAccessor(object):
 
     def crop(self, crop_vector=None):
         """Crops xarray Dataset to specified spatial boundaries
-        
+
         Args:
-            crop_vector (list): List of [xmin, xmax, ymin, ymax] values 
-                to define cropping boundaries. Use None for any value to keep 
+            crop_vector (list): List of [xmin, xmax, ymin, ymax] values
+                to define cropping boundaries. Use None for any value to keep
                 the original boundary. Defaults to None (no cropping).
-                
+
         Returns:
             xarray.Dataset: Cropped dataset
-            
+
         Raises:
             ValueError: If crop_vector has wrong length or invalid bounds
-            
+
         Example:
             >>> data = data.piv.crop([5, 15, -5, -15])  # Crop to x:[5,15], y:[-5,-15]
             >>> data = data.piv.crop([None, 20, None, None])  # Crop only xmax to 20
         """
         if crop_vector is None:
             crop_vector = 4 * [None]
-        
+
         if len(crop_vector) != 4:
             raise ValueError(
                 f"crop_vector must have 4 elements [xmin, xmax, ymin, ymax], "
@@ -214,7 +312,7 @@ class PIVAccessor(object):
         xmax = self._obj.x.max() if xmax is None else xmax
         ymin = self._obj.y.min() if ymin is None else ymin
         ymax = self._obj.y.max() if ymax is None else ymax
-        
+
         # Note: We don't validate xmin < xmax or ymin < ymax because coordinates
         # might be in reverse order (e.g., negative y-axis pointing down)
 
@@ -264,7 +362,9 @@ class PIVAccessor(object):
         if rect is None:
             raise ValueError("extractf requires rect=[x1, y1, x2, y2]")
         if isinstance(rect, str) and rect.lower().startswith("draw"):
-            raise NotImplementedError("Interactive rectangle selection is not supported; pass rect explicitly.")
+            raise NotImplementedError(
+                "Interactive rectangle selection is not supported; pass rect explicitly."
+            )
 
         if not hasattr(rect, "__len__") or len(rect) != 4:
             raise ValueError("rect must be a sequence of 4 values: [x1, y1, x2, y2]")
@@ -274,7 +374,9 @@ class PIVAccessor(object):
         if "x" not in ds.dims or "y" not in ds.dims:
             raise ValueError("extractf requires dataset dims 'x' and 'y'")
 
-        def _bounds_from_phys(coord_vals: np.ndarray, a: float, b: float) -> tuple[int, int]:
+        def _bounds_from_phys(
+            coord_vals: np.ndarray, a: float, b: float
+        ) -> tuple[int, int]:
             vals = np.asarray(coord_vals, dtype=float)
             n = int(vals.shape[0])
             if n == 0:
@@ -291,14 +393,10 @@ class PIVAccessor(object):
             i1 = int(np.searchsorted(sorted_vals, lo, side="right") - 1)
             i2 = int(np.searchsorted(sorted_vals, hi, side="left"))
 
-            if i1 < 0:
-                i1 = 0
-            if i2 < 0:
-                i2 = 0
-            if i1 > n - 1:
-                i1 = n - 1
-            if i2 > n - 1:
-                i2 = n - 1
+            i1 = max(i1, 0)
+            i2 = max(i2, 0)
+            i1 = min(i1, n - 1)
+            i2 = min(i2, n - 1)
 
             if reversed_axis:
                 start = (n - 1) - i2
@@ -322,8 +420,7 @@ class PIVAccessor(object):
             hi = int(np.ceil(max(a, b))) - 1
             lo = max(lo, 0)
             hi = min(hi, n - 1)
-            if lo > hi:
-                lo = hi
+            lo = min(lo, hi)
             return lo, hi
 
         opt_l = str(opt).lower()
@@ -347,14 +444,14 @@ class PIVAccessor(object):
 
     def pan(self, shift_x=0.0, shift_y=0.0):
         """Shifts the coordinate system by specified amounts
-        
+
         Args:
             shift_x (float): Amount to shift in x direction. Defaults to 0.0.
             shift_y (float): Amount to shift in y direction. Defaults to 0.0.
-            
+
         Returns:
             xarray.Dataset: Dataset with shifted coordinates
-            
+
         Example:
             >>> data = data.piv.pan(10.0, -5.0)  # Shift x by +10, y by -5
         """
@@ -372,59 +469,59 @@ class PIVAccessor(object):
         keep_attrs: bool = True,
     ):
         """Clips values in the dataset based on specified thresholds
-        
+
         This method limits values in the dataset to fall within [min, max] range.
-        It can clip the entire dataset or filter based on specific variables (U, V, 
+        It can clip the entire dataset or filter based on specific variables (U, V,
         or scalar properties like magnitude).
-        
+
         Args:
-            min (float or None): Minimum value threshold. Values below this 
-                will be masked/removed. If None, no lower clipping is performed. 
+            min (float or None): Minimum value threshold. Values below this
+                will be masked/removed. If None, no lower clipping is performed.
                 Defaults to None.
-            max (float or None): Maximum value threshold. Values above this 
-                will be masked/removed. If None, no upper clipping is performed. 
+            max (float or None): Maximum value threshold. Values above this
+                will be masked/removed. If None, no upper clipping is performed.
                 Defaults to None.
             by (str or None): Variable name to use for clipping criterion.
-                Common values include 'u', 'v', or 'magnitude', but any scalar property 
+                Common values include 'u', 'v', or 'magnitude', but any scalar property
                 name in the dataset is valid (e.g., 'w' for vorticity, 'tke', etc.).
                 If None, clips all variables independently. If 'magnitude', computes
                 velocity magnitude and uses it for filtering. Defaults to None.
-            keep_attrs (bool): If True, attributes will be preserved. 
+            keep_attrs (bool): If True, attributes will be preserved.
                 Defaults to True.
-                
+
         Returns:
             xarray.Dataset: Dataset with clipped values. If 'by' is specified, returns
                 dataset with locations that don't meet the criteria set to NaN.
-                
+
         Raises:
             ValueError: If neither min nor max is provided
             ValueError: If 'by' variable doesn't exist in the dataset and isn't 'magnitude'
-            
+
         Examples:
             >>> # Clip all variables to [-10, 10] range
             >>> data = data.piv.clip(min=-10, max=10)
-            
+
             >>> # Filter based on U velocity component
             >>> data = data.piv.clip(min=-5, max=5, by='u')
-            
+
             >>> # Filter based on velocity magnitude
             >>> data = data.piv.clip(max=10, by='magnitude')
-            
+
             >>> # Filter based on vorticity (after computing it)
             >>> data = data.piv.vorticity(name='w')
             >>> data = data.piv.clip(min=-100, max=100, by='w')
-        
+
         See Also:
             xarray.Dataset.clip : Similar method in xarray
             numpy.clip : Equivalent function in NumPy
         """
         if min is None and max is None:
             raise ValueError("At least one of 'min' or 'max' must be provided")
-        
+
         if by is None:
             # Clip all variables independently using xarray's built-in clip
             return self._obj.clip(min=min, max=max, keep_attrs=keep_attrs)
-        
+
         # Clip based on a specific variable
         if by == "magnitude":
             # Compute magnitude if not already in dataset
@@ -437,27 +534,33 @@ class PIVAccessor(object):
                     f"Available variables: {list(self._obj.data_vars)}"
                 )
             criterion = self._obj[by]
-        
+
         # Create mask based on criterion
         mask = xr.ones_like(criterion, dtype=bool)
         if min is not None:
             mask = mask & (criterion >= min)
         if max is not None:
             mask = mask & (criterion <= max)
-        
+
         # Apply mask to all data variables (set non-matching locations to NaN)
         result = self._obj.copy()
         for var in result.data_vars:
             result[var] = result[var].where(mask)
-        
+
         if not keep_attrs:
             result.attrs = {}
             for var in result.data_vars:
                 result[var].attrs = {}
-        
+
         return result
 
-    def filterf(self, sigma: List[float] | float = [1.0, 1.0, 0.0], method: str = "gauss", *opts: str, **kwargs):
+    def filterf(
+        self,
+        sigma: list[float] | float = [1.0, 1.0, 0.0],
+        method: str = "gauss",
+        *opts: str,
+        **kwargs,
+    ):
         """Apply a spatial filter to a vector/scalar field (PIVMAT-inspired).
 
         This method supports two calling conventions:
@@ -487,7 +590,9 @@ class PIVAccessor(object):
                     f"sigma must have 3 elements [sigma_y, sigma_x, sigma_t], got {len(sigma_list)} elements"
                 )
             if any(float(s) < 0 for s in sigma_list):
-                raise ValueError(f"All sigma values must be non-negative, got {sigma_list}")
+                raise ValueError(
+                    f"All sigma values must be non-negative, got {sigma_list}"
+                )
 
             self._obj["u"] = xr.DataArray(
                 gaussian_filter(self._obj["u"].values, sigma_list, **kwargs),
@@ -587,8 +692,8 @@ class PIVAccessor(object):
         *,
         mode: Literal["low", "high"] = "low",
         trunc: bool = False,
-        var: Optional[str] = None,
-        variables: Optional[List[str]] = None,
+        var: str | None = None,
+        variables: list[str] | None = None,
     ) -> xr.Dataset:
         """Butterworth spatial filter for vector/scalar fields (PIVMAT-inspired).
 
@@ -640,7 +745,9 @@ class PIVAccessor(object):
             else:
                 variables = [v for v in ("u", "v") if v in out.data_vars]
                 if not variables:
-                    raise ValueError("bwfilterf: no variables to filter (expected 'u'/'v' or var=...)")
+                    raise ValueError(
+                        "bwfilterf: no variables to filter (expected 'u'/'v' or var=...)"
+                    )
         else:
             variables = list(variables)
             for v in variables:
@@ -684,8 +791,8 @@ class PIVAccessor(object):
         filtsize: float,
         order: float,
         *opts: str,
-        var: Optional[str] = None,
-        variables: Optional[List[str]] = None,
+        var: str | None = None,
+        variables: list[str] | None = None,
     ) -> xr.Dataset:
         """PIVMAT-compatible wrapper for :meth:`bwfilterf`.
 
@@ -790,7 +897,7 @@ class PIVAccessor(object):
         eps: float = 0.1,
         opt: Literal["add", "mul"] = "add",
         nc: float = 0.0,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ):
         """Adds normally-distributed white noise to velocity fields.
 
@@ -929,9 +1036,16 @@ class PIVAccessor(object):
             v_mean = _mean_excluding_zeros(v0)
 
             avg = ds.isel(t=[0]).copy(deep=True)
-            avg = avg.drop_vars([v for v in avg.data_vars if v not in {"u", "v", "chc", "mask"}], errors="ignore")
-            avg["u"] = xr.DataArray(u_mean[:, :, None], dims=("y", "x", "t"), attrs=ds["u"].attrs)
-            avg["v"] = xr.DataArray(v_mean[:, :, None], dims=("y", "x", "t"), attrs=ds["v"].attrs)
+            avg = avg.drop_vars(
+                [v for v in avg.data_vars if v not in {"u", "v", "chc", "mask"}],
+                errors="ignore",
+            )
+            avg["u"] = xr.DataArray(
+                u_mean[:, :, None], dims=("y", "x", "t"), attrs=ds["u"].attrs
+            )
+            avg["v"] = xr.DataArray(
+                v_mean[:, :, None], dims=("y", "x", "t"), attrs=ds["v"].attrs
+            )
             avg = avg.assign_coords(t=np.asarray([0.0], dtype=float))
             avg.attrs = dict(ds.attrs)
 
@@ -964,8 +1078,16 @@ class PIVAccessor(object):
             rms_ds = rms_ds.drop_vars(list(rms_ds.data_vars), errors="ignore")
 
             units = ds["u"].attrs.get("units", "")
-            std_ds["w"] = xr.DataArray(std_field[:, :, None], dims=("y", "x", "t"), attrs={"standard_name": "standard_deviation", "units": units})
-            rms_ds["w"] = xr.DataArray(rms_field[:, :, None], dims=("y", "x", "t"), attrs={"standard_name": "root_mean_square", "units": units})
+            std_ds["w"] = xr.DataArray(
+                std_field[:, :, None],
+                dims=("y", "x", "t"),
+                attrs={"standard_name": "standard_deviation", "units": units},
+            )
+            rms_ds["w"] = xr.DataArray(
+                rms_field[:, :, None],
+                dims=("y", "x", "t"),
+                attrs={"standard_name": "root_mean_square", "units": units},
+            )
             std_ds = std_ds.assign_coords(t=np.asarray([0.0], dtype=float))
             rms_ds = rms_ds.assign_coords(t=np.asarray([0.0], dtype=float))
             std_ds.attrs = dict(ds.attrs)
@@ -979,7 +1101,9 @@ class PIVAccessor(object):
             w_mean = _mean_excluding_zeros(w0)
             avg = ds.isel(t=[0]).copy(deep=True)
             avg = avg.drop_vars([v for v in avg.data_vars if v != "w"], errors="ignore")
-            avg["w"] = xr.DataArray(w_mean[:, :, None], dims=("y", "x", "t"), attrs=ds["w"].attrs)
+            avg["w"] = xr.DataArray(
+                w_mean[:, :, None], dims=("y", "x", "t"), attrs=ds["w"].attrs
+            )
             avg = avg.assign_coords(t=np.asarray([0.0], dtype=float))
             avg.attrs = dict(ds.attrs)
             if not return_std_rms:
@@ -1000,8 +1124,16 @@ class PIVAccessor(object):
             rms_ds = ds.isel(t=[0]).copy(deep=True)
             std_ds = std_ds.drop_vars(list(std_ds.data_vars), errors="ignore")
             rms_ds = rms_ds.drop_vars(list(rms_ds.data_vars), errors="ignore")
-            std_ds["w"] = xr.DataArray(std_field[:, :, None], dims=("y", "x", "t"), attrs={"standard_name": "standard_deviation", "units": units})
-            rms_ds["w"] = xr.DataArray(rms_field[:, :, None], dims=("y", "x", "t"), attrs={"standard_name": "root_mean_square", "units": units})
+            std_ds["w"] = xr.DataArray(
+                std_field[:, :, None],
+                dims=("y", "x", "t"),
+                attrs={"standard_name": "standard_deviation", "units": units},
+            )
+            rms_ds["w"] = xr.DataArray(
+                rms_field[:, :, None],
+                dims=("y", "x", "t"),
+                attrs={"standard_name": "root_mean_square", "units": units},
+            )
             std_ds = std_ds.assign_coords(t=np.asarray([0.0], dtype=float))
             rms_ds = rms_ds.assign_coords(t=np.asarray([0.0], dtype=float))
             std_ds.attrs = dict(ds.attrs)
@@ -1016,11 +1148,11 @@ class PIVAccessor(object):
         y0: float = 0.0,
         *,
         center_units: Literal["phys", "mesh"] = "phys",
-        rmax: Optional[float] = None,
+        rmax: float | None = None,
         keepzero: bool = False,
         return_profiles: bool = False,
-        var: Optional[str] = None,
-        frame: Optional[int] = None,
+        var: str | None = None,
+        frame: int | None = None,
     ):
         """Azimuthal average of a vector/scalar field.
 
@@ -1157,7 +1289,9 @@ class PIVAccessor(object):
                 if not np.any(valid):
                     continue
                 cnt = np.bincount(bin_flat[valid], minlength=maxbin + 1)
-                s = np.bincount(bin_flat[valid], weights=A_flat[valid], minlength=maxbin + 1)
+                s = np.bincount(
+                    bin_flat[valid], weights=A_flat[valid], minlength=maxbin + 1
+                )
                 with np.errstate(divide="ignore", invalid="ignore"):
                     p = s / cnt
                 prof[:, k] = p
@@ -1177,8 +1311,12 @@ class PIVAccessor(object):
                     ut_pt = (-U_flat * dY_flat + V_flat * dX_flat) / R_flat
 
                 cnt = np.bincount(bin_flat[valid], minlength=maxbin + 1)
-                sur = np.bincount(bin_flat[valid], weights=ur_pt[valid], minlength=maxbin + 1)
-                sut = np.bincount(bin_flat[valid], weights=ut_pt[valid], minlength=maxbin + 1)
+                sur = np.bincount(
+                    bin_flat[valid], weights=ur_pt[valid], minlength=maxbin + 1
+                )
+                sut = np.bincount(
+                    bin_flat[valid], weights=ut_pt[valid], minlength=maxbin + 1
+                )
                 with np.errstate(divide="ignore", invalid="ignore"):
                     ur = sur / cnt
                     ut = sut / cnt
@@ -1203,12 +1341,16 @@ class PIVAccessor(object):
 
         first_bin = int(nonzero_bins[0])
         last_bin = int(nonzero_bins[-1])
-        r_vec = (np.arange(first_bin, last_bin + 1, dtype=float) * dr)
+        r_vec = np.arange(first_bin, last_bin + 1, dtype=float) * dr
 
         if return_profiles:
             if scalar_mode:
                 return r_vec, prof[first_bin : last_bin + 1, :]
-            return r_vec, prof_ur[first_bin : last_bin + 1, :], prof_ut[first_bin : last_bin + 1, :]
+            return (
+                r_vec,
+                prof_ur[first_bin : last_bin + 1, :],
+                prof_ut[first_bin : last_bin + 1, :],
+            )
 
         # Build azimuthally averaged field.
         out = ds.copy(deep=True)
@@ -1271,8 +1413,12 @@ class PIVAccessor(object):
                 u_new = np.zeros_like(R)
                 v_new = np.zeros_like(R)
                 # u = ur * cos(theta) - ut * sin(theta) where cos=dx/r, sin=dy/r
-                u_new[in_range] = ur_grid[in_range] * (dX[in_range] / R[in_range]) - ut_grid[in_range] * (dY[in_range] / R[in_range])
-                v_new[in_range] = ur_grid[in_range] * (dY[in_range] / R[in_range]) + ut_grid[in_range] * (dX[in_range] / R[in_range])
+                u_new[in_range] = ur_grid[in_range] * (
+                    dX[in_range] / R[in_range]
+                ) - ut_grid[in_range] * (dY[in_range] / R[in_range])
+                v_new[in_range] = ur_grid[in_range] * (
+                    dY[in_range] / R[in_range]
+                ) + ut_grid[in_range] * (dX[in_range] / R[in_range])
                 out["u"].isel(t=ti).values[...] = u_new
                 out["v"].isel(t=ti).values[...] = v_new
         else:
@@ -1286,8 +1432,12 @@ class PIVAccessor(object):
             ut_grid[in_range] = ut_full[bin2[in_range]]
             u_new = np.zeros_like(R)
             v_new = np.zeros_like(R)
-            u_new[in_range] = ur_grid[in_range] * (dX[in_range] / R[in_range]) - ut_grid[in_range] * (dY[in_range] / R[in_range])
-            v_new[in_range] = ur_grid[in_range] * (dY[in_range] / R[in_range]) + ut_grid[in_range] * (dX[in_range] / R[in_range])
+            u_new[in_range] = ur_grid[in_range] * (
+                dX[in_range] / R[in_range]
+            ) - ut_grid[in_range] * (dY[in_range] / R[in_range])
+            v_new[in_range] = ur_grid[in_range] * (
+                dY[in_range] / R[in_range]
+            ) + ut_grid[in_range] * (dX[in_range] / R[in_range])
             out["u"].values[...] = u_new
             out["v"].values[...] = v_new
 
@@ -1363,8 +1513,12 @@ class PIVAccessor(object):
         a_da = xr.DataArray(angle, dims=(angle_dim,), coords={angle_dim: angle})
         x_da = xr.DataArray(x_s, dims=(angle_dim,), coords={angle_dim: angle})
         y_da = xr.DataArray(y_s, dims=(angle_dim,), coords={angle_dim: angle})
-        cos_da = xr.DataArray(np.cos(angle), dims=(angle_dim,), coords={angle_dim: angle})
-        sin_da = xr.DataArray(np.sin(angle), dims=(angle_dim,), coords={angle_dim: angle})
+        cos_da = xr.DataArray(
+            np.cos(angle), dims=(angle_dim,), coords={angle_dim: angle}
+        )
+        sin_da = xr.DataArray(
+            np.sin(angle), dims=(angle_dim,), coords={angle_dim: angle}
+        )
 
         # Optional frame selection.
         if frame is not None:
@@ -1489,7 +1643,7 @@ class PIVAccessor(object):
         x0,
         y0,
         *,
-        variables: Optional[list[str]] = None,
+        variables: list[str] | None = None,
         method: str = "linear",
     ) -> xr.Dataset:
         """Record the time evolution of probe point(s) (PIVMAT-inspired).
@@ -1520,7 +1674,7 @@ class PIVAccessor(object):
         self,
         rect,
         *,
-        variables: Optional[list[str]] = None,
+        variables: list[str] | None = None,
         skipna: bool = True,
     ) -> xr.Dataset:
         """Time series averaged over a rectangular area (PIVMAT-inspired).
@@ -1549,7 +1703,7 @@ class PIVAccessor(object):
         Y,
         *,
         var: str = "w",
-        n: Optional[int] = None,
+        n: int | None = None,
         method: str = "linear",
     ) -> xr.Dataset:
         """Spatio-temporal diagram along line segment(s) (PIVMAT-inspired).
@@ -1577,7 +1731,7 @@ class PIVAccessor(object):
     def tempcorrf(
         self,
         *,
-        variables: Optional[list[str]] = None,
+        variables: list[str] | None = None,
         opt: str = "",
         normalize: bool = False,
     ) -> xr.Dataset:
@@ -1632,7 +1786,9 @@ class PIVAccessor(object):
 
         n_frames = int(ds.sizes.get("t", 0) or 0)
         if tini_arr.size != n_frames:
-            raise ValueError("Size of tini must coincide with the dataset time dimension")
+            raise ValueError(
+                "Size of tini must coincide with the dataset time dimension"
+            )
 
         if tini_arr.size < 2:
             raise ValueError("tini must contain at least 2 points")
@@ -1643,11 +1799,15 @@ class PIVAccessor(object):
         if tfin_arr.size == 0:
             raise ValueError("tfin must be non-empty")
 
-        if float(np.min(tfin_arr)) < float(tini_arr[0]) or float(np.max(tfin_arr)) > float(tini_arr[-1]):
+        if float(np.min(tfin_arr)) < float(tini_arr[0]) or float(
+            np.max(tfin_arr)
+        ) > float(tini_arr[-1]):
             raise ValueError("Some values of tfin fall outside the bounds of tini")
 
         # Interpolate in a dedicated coordinate to avoid assumptions about existing ds.t.
-        ds_time = ds.assign_coords(_resample_time=("t", tini_arr)).swap_dims({"t": "_resample_time"})
+        ds_time = ds.assign_coords(_resample_time=("t", tini_arr)).swap_dims(
+            {"t": "_resample_time"}
+        )
         out = ds_time.interp(_resample_time=tfin_arr, method=method)
         out = out.swap_dims({"_resample_time": "t"}).assign_coords(t=tfin_arr)
         out = out.drop_vars("_resample_time")
@@ -1658,7 +1818,7 @@ class PIVAccessor(object):
         self,
         opt: str = "xy",
         *,
-        var: Optional[str] = None,
+        var: str | None = None,
     ):
         """Spatial average over X and/or Y of a vector/scalar field.
 
@@ -1682,7 +1842,9 @@ class PIVAccessor(object):
         axis = opt_l.replace("0", "") or "xy"
 
         if axis not in {"x", "y", "xy"}:
-            raise ValueError("Invalid axis; expected 'x', 'y', or 'xy' (optionally with '0')")
+            raise ValueError(
+                "Invalid axis; expected 'x', 'y', or 'xy' (optionally with '0')"
+            )
 
         def _mean_broadcast(da: xr.DataArray, reduce_dims: list[str]) -> xr.DataArray:
             if include_zeros:
@@ -1715,7 +1877,9 @@ class PIVAccessor(object):
             da = out[name]
             # Ensure y/x exist; allow missing t (single frame).
             if "y" not in da.dims or "x" not in da.dims:
-                raise ValueError(f"Variable '{name}' must have spatial dims 'y' and 'x'")
+                raise ValueError(
+                    f"Variable '{name}' must have spatial dims 'y' and 'x'"
+                )
             out[name] = _mean_broadcast(da, reduce_dims)
             out[name].attrs = dict(ds[name].attrs)
 
@@ -1726,7 +1890,7 @@ class PIVAccessor(object):
         self,
         opt: str = "e",
         *,
-        var: Optional[str] = None,
+        var: str | None = None,
     ):
         """Subtract an ensemble (temporal) or spatial average from a field.
 
@@ -1773,7 +1937,11 @@ class PIVAccessor(object):
                 mean_da = mean_ds[name]
 
                 # Broadcast mean to all time steps.
-                if "t" in da.dims and "t" in mean_da.dims and mean_da.sizes.get("t", 1) == 1:
+                if (
+                    "t" in da.dims
+                    and "t" in mean_da.dims
+                    and mean_da.sizes.get("t", 1) == 1
+                ):
                     mean_b = mean_da.isel(t=0).broadcast_like(da)
                 else:
                     mean_b = mean_da.broadcast_like(da)
@@ -1877,7 +2045,9 @@ class PIVAccessor(object):
 
         ds = self._obj
         if variables is None:
-            variables = [v for v in ("u", "v") if v in ds.data_vars] or list(ds.data_vars)
+            variables = [v for v in ("u", "v") if v in ds.data_vars] or list(
+                ds.data_vars
+            )
 
         out = ds.copy(deep=True)
         for name in variables:
@@ -1921,7 +2091,9 @@ class PIVAccessor(object):
             Filled dataset.
         """
 
-        return cinterpf(self._obj, method=int(method), variables=variables, missing=missing)
+        return cinterpf(
+            self._obj, method=int(method), variables=variables, missing=missing
+        )
 
     def __add__(self, other):
         """add two datasets means that we sum up the velocities, assume
@@ -1939,9 +2111,11 @@ class PIVAccessor(object):
         self._obj["v"] -= other._obj["v"]
         return self._obj
 
-    def vorticity(self, method: str = "differentiation", radius: int = 1, name: str = "w"):
+    def vorticity(
+        self, method: str = "differentiation", radius: int = 1, name: str = "w"
+    ):
         """Calculates vorticity of the data array and adds it to the dataset.
-        
+
         Args:
             method (str): Vorticity calculation method. Options:
                 'differentiation' (default): Standard finite difference (dv_dx - du_dy).
@@ -1955,7 +2129,7 @@ class PIVAccessor(object):
 
         Output:
             xarray with the estimated vorticity as a scalar field with same dimensions
-            
+
         Example:
             >>> data.piv.vorticity()  # Creates data["w"] with finite-difference vorticity
             >>> data.piv.vorticity(method="circulation", radius=2)  # Noise-robust circulation vorticity
@@ -1976,14 +2150,14 @@ class PIVAccessor(object):
 
     def strain(self, name: str = "w"):
         """Calculates rate of strain of a two component field
-        
+
         Args:
             name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
 
         Returns:
             xarray.Dataset: Dataset with added scalar field = du_dx^2 + dv_dy^2 + 0.5*(du_dy+dv_dx)^2
-            
+
         Example:
             >>> data.piv.strain()  # Creates data["w"] with strain
             >>> data.piv.strain(name="strain_rate")  # Creates data["strain_rate"]
@@ -2002,14 +2176,14 @@ class PIVAccessor(object):
 
     def divergence(self, name: str = "w"):
         """Calculates divergence field
-        
+
         Args:
             name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
 
         Returns:
             xarray.Dataset: Dataset with the new property [name] = divergence
-            
+
         Example:
             >>> data.piv.divergence()  # Creates data["w"] with divergence
             >>> data.piv.divergence(name="div")  # Creates data["div"] with divergence
@@ -2024,9 +2198,11 @@ class PIVAccessor(object):
 
         return self._obj
 
-    def acceleration(self, name: str = "w", unsteady: bool = True, return_vector: bool = False):
+    def acceleration(
+        self, name: str = "w", unsteady: bool = True, return_vector: bool = False
+    ):
         """Calculates material derivative or acceleration of the data array.
-        
+
         Args:
             name (str): Name for the output scalar field. Defaults to "w".
             unsteady (bool): If True and time dimension 't' has multiple frames,
@@ -2038,7 +2214,7 @@ class PIVAccessor(object):
 
         Output:
             xarray with the estimated acceleration as a scalar field data[name] (or ax, ay)
-            
+
         Example:
             >>> data = data.piv.acceleration()  # Creates data["w"] with acceleration
             >>> data = data.piv.acceleration(name="accel")  # Creates data["accel"]
@@ -2050,14 +2226,14 @@ class PIVAccessor(object):
 
     def kinetic_energy(self, name: str = "w"):
         """Estimates kinetic energy
-        
+
         Args:
             name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
-                
+
         Returns:
             xarray.Dataset: Dataset with kinetic energy field
-            
+
         Example:
             >>> data.piv.kinetic_energy()  # Creates data["w"] with KE
             >>> data.piv.kinetic_energy(name="ke")  # Creates data["ke"]
@@ -2071,22 +2247,22 @@ class PIVAccessor(object):
     def tke(
         self,
         name: str = "w",
-        weights: Optional[xr.DataArray] = None,
+        weights: xr.DataArray | None = None,
         time_average: bool = False,
-        dim: Optional[str] = None,
+        dim: str | None = None,
     ):
         """Estimates turbulent kinetic energy: 0.5 * sum(<u_i'^2>).
-        
+
         Args:
             name (str): Name for the output scalar field. Defaults to "w".
             weights (DataArray, optional): Weights for time averaging.
             time_average (bool): If True, returns time-averaged TKE field. If False,
                 returns instantaneous TKE across time frames. Defaults to False.
             dim (str, optional): Time/ensemble dimension.
-                
+
         Returns:
             xarray.Dataset: Dataset with TKE field.
-            
+
         Raises:
             ValueError: If dataset has less than 2 time frames
         """
@@ -2126,7 +2302,7 @@ class PIVAccessor(object):
 
     def tke_budget(
         self,
-        nu: Optional[float] = None,
+        nu: float | None = None,
         rho: float = 1.0,
         method: str = "central",
     ) -> xr.Dataset:
@@ -2154,14 +2330,30 @@ class PIVAccessor(object):
             point=point,
         )
 
-    def detect_vortices(self, criterion="gamma2", threshold=0.5, sign="all", min_area=4):
-        return cdetect_vortices(self._obj, criterion=criterion, threshold=threshold, sign=sign, min_area=min_area)
+    def detect_vortices(
+        self, criterion="gamma2", threshold=0.5, sign="all", min_area=4
+    ):
+        return cdetect_vortices(
+            self._obj,
+            criterion=criterion,
+            threshold=threshold,
+            sign=sign,
+            min_area=min_area,
+        )
 
     def vortex_probability(self, criterion="gamma2", threshold=0.5, sign="all"):
-        return cspatial_vortex_probability(self._obj, criterion=criterion, threshold=threshold, sign=sign)
+        return cspatial_vortex_probability(
+            self._obj, criterion=criterion, threshold=threshold, sign=sign
+        )
 
     def fft_spectrum(self, component="u", window="hann", detrend=True, azimuthal=True):
-        return cfft_spectrum_2d(self._obj, component=component, window=window, detrend=detrend, azimuthal=azimuthal)
+        return cfft_spectrum_2d(
+            self._obj,
+            component=component,
+            window=window,
+            detrend=detrend,
+            azimuthal=azimuthal,
+        )
 
     def reynolds_stress_std(self, ddof: int = 1):
         return creynolds_stress_std(self._obj, ddof=ddof)
@@ -2170,7 +2362,9 @@ class PIVAccessor(object):
         return ctke_std(self._obj, mode=mode, ddof=ddof)
 
     def stress_line_profile(self, x0, y0, x1, y1, component: str = "uu"):
-        return cstress_line_profile(self._obj, x0=x0, y0=y0, x1=x1, y1=y1, component=component)
+        return cstress_line_profile(
+            self._obj, x0=x0, y0=y0, x1=x1, y1=y1, component=component
+        )
 
     def anisotropy_tensor(self):
         return canisotropy_tensor(self._obj)
@@ -2183,12 +2377,12 @@ class PIVAccessor(object):
 
     def fluct(
         self,
-        var_key: Optional[str] = None,
-        weights: Optional[xr.DataArray] = None,
-        dim: Optional[str] = None,
+        var_key: str | None = None,
+        weights: xr.DataArray | None = None,
+        dim: str | None = None,
     ):
         """Returns velocity fluctuations relative to the ensemble mean.
-        
+
         If `var_key` is provided (e.g. 'u', 'v'), returns an xr.DataArray of fluctuations.
         If `var_key` is None, returns a new xr.Dataset with all velocity components
         replaced by their fluctuations.
@@ -2218,11 +2412,11 @@ class PIVAccessor(object):
     def product(
         self,
         product_key: str,
-        weights: Optional[xr.DataArray] = None,
-        dim: Optional[str] = None,
+        weights: xr.DataArray | None = None,
+        dim: str | None = None,
     ) -> xr.DataArray:
         """Calculates element-wise product of variables (raw or fluctuating).
-        
+
         Example:
             >>> ds.piv.product("u'v'")    # u' * v'
             >>> ds.piv.product("u'u'u'")  # u'^3
@@ -2231,23 +2425,25 @@ class PIVAccessor(object):
 
     def reynolds_stresses(
         self,
-        weights: Optional[xr.DataArray] = None,
-        dim: Optional[str] = None,
-        components: Optional[List[str]] = None,
+        weights: xr.DataArray | None = None,
+        dim: str | None = None,
+        components: list[str] | None = None,
     ) -> xr.Dataset:
         """Calculates all Reynolds stress components <u_i' u_j'> for 2D or 3D fields."""
-        return creynolds_stresses(self._obj, weights=weights, dim=dim, components=components)
+        return creynolds_stresses(
+            self._obj, weights=weights, dim=dim, components=components
+        )
 
     def moments(
         self,
-        variables: Optional[List[str]] = None,
+        variables: list[str] | None = None,
         order: int = 2,
-        weights: Optional[xr.DataArray] = None,
+        weights: xr.DataArray | None = None,
         standardized: bool = False,
-        dim: Optional[str] = None,
+        dim: str | None = None,
     ) -> xr.Dataset:
         """Calculates high-order turbulence moments up to specified order.
-        
+
         If standardized=True, moments are normalized by powers of standard deviations
         (e.g. skewness for order 3, kurtosis/flatness for order 4).
         """
@@ -2262,10 +2458,10 @@ class PIVAccessor(object):
 
     def all_products(
         self,
-        variables: Optional[List[str]] = None,
+        variables: list[str] | None = None,
         order: int = 2,
-        weights: Optional[xr.DataArray] = None,
-        dim: Optional[str] = None,
+        weights: xr.DataArray | None = None,
+        dim: str | None = None,
     ) -> xr.Dataset:
         """Adds all instantaneous fluctuation products up to specified order to the dataset."""
         return ccalc_all_products(
@@ -2279,12 +2475,12 @@ class PIVAccessor(object):
     def two_point_correlation(
         self,
         var_name: str = "u",
-        x_ref: Optional[float] = None,
-        y_ref: Optional[float] = None,
+        x_ref: float | None = None,
+        y_ref: float | None = None,
         x_dim: str = "x",
         y_dim: str = "y",
-        time_dim: Optional[str] = None,
-        weights: Optional[xr.DataArray] = None,
+        time_dim: str | None = None,
+        weights: xr.DataArray | None = None,
         swap_dims: bool = True,
     ) -> xr.DataArray:
         """Calculates localized 2-point spatial correlation relative to reference probe (x_ref, y_ref)."""
@@ -2306,8 +2502,8 @@ class PIVAccessor(object):
         dim: str = "x",
         method: str = "1e",
         fit_model: str = "single",
-        x_ref: Optional[float] = None,
-        y_ref: Optional[float] = None,
+        x_ref: float | None = None,
+        y_ref: float | None = None,
     ) -> xr.DataArray:
         """Computes integral length scale using method ('1e', 'integral', 'fit')."""
         corr = self.two_point_correlation(
@@ -2318,18 +2514,20 @@ class PIVAccessor(object):
             y_dim="y",
         )
         lag_dim = f"lag_{dim}" if f"lag_{dim}" in corr.coords else dim
-        return ccompute_length_scale(corr, dim=lag_dim, method=method, fit_model=fit_model)
+        return ccompute_length_scale(
+            corr, dim=lag_dim, method=method, fit_model=fit_model
+        )
 
     def add_quadrants(
         self,
         x_var: str = "u",
         y_var: str = "v",
-        z_var: Optional[str] = None,
+        z_var: str | None = None,
         analysis_type: str = "quadrant",
         hole_size: float = 0.0,
-        hole_vars: Optional[Tuple[str, str]] = None,
-        weights: Optional[xr.DataArray] = None,
-        dim: Optional[str] = None,
+        hole_vars: tuple[str, str] | None = None,
+        weights: xr.DataArray | None = None,
+        dim: str | None = None,
     ) -> xr.Dataset:
         """Classify data points into quadrants (2D) or octants (3D) and apply hole filtering."""
         return cadd_quadrants(
@@ -2349,11 +2547,11 @@ class PIVAccessor(object):
         analysis_type: str = "quadrant",
         x_var: str = "u",
         y_var: str = "v",
-        z_var: Optional[str] = None,
+        z_var: str | None = None,
         hole_size: float = 0.0,
-        hole_vars: Optional[Tuple[str, str]] = None,
-        weights: Optional[xr.DataArray] = None,
-        dim: Optional[str] = None,
+        hole_vars: tuple[str, str] | None = None,
+        weights: xr.DataArray | None = None,
+        dim: str | None = None,
     ) -> xr.Dataset:
         """Calculates conditional averages for each quadrant/octant."""
         return ccalc_quadrant_mean(
@@ -2373,11 +2571,11 @@ class PIVAccessor(object):
         analysis_type: str = "quadrant",
         x_var: str = "u",
         y_var: str = "v",
-        z_var: Optional[str] = None,
+        z_var: str | None = None,
         hole_size: float = 0.0,
-        hole_vars: Optional[Tuple[str, str]] = None,
-        weights: Optional[xr.DataArray] = None,
-        dim: Optional[str] = None,
+        hole_vars: tuple[str, str] | None = None,
+        weights: xr.DataArray | None = None,
+        dim: str | None = None,
     ) -> xr.Dataset:
         """Calculates the fraction of total stress from each quadrant."""
         return ccalc_quadrant_fraction(
@@ -2397,11 +2595,11 @@ class PIVAccessor(object):
         analysis_type: str = "quadrant",
         x_var: str = "u",
         y_var: str = "v",
-        z_var: Optional[str] = None,
+        z_var: str | None = None,
         hole_size: float = 0.0,
-        hole_vars: Optional[Tuple[str, str]] = None,
-        weights: Optional[xr.DataArray] = None,
-        dim: Optional[str] = None,
+        hole_vars: tuple[str, str] | None = None,
+        weights: xr.DataArray | None = None,
+        dim: str | None = None,
     ) -> xr.Dataset:
         """Calculates duration or occurrence frequency spent in each quadrant."""
         return ccalc_quadrant_duration(
@@ -2420,12 +2618,12 @@ class PIVAccessor(object):
         self,
         x_var: str = "u",
         y_var: str = "v",
-        z_var: Optional[str] = None,
+        z_var: str | None = None,
         analysis_type: str = "quadrant",
         hole_size: float = 0.0,
-        hole_vars: Optional[Tuple[str, str]] = None,
-        weights: Optional[xr.DataArray] = None,
-        dim: Optional[str] = None,
+        hole_vars: tuple[str, str] | None = None,
+        weights: xr.DataArray | None = None,
+        dim: str | None = None,
     ) -> xr.Dataset:
         """High-level quadrant/octant turbulence analysis returning fractions, duration, and means."""
         return cquadrant_analysis(
@@ -2462,7 +2660,7 @@ class PIVAccessor(object):
         self,
         var_key: str = "u",
         dim: str = "x",
-        s_factor: Optional[float] = None,
+        s_factor: float | None = None,
         order: int = 3,
         deriv: int = 0,
     ) -> xr.DataArray:
@@ -2480,9 +2678,9 @@ class PIVAccessor(object):
         self,
         var_key: str = "u",
         dim: str = "t",
-        weights: Optional[Union[str, xr.DataArray]] = None,
-        dt: Optional[float] = None,
-        K2: Optional[int] = None,
+        weights: str | xr.DataArray | None = None,
+        dt: float | None = None,
+        K2: int | None = None,
         meanrem: bool = True,
         atw: bool = False,
         locnor: bool = False,
@@ -2514,31 +2712,39 @@ class PIVAccessor(object):
             selfproducts=selfproducts,
         )
 
-        return xr.Dataset(
-            data_vars={
-                "autocorrelation": xr.DataArray(np.real(R), dims=("lag",), coords={"lag": tau}),
-                "psd": xr.DataArray(np.real(S), dims=("frequency",), coords={"frequency": f}),
-            },
-            attrs={
-                "method": "non_uniform_spectra",
-                "source_variable": var_key,
-                "source_dim": dim,
-            },
-        ).sortby("lag").sortby("frequency")
+        return (
+            xr.Dataset(
+                data_vars={
+                    "autocorrelation": xr.DataArray(
+                        np.real(R), dims=("lag",), coords={"lag": tau}
+                    ),
+                    "psd": xr.DataArray(
+                        np.real(S), dims=("frequency",), coords={"frequency": f}
+                    ),
+                },
+                attrs={
+                    "method": "non_uniform_spectra",
+                    "source_variable": var_key,
+                    "source_dim": dim,
+                },
+            )
+            .sortby("lag")
+            .sortby("frequency")
+        )
 
     def reynolds_stress(self, name: str = "w"):
         """Calculates Reynolds stress from velocity fluctuations
-        
+
         Args:
             name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
-                
+
         Returns:
             xarray.Dataset: Dataset with Reynolds stress field (-<u'v'>)
-            
+
         Raises:
             ValueError: If dataset has less than 2 time frames
-            
+
         Example:
             >>> data.piv.reynolds_stress()  # Creates data["w"] with Reynolds stress
             >>> data.piv.reynolds_stress(name="rey_stress")  # Creates data["rey_stress"]
@@ -2555,21 +2761,23 @@ class PIVAccessor(object):
         new_obj -= new_obj.mean(dim="t")
 
         new_obj[name] = -1 * new_obj["u"] * new_obj["v"]  # new scalar
-        self._obj[name] = new_obj[name].mean(dim="t")  # reynolds stress is -\rho < u' v'>
+        self._obj[name] = new_obj[name].mean(
+            dim="t"
+        )  # reynolds stress is -\rho < u' v'>
         self._obj[name].attrs["standard_name"] = "Reynolds_stress"
 
         return self._obj
 
     def rms(self, name: str = "w"):
         """Root mean square of velocity fluctuations
-        
+
         Args:
             name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
-                
+
         Returns:
             xarray.Dataset: Dataset with RMS field (sqrt of TKE)
-            
+
         Example:
             >>> data.piv.rms()  # Creates data["w"] with RMS
             >>> data.piv.rms(name="rms")  # Creates data["rms"]
@@ -2666,18 +2874,22 @@ class PIVAccessor(object):
         name_mask: str | None = None,
     ):
         """Applies Westerweel & Scarano (2005) Normalized Median Test to detect outliers.
-        
+
         Args:
             radius (int): Stencil radius in grid units. Defaults to 1.
             threshold (float): Outlier detection threshold. Defaults to 2.0.
             epsilon (float): Noise floor in velocity units. Defaults to 0.1.
             name_mask (str, optional): Optional variable name to store outlier boolean mask.
-            
+
         Returns:
             xarray.Dataset: Dataset with outliers flagged in 'chc' (and optional mask).
         """
         return cnormalized_median_test(
-            self._obj, radius=radius, threshold=threshold, epsilon=epsilon, name_mask=name_mask
+            self._obj,
+            radius=radius,
+            threshold=threshold,
+            epsilon=epsilon,
+            name_mask=name_mask,
         )
 
     def clean(
@@ -2689,14 +2901,14 @@ class PIVAccessor(object):
         radius: int = 1,
     ):
         """Detects velocity outliers and inpaints missing/flagged vectors.
-        
+
         Args:
             method (str): Outlier detection method ('normalized_median' or 'mask').
             threshold (float): Outlier threshold for normalized median test. Defaults to 2.0.
             epsilon (float): Noise floor parameter. Defaults to 0.1.
             inpaint_method (int or str): Inpainting scheme (0=harmonic, 1=nearest, 2=linear).
             radius (int): Neighborhood radius for median test. Defaults to 1.
-            
+
         Returns:
             xarray.Dataset: Cleaned dataset.
         """
@@ -2711,12 +2923,12 @@ class PIVAccessor(object):
 
     def filter_outliers(self, threshold: float = 2.0, replace: bool = True, **kwargs):
         """Convenience method to detect and optionally replace spurious vector outliers.
-        
+
         Args:
             threshold (float): Outlier threshold for normalized median test. Defaults to 2.0.
             replace (bool): If True, replaces outliers via harmonic inpainting. If False, flags in 'chc'.
             **kwargs: Additional parameters passed to `clean` or `normalized_median_test`.
-            
+
         Returns:
             xarray.Dataset: Filtered/cleaned dataset.
         """
@@ -2731,12 +2943,12 @@ class PIVAccessor(object):
         **kwargs,
     ):
         """Applies spatial smoothing to velocity vector fields.
-        
+
         Args:
             sigma (float or sequence): Smoothing scale / window size / cutoff size.
             method (str): Filtering method ('gaussian', 'median', 'boxcar', 'butterworth'). Defaults to 'gaussian'.
             **kwargs: Additional parameters passed to filtering backend (e.g. order=2 for Butterworth).
-            
+
         Returns:
             xarray.Dataset: Smoothed dataset.
         """
@@ -2746,13 +2958,20 @@ class PIVAccessor(object):
             dim = kwargs.pop("dim", "x")
             window_length = kwargs.pop(
                 "window_length",
-                5 if isinstance(sigma, (int, float)) and sigma == 1.0 else int(sigma if isinstance(sigma, (int, float)) else sigma[0]),
+                5
+                if isinstance(sigma, (int, float)) and sigma == 1.0
+                else int(sigma if isinstance(sigma, (int, float)) else sigma[0]),
             )
             polyorder = kwargs.pop("polyorder", 2)
             for v in ["u", "v", "w"]:
                 if v in out.data_vars:
                     out[v] = csmooth_savgol(
-                        out, var_key=v, dim=dim, window_length=window_length, polyorder=polyorder, **kwargs
+                        out,
+                        var_key=v,
+                        dim=dim,
+                        window_length=window_length,
+                        polyorder=polyorder,
+                        **kwargs,
                     )
             return out
         elif m == "spline":
@@ -2764,7 +2983,12 @@ class PIVAccessor(object):
             for v in ["u", "v", "w"]:
                 if v in out.data_vars:
                     out[v] = csmooth_spline(
-                        out, var_key=v, dim=dim, s_factor=s_factor, order=order, deriv=deriv
+                        out,
+                        var_key=v,
+                        dim=dim,
+                        s_factor=s_factor,
+                        order=order,
+                        deriv=deriv,
                     )
             return out
 
@@ -2781,10 +3005,10 @@ class PIVAccessor(object):
 
     def gradient_tensor(self, return_components: bool = False):
         """Calculates velocity gradient tensor, strain rate tensor, and principal strains.
-        
+
         Args:
             return_components (bool): If True, returns new dataset with tensor fields. Defaults to False.
-            
+
         Returns:
             xarray.Dataset: Dataset with computed tensor variables.
         """
@@ -2805,7 +3029,9 @@ class PIVAccessor(object):
         name_prime: str = "prime",
     ):
         """Performs Reynolds decomposition on time series velocity dataset."""
-        return creynolds_decomposition(self._obj, name_mean=name_mean, name_prime=name_prime)
+        return creynolds_decomposition(
+            self._obj, name_mean=name_mean, name_prime=name_prime
+        )
 
     def energy_spectrum(
         self,
@@ -2814,7 +3040,9 @@ class PIVAccessor(object):
         radial: bool = True,
     ):
         """Computes 2D and radial wavenumber energy spectra."""
-        return cenergy_spectrum(self._obj, window=window, detrend=detrend, radial=radial)
+        return cenergy_spectrum(
+            self._obj, window=window, detrend=detrend, radial=radial
+        )
 
     def probe_esd(
         self,
@@ -2824,7 +3052,7 @@ class PIVAccessor(object):
         variable: str = "u",
         windows: int = 8,
         overlap: float = 0.5,
-        fs: Optional[float] = None,
+        fs: float | None = None,
         method: str = "linear",
     ) -> xr.Dataset:
         """Energy spectral density of a velocity component at a probe point.
@@ -2833,8 +3061,14 @@ class PIVAccessor(object):
         (https://github.com/ajpetersen25/pyTurb).
         """
         return cprobe_esd(
-            self._obj, x0, y0,
-            variable=variable, windows=windows, overlap=overlap, fs=fs, method=method,
+            self._obj,
+            x0,
+            y0,
+            variable=variable,
+            windows=windows,
+            overlap=overlap,
+            fs=fs,
+            method=method,
         )
 
     def moving_average(self, window: int = 3, *, dim: str = "t") -> xr.Dataset:
@@ -2852,7 +3086,9 @@ class PIVAccessor(object):
         normalize: bool = True,
     ):
         """Calculates spatial two-point autocorrelation function R_ij(r)."""
-        return cspatial_correlation(self._obj, component=component, dim=dim, normalize=normalize)
+        return cspatial_correlation(
+            self._obj, component=component, dim=dim, normalize=normalize
+        )
 
     def integral_length_scale(
         self,
@@ -2869,7 +3105,9 @@ class PIVAccessor(object):
         method: str = "curvature",
     ) -> float:
         """Estimates the Taylor microscale lambda_T from velocity fluctuations."""
-        return ctaylor_microscale(self._obj, component=component, dim=dim, method=method)
+        return ctaylor_microscale(
+            self._obj, component=component, dim=dim, method=method
+        )
 
     def dissipation(
         self,
@@ -2882,7 +3120,7 @@ class PIVAccessor(object):
 
     def vec2scal(self, flow_property: str = "curl", name: str = "w"):
         """Creates a scalar flow property field from velocity data
-        
+
         Args:
             flow_property (str): Name of the flow property to compute.
                 Valid options: 'curl'/'vorticity'/'vort', 'ke'/'ken'/'kinetic_energy',
@@ -2892,13 +3130,13 @@ class PIVAccessor(object):
                 Defaults to "curl".
             name (str): Name for the output scalar field. Defaults to "w".
                 Use different names to store multiple scalar fields in one dataset.
-                
+
         Returns:
             xarray.Dataset: Dataset with computed scalar field
-            
+
         Raises:
             AttributeError: If the specified flow property method doesn't exist
-            
+
         Example:
             >>> data = data.piv.vec2scal('vorticity')  # Compute vorticity in data["w"]
             >>> data = data.piv.vec2scal('gamma1', name='g1')  # Compute Gamma1 in data["g1"]
@@ -2920,14 +3158,24 @@ class PIVAccessor(object):
             "dissip": "dissipation",
         }
         flow_property = alias_map.get(str(flow_property).lower(), flow_property)
-        
+
         # Check if method exists
         if not hasattr(self, flow_property):
             valid_properties = [
-                'vorticity', 'kinetic_energy', 'strain', 'divergence', 
-                'acceleration', 'tke', 'reynolds_stress', 'rms',
-                'gamma1', 'gamma2', 'q_criterion', 'okubo_weiss', 'max_shear',
-                'dissipation'
+                "vorticity",
+                "kinetic_energy",
+                "strain",
+                "divergence",
+                "acceleration",
+                "tke",
+                "reynolds_stress",
+                "rms",
+                "gamma1",
+                "gamma2",
+                "q_criterion",
+                "okubo_weiss",
+                "max_shear",
+                "dissipation",
             ]
             raise AttributeError(
                 f"Unknown flow property '{flow_property}'. "
@@ -2939,13 +3187,13 @@ class PIVAccessor(object):
 
     def __mul__(self, scalar):
         """Multiplies velocity field by a scalar (simple scaling)
-        
+
         Args:
             scalar (float): Scaling factor
-            
+
         Returns:
             xarray.Dataset: Scaled dataset
-            
+
         Example:
             >>> scaled_data = data.piv * 2.0  # Double all velocities
         """
@@ -2959,16 +3207,16 @@ class PIVAccessor(object):
 
     def __truediv__(self, scalar):
         """Divides velocity field by a scalar
-        
+
         Args:
             scalar (float): Division factor
-            
+
         Returns:
             xarray.Dataset: Scaled dataset
-            
+
         Raises:
             ValueError: If scalar is zero
-            
+
         Example:
             >>> normalized_data = data.piv / 100.0  # Normalize velocities
         """
@@ -2983,43 +3231,43 @@ class PIVAccessor(object):
 
     def set_delta_t(self, delta_t: float = 0.0):
         """Sets the time interval attribute for PIV measurements
-        
+
         Args:
             delta_t (float): Time interval between frame A and B. Defaults to 0.0.
-            
+
         Returns:
             xarray.Dataset: Dataset with updated delta_t attribute
-            
+
         Raises:
             ValueError: If delta_t is negative
-            
+
         Example:
             >>> data = data.piv.set_delta_t(0.001)  # Set dt to 1 millisecond
         """
         if delta_t < 0:
             raise ValueError(f"delta_t must be non-negative, got {delta_t}")
-            
+
         self._obj.attrs["delta_t"] = delta_t
         return self._obj
 
     def set_scale(self, scale: float = 1.0):
         """Scales all spatial coordinates and velocities by a factor
-        
+
         Args:
             scale (float): Scaling factor. Defaults to 1.0.
-            
+
         Returns:
             xarray.Dataset: Dataset with scaled coordinates and velocities
-            
+
         Raises:
             ValueError: If scale is zero or negative
-            
+
         Example:
             >>> data = data.piv.set_scale(0.001)  # Convert from pixels to mm if 1 pix = 0.001 mm
         """
         if scale <= 0:
             raise ValueError(f"scale must be positive, got {scale}")
-            
+
         for var in ["x", "y", "u", "v"]:
             self._obj[var] = self._obj[var] * scale
 
@@ -3027,17 +3275,17 @@ class PIVAccessor(object):
 
     def rotate(self, theta: float = 0.0):
         """Rotates the coordinate system and velocity field
-        
+
         Args:
             theta (float): Rotation angle in degrees (clockwise). Defaults to 0.0.
-            
+
         Returns:
             xarray.Dataset: Rotated dataset
-            
+
         Note:
             This method works best for cases with equal grid spacing in x and y directions.
             The rotation is performed in-place on coordinates and velocity components.
-            
+
         Example:
             >>> data = data.piv.rotate(45.0)  # Rotate by 45 degrees clockwise
         """
@@ -3070,7 +3318,7 @@ class PIVAccessor(object):
 
     def plot(self, **kwargs):
         """High-level, publication-quality plotting method.
-        
+
         Renders a publication-quality flow field visualization with zero effort:
         - Smooth background contour (vorticity by default, or magnitude, KE, divergence, etc.)
         - Flow streamlines
@@ -3170,26 +3418,29 @@ class PIVAccessor(object):
         """method for graphics.histvec_disp"""
         return ghistvec_disp(self._obj, *args, **kwargs)
 
-    def autocorrelation_plot(self, variable: str = "u", spatial_average: bool = True, **kwargs):
+    def autocorrelation_plot(
+        self, variable: str = "u", spatial_average: bool = True, **kwargs
+    ):
         """Creates autocorrelation plot of a specified variable
-        
+
         Args:
-            variable (str): Variable name to plot autocorrelation for 
+            variable (str): Variable name to plot autocorrelation for
                 (e.g., 'u', 'v', 'w', 'c', or any other data variable). Defaults to "u".
-            spatial_average (bool): If True and time dimension exists, compute 
-                spatial average before temporal autocorrelation. If False, flatten all 
+            spatial_average (bool): If True and time dimension exists, compute
+                spatial average before temporal autocorrelation. If False, flatten all
                 dimensions. Defaults to True for proper temporal analysis.
             **kwargs: Additional keyword arguments passed to graphics.autocorrelation_plot
-            
+
         Returns:
             matplotlib.axes.Axes: The axes object containing the autocorrelation plot
-            
+
         Example:
             >>> data.piv.autocorrelation_plot(variable='u')
             >>> data.piv.autocorrelation_plot(variable='v', spatial_average=False)
         """
-        return gautocorrelation_plot(self._obj, variable=variable, 
-                                     spatial_average=spatial_average, **kwargs)
+        return gautocorrelation_plot(
+            self._obj, variable=variable, spatial_average=spatial_average, **kwargs
+        )
 
     def corrm(
         self,
@@ -3324,14 +3575,20 @@ class PIVAccessor(object):
         out["hy"].attrs["long_name"] = f"histogram({yname})"
         return out
 
-    def explore(self, port: int = 8000, host: str = "127.0.0.1", open_browser: bool = True):
+    def explore(
+        self, port: int = 8000, host: str = "127.0.0.1", open_browser: bool = True
+    ):
         """Launches the interactive Marimo PIVPy diagnostics and visualization app."""
         from pivpy.app import launch_app
-        return launch_app(dataset=self._obj, port=port, host=host, open_browser=open_browser)
+
+        return launch_app(
+            dataset=self._obj, port=port, host=host, open_browser=open_browser
+        )
 
     def stream_statistics(self, name_mean: str = "mean", name_prime: str = "prime"):
         """Computes online streaming temporal mean, Reynolds stresses, and TKE with O(1) memory."""
         from pivpy.io import stream_statistics
+
         return stream_statistics(self._obj, name_mean=name_mean, name_prime=name_prime)
 
     # @property

@@ -17,10 +17,9 @@ import os
 import pathlib
 import warnings
 
-import numpy as np
-
 # Make this module safe in headless environments (CI).
 import matplotlib
+import numpy as np
 
 if os.environ.get("DISPLAY", "") == "":
     matplotlib.use("Agg")
@@ -75,8 +74,12 @@ def run_demo(*, make_plots: bool = True) -> None:
     levels_g1 = _safe_levels(data["Γ1"].isel(t=0))
     levels_g2 = _safe_levels(data["Γ2"].isel(t=0))
     fig_g, ax_g = plt.subplots(nrows=1, ncols=2, clear=True, figsize=(15, 10))
-    data["Γ1"].isel(t=0).plot.contourf(x="x", y="y", levels=levels_g1, cmap=plt.get_cmap("RdYlBu"), ax=ax_g[0])
-    data["Γ2"].isel(t=0).plot.contourf(x="x", y="y", levels=levels_g2, cmap=plt.get_cmap("RdYlBu"), ax=ax_g[1])
+    data["Γ1"].isel(t=0).plot.contourf(
+        x="x", y="y", levels=levels_g1, cmap=plt.get_cmap("RdYlBu"), ax=ax_g[0]
+    )
+    data["Γ2"].isel(t=0).plot.contourf(
+        x="x", y="y", levels=levels_g2, cmap=plt.get_cmap("RdYlBu"), ax=ax_g[1]
+    )
 
 
 def test_gamma_smoke_no_runtimewarning() -> None:
@@ -106,5 +109,3 @@ def test_gamma_smoke_no_runtimewarning() -> None:
 
 if __name__ == "__main__":
     run_demo(make_plots=True)
-
-

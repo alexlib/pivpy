@@ -5,10 +5,9 @@ Comprehensive test suite for pivpy.synthetic analytical flow field generators.
 
 import numpy as np
 import pytest
-import xarray as xr
 
 from pivpy import synthetic
-from pivpy.schema import validate, is_valid
+from pivpy.schema import is_valid, validate
 
 
 def test_vortex_lamb_schema_and_center():

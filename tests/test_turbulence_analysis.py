@@ -1,11 +1,11 @@
 """Unit tests for turbulence analysis features adopted and adapted from xrturb."""
+
 import numpy as np
 import pytest
 import xarray as xr
 
-from pivpy.schema import build_dataset
-from pivpy.synthetic import multivortex
 import pivpy.pivpy  # noqa: F401
+from pivpy.synthetic import multivortex
 
 
 @pytest.fixture
@@ -91,7 +91,9 @@ def test_tke_computation(sample_turb_ds, sample_3d_turb_ds):
     ds_3d_tke = sample_3d_turb_ds.piv.tke(name="tke_3d", time_average=True)
     w_prime = sample_3d_turb_ds["w"] - sample_3d_turb_ds["w"].mean(dim="t")
     expected_3d = 0.5 * (u_prime**2 + v_prime**2 + w_prime**2).mean(dim="t")
-    np.testing.assert_allclose(ds_3d_tke["tke_3d"].values, expected_3d.values, atol=1e-12)
+    np.testing.assert_allclose(
+        ds_3d_tke["tke_3d"].values, expected_3d.values, atol=1e-12
+    )
 
 
 def test_moments_and_all_products(sample_turb_ds):
@@ -134,7 +136,14 @@ def test_two_point_correlation_and_length_scales(sample_turb_ds):
     np.testing.assert_allclose(val_at_ref, 1.0, atol=1e-6)
 
     # Length scale computation via fit on field
-    L_fit = ds.piv.length_scale(variable="u", dim="x", method="fit", fit_model="single", x_ref=x_mid, y_ref=y_mid)
+    L_fit = ds.piv.length_scale(
+        variable="u",
+        dim="x",
+        method="fit",
+        fit_model="single",
+        x_ref=x_mid,
+        y_ref=y_mid,
+    )
     assert isinstance(L_fit, xr.DataArray)
     val_fit = float(L_fit.sel(lag_y=0.0, method="nearest").values)
     assert np.isfinite(val_fit) and val_fit > 0.0
@@ -151,7 +160,9 @@ def test_compute_length_scale_methods():
     L_1e = float(compute_length_scale(da_single, dim="lag_x", method="1e").values)
     np.testing.assert_allclose(L_1e, 5.0, atol=1e-3)
 
-    L_int = float(compute_length_scale(da_single, dim="lag_x", method="integral").values)
+    L_int = float(
+        compute_length_scale(da_single, dim="lag_x", method="integral").values
+    )
     np.testing.assert_allclose(L_int, 5.0, atol=0.1)
 
     L_fit = float(compute_length_scale(da_single, dim="lag_x", method="fit").values)
@@ -202,7 +213,9 @@ def test_smoothing_savgol_and_spline(sample_turb_ds):
     ds = sample_turb_ds
 
     # Savitzky-Golay 1D smoothing along x
-    smoothed_sg = ds.piv.smooth_savgol(var_key="u", dim="x", window_length=5, polyorder=2)
+    smoothed_sg = ds.piv.smooth_savgol(
+        var_key="u", dim="x", window_length=5, polyorder=2
+    )
     assert isinstance(smoothed_sg, xr.DataArray)
     assert smoothed_sg.shape == ds["u"].shape
     # Check that variance decreases due to noise suppression

@@ -1,8 +1,6 @@
 import numpy as np
 import xarray as xr
 
-import pivpy.pivpy  # registers accessor
-
 
 def _make_scalar_ds():
     x = np.array([0.0, 1.0, 2.0])

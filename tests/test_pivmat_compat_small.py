@@ -1,7 +1,6 @@
 import numpy as np
 import xarray as xr
 
-
 from pivpy.compute_funcs import interpolat_zeros_2d, meannz
 from pivpy.pivmat_compat import expandstr
 
@@ -25,7 +24,9 @@ def test_meannz_xarray_dimname():
     )
     out = meannz(da, dim="y")
     assert out.dims == ("x",)
-    np.testing.assert_allclose(out.values, np.array([3.0, 2.5, 3.5]), rtol=0, atol=1e-12)
+    np.testing.assert_allclose(
+        out.values, np.array([3.0, 2.5, 3.5]), rtol=0, atol=1e-12
+    )
 
 
 def test_interpolat_zeros_2d_single_pass_center():

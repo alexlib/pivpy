@@ -3,19 +3,13 @@ Tests for Work Package 2: Vortex Topology and Identification Criteria.
 """
 
 import numpy as np
-import pytest
 import xarray as xr
 
-from pivpy.synthetic import vortex
-from pivpy.compute_funcs import (
-    gamma1,
-    gamma2,
-    vorticity_circulation,
-    q_criterion,
-    okubo_weiss,
-    subsbr,
-)
 import pivpy.pivpy  # noqa: F401
+from pivpy.compute_funcs import (
+    gamma2,
+)
+from pivpy.synthetic import vortex
 
 
 def test_gamma1_lamb_vortex():
@@ -94,9 +88,21 @@ def test_vorticity_circulation_noise_reduction():
     ds_noisy["u"] = ds_noisy["u"] + noise_u
     ds_noisy["v"] = ds_noisy["v"] + noise_v
 
-    w_true = ds_clean.piv.vorticity(method="differentiation", name="w_true")["w_true"].squeeze().to_numpy()
-    w_diff_noisy = ds_noisy.piv.vorticity(method="differentiation", name="w_d")["w_d"].squeeze().to_numpy()
-    w_circ_noisy = ds_noisy.piv.vorticity(method="circulation", radius=2, name="w_c")["w_c"].squeeze().to_numpy()
+    w_true = (
+        ds_clean.piv.vorticity(method="differentiation", name="w_true")["w_true"]
+        .squeeze()
+        .to_numpy()
+    )
+    w_diff_noisy = (
+        ds_noisy.piv.vorticity(method="differentiation", name="w_d")["w_d"]
+        .squeeze()
+        .to_numpy()
+    )
+    w_circ_noisy = (
+        ds_noisy.piv.vorticity(method="circulation", radius=2, name="w_c")["w_c"]
+        .squeeze()
+        .to_numpy()
+    )
 
     r = 3
     err_diff = np.sqrt(np.mean((w_diff_noisy[r:-r, r:-r] - w_true[r:-r, r:-r]) ** 2))

@@ -1,7 +1,8 @@
-""" tests of pivpy.graphics module """
+"""tests of pivpy.graphics module"""
+
 import pathlib
-import importlib.resources
-from pivpy import io, graphics, pivpy 
+
+from pivpy import graphics, io
 
 # Ensure compatibility with different Python versions (3.9+ has 'files', 3.7 and 3.8 need 'path')
 try:
@@ -11,10 +12,10 @@ except ImportError:
 
 # For Python 3.9+
 try:
-    path = files('pivpy') / 'data'
+    path = files("pivpy") / "data"
 except NameError:
     # For Python 3.7 and 3.8
-    with resource_path('pivpy', 'data') as data_path:
+    with resource_path("pivpy", "data") as data_path:
         path = data_path
 
 # Convert to pathlib.Path if not already
@@ -27,8 +28,7 @@ _d = io.load_vec(filename).isel(t=0)
 
 
 def test_showscal():
-    """tests showscal
-    """
+    """tests showscal"""
     graphics.showscal(_d, flow_property="curl")
 
 
@@ -65,7 +65,9 @@ def test_plot_quiver_respects_chc_mask():
     chc[:, :3] = 0
     d["chc"] = (d["chc"].dims, chc)
 
-    fig, ax = graphics.plot(d, background=None, color_by="mag", streamlines=False, skip=1)
+    fig, ax = graphics.plot(
+        d, background=None, color_by="mag", streamlines=False, skip=1
+    )
     Q = next(c for c in ax.get_children() if isinstance(c, Quiver))
     masked = Q.Umask.reshape(chc.shape[0], chc.shape[1])
     assert masked[:, :3].all()
@@ -80,7 +82,9 @@ def test_plot_colorbar_not_duplicated_when_redundant():
     fig, ax = graphics.plot(_d, background="mag", color_by="mag", streamlines=False)
     assert len(fig.axes) == 2  # 1 plot axes + 1 colorbar, not 2
 
-    fig2, ax2 = graphics.plot(_d, background="vorticity", color_by="mag", streamlines=False)
+    fig2, ax2 = graphics.plot(
+        _d, background="vorticity", color_by="mag", streamlines=False
+    )
     assert len(fig2.axes) == 3  # 1 plot axes + 2 colorbars - legitimately different
 
 
@@ -94,7 +98,9 @@ def test_plot_colorbar_matches_axes_height():
     docs_mkdocs/pivpy_visualization.md."""
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(3, 12))  # deliberately mismatched vs the data's own aspect
+    fig, ax = plt.subplots(
+        figsize=(3, 12)
+    )  # deliberately mismatched vs the data's own aspect
     graphics.plot(_d, ax=ax, background="mag", color_by=None, streamlines=False)
     cbar_ax = next(a for a in fig.axes if a is not ax)
     plot_h = ax.get_position().height
@@ -112,82 +118,77 @@ def test_animate():
 
 
 def test_quiver():
-    """ tests quiver
-    """
+    """tests quiver"""
     graphics.quiver(_d)
     _d.piv.quiver()
 
 
 def test_streamplot():
-    """ tests streamplot
-    """
+    """tests streamplot"""
     graphics.streamplot(_d)
     _d.piv.streamplot()
 
 
 def test_xarray_plot():
-    """tests xarray plot use of pcolormesh 
-    """
+    """tests xarray plot use of pcolormesh"""
     d = _d.piv.vec2scal("curl")
     d["w"].plot.pcolormesh()
 
 
 def test_histogram():
-    """tests histogram
-    """
+    """tests histogram"""
     graphics.histogram(_d)
 
 
 def test_quiver_openpiv_vec():
-    """ tests quiver of openpiv vec file
-    """
+    """tests quiver of openpiv vec file"""
     filename = path / "openpiv_vec" / "exp1_001_b.vec"
     print(filename, filename.exists())
     _d = io.load_vec(filename)
-    _d.isel(t=0).piv.quiver() # notice the warning
+    _d.isel(t=0).piv.quiver()  # notice the warning
+
 
 def test_showf():
-    """tests showf
-    """
+    """tests showf"""
     graphics.showf(_d)
 
+
 def test_average():
-    """tests average
-    """
+    """tests average"""
     d = io.create_sample_Dataset()
     d = d.piv.average
     d.piv.quiver()
 
+
 def test_autocorrelation_plot():
-    """tests autocorrelation plot
-    """
+    """tests autocorrelation plot"""
     # Test with default variable 'u' and default spatial_average=True
     graphics.autocorrelation_plot(_d)
-    
+
     # Test with variable 'v'
-    graphics.autocorrelation_plot(_d, variable='v')
-    
+    graphics.autocorrelation_plot(_d, variable="v")
+
     # Test with spatial_average=False (flatten all dimensions)
-    graphics.autocorrelation_plot(_d, variable='u', spatial_average=False)
-    
+    graphics.autocorrelation_plot(_d, variable="u", spatial_average=False)
+
     # Test with accessor
-    _d.piv.autocorrelation_plot(variable='u')
-    _d.piv.autocorrelation_plot(variable='v', spatial_average=False)
+    _d.piv.autocorrelation_plot(variable="u")
+    _d.piv.autocorrelation_plot(variable="v", spatial_average=False)
 
 
 def test_histscal_disp():
     """tests histscal_disp"""
     d = io.create_sample_Dataset(n_frames=3, rows=8, cols=8)
-    fig, ax = graphics.histscal_disp(d, variable='u', smooth=0, opt='n')
+    fig, ax = graphics.histscal_disp(d, variable="u", smooth=0, opt="n")
     assert fig is not None
     assert ax is not None
 
     # log-y option
-    fig2, ax2 = graphics.histscal_disp(d, variable='u', smooth=0, opt='nl')
-    assert ax2.get_yscale() == 'log'
+    fig2, ax2 = graphics.histscal_disp(d, variable="u", smooth=0, opt="nl")
+    assert ax2.get_yscale() == "log"
 
     # accessor wrapper
-    fig3, ax3 = d.piv.histscal_disp(variable='u', smooth=0, opt='n')
+    fig3, ax3 = d.piv.histscal_disp(variable="u", smooth=0, opt="n")
     assert fig3 is not None
     assert ax3 is not None
 
@@ -195,16 +196,17 @@ def test_histscal_disp():
 def test_histvec_disp():
     """tests histvec_disp"""
     d = io.create_sample_Dataset(n_frames=3, rows=8, cols=8)
-    fig, ax = graphics.histvec_disp(d, smooth=0, opt='n')
+    fig, ax = graphics.histvec_disp(d, smooth=0, opt="n")
     assert fig is not None
     assert ax is not None
 
-    fig2, ax2 = graphics.histvec_disp(d, smooth=0, opt='nl')
-    assert ax2.get_yscale() == 'log'
+    fig2, ax2 = graphics.histvec_disp(d, smooth=0, opt="nl")
+    assert ax2.get_yscale() == "log"
 
-    fig3, ax3 = d.piv.histvec_disp(smooth=0, opt='n')
+    fig3, ax3 = d.piv.histvec_disp(smooth=0, opt="n")
     assert fig3 is not None
     assert ax3 is not None
+
 
 def test_streamscal_defaults_clean():
     """bare streamscal(): picture only - no axes, no colorbar, black opaque streamlines"""
@@ -241,7 +243,9 @@ def test_streamscal_handles_nan_and_flipped_axes():
 
 
 def test_streamscal_panels_shared_clim_and_gap():
-    fig, axs = graphics.streamscal_panels([_d, _d], scalar="speed", labels=["(a)", "(b)"])
+    fig, axs = graphics.streamscal_panels(
+        [_d, _d], scalar="speed", labels=["(a)", "(b)"]
+    )
     assert len(axs) == 2
     assert axs[0]._pivpy_mappable.get_clim() == axs[1]._pivpy_mappable.get_clim()
     p0, p1 = axs[0].get_position(), axs[1].get_position()

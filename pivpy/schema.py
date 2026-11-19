@@ -14,8 +14,6 @@ Schema:
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import xarray as xr
 from numpy.typing import ArrayLike
@@ -75,12 +73,12 @@ def build_dataset(
     y: ArrayLike,
     u: ArrayLike,
     v: ArrayLike,
-    chc: Optional[ArrayLike] = None,
-    mask: Optional[ArrayLike] = None,
-    t: Optional[ArrayLike] = None,
+    chc: ArrayLike | None = None,
+    mask: ArrayLike | None = None,
+    t: ArrayLike | None = None,
     frame: int = 0,
     delta_t: float = 0.0,
-    files: Optional[list[str]] = None,
+    files: list[str] | None = None,
     **extra_vars: ArrayLike,
 ) -> xr.Dataset:
     """Canonical constructor for a pivpy Dataset.

@@ -20,7 +20,9 @@ def _vector_ds_from_values(u: np.ndarray, v: np.ndarray) -> xr.Dataset:
     v = np.asarray(v, dtype=float)
     y = np.arange(u.shape[0], dtype=float)
     x = np.arange(u.shape[1], dtype=float)
-    return xr.Dataset({"u": (("y", "x"), u), "v": (("y", "x"), v)}, coords={"x": x, "y": y})
+    return xr.Dataset(
+        {"u": (("y", "x"), u), "v": (("y", "x"), v)}, coords={"x": x, "y": y}
+    )
 
 
 def test_histf_scalar_default_bins_symmetric_when_mean_lt_std():
@@ -71,7 +73,9 @@ def test_histf_scalar_custom_bins_used_as_centers():
 
 
 def test_histf_vector_mode_returns_hx_hy_and_common_bins():
-    ds = _vector_ds_from_values(u=np.array([[0.0, 1.0], [0.0, 1.0]]), v=np.array([[0.0, 2.0], [0.0, 2.0]]))
+    ds = _vector_ds_from_values(
+        u=np.array([[0.0, 1.0], [0.0, 1.0]]), v=np.array([[0.0, 2.0], [0.0, 2.0]])
+    )
     out = ds.piv.histf()
 
     assert "hx" in out and "hy" in out

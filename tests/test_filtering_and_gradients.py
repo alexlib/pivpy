@@ -1,11 +1,9 @@
 """Comprehensive unit tests for Work Package 3: Gradient Calculus, Spatial Filtering & Masking."""
 
 import numpy as np
-import pytest
-import xarray as xr
-from pivpy.synthetic import vortex, channel
+
 from pivpy.schema import build_dataset
-import pivpy.pivpy  # Register accessor
+from pivpy.synthetic import vortex
 
 
 def test_normalized_median_test_outlier_detection():
@@ -18,7 +16,9 @@ def test_normalized_median_test_outlier_detection():
     ds["u"].values[15, 20, 0] = 50.0
     ds["v"].values[40, 45, 0] = -45.0
 
-    flagged = ds.piv.normalized_median_test(radius=1, threshold=2.0, epsilon=0.1, name_mask="mask")
+    flagged = ds.piv.normalized_median_test(
+        radius=1, threshold=2.0, epsilon=0.1, name_mask="mask"
+    )
 
     # Flagged outliers must have chc == 0
     assert flagged["chc"].values[15, 20, 0] == 0.0
@@ -43,7 +43,9 @@ def test_clean_and_inpaint_outliers():
     ds_corrupt["v"].values[38, 38, 0] = -120.0
 
     # Inpaint
-    ds_cleaned = ds_corrupt.piv.clean(method="normalized_median", threshold=2.0, inpaint_method=0)
+    ds_cleaned = ds_corrupt.piv.clean(
+        method="normalized_median", threshold=2.0, inpaint_method=0
+    )
 
     # Inpainted values should closely match true values
     u_rep = ds_cleaned["u"].values[25, 25, 0]
@@ -125,7 +127,9 @@ def test_gradient_tensor_decomposition():
 
     # vec2scal max_shear check
     ds_shear = ds.copy(deep=True).piv.vec2scal("max_shear", name="shear")
-    np.testing.assert_allclose(ds_shear["shear"].squeeze().values, gamma_max, atol=1e-12)
+    np.testing.assert_allclose(
+        ds_shear["shear"].squeeze().values, gamma_max, atol=1e-12
+    )
 
 
 def test_material_acceleration_exactness_lamb_vortex():
@@ -149,7 +153,10 @@ def test_material_acceleration_exactness_lamb_vortex():
 
     # Validate in core annular region away from singularity / boundary
     mask_annulus = (r > 3.0) & (r < 15.0)
-    rel_err = np.abs(a_computed[mask_annulus] - a_centripetal[mask_annulus]) / a_centripetal[mask_annulus]
+    rel_err = (
+        np.abs(a_computed[mask_annulus] - a_centripetal[mask_annulus])
+        / a_centripetal[mask_annulus]
+    )
     assert np.max(rel_err) < 0.01  # < 1% relative error
 
 
@@ -177,10 +184,13 @@ def test_material_acceleration_unsteady_and_vector():
     # At t=1 (middle frame), du/dt = u0
     u0 = ds1["u"].squeeze().values
     # ax should have local part u0 + convective part
-    du_dt = ds_accel_vec["ax"].isel(t=1).values - (
-        ds_ramp["u"].isel(t=1) * ds_ramp["u"].isel(t=1).differentiate("x")
-        + ds_ramp["v"].isel(t=1) * ds_ramp["u"].isel(t=1).differentiate("y")
-    ).values
+    du_dt = (
+        ds_accel_vec["ax"].isel(t=1).values
+        - (
+            ds_ramp["u"].isel(t=1) * ds_ramp["u"].isel(t=1).differentiate("x")
+            + ds_ramp["v"].isel(t=1) * ds_ramp["u"].isel(t=1).differentiate("y")
+        ).values
+    )
 
     np.testing.assert_allclose(du_dt, u0, atol=1e-12)
 
@@ -188,9 +198,10 @@ def test_material_acceleration_unsteady_and_vector():
 def test_multi_frame_wp3_pipeline():
     """Verify complete filtering, outlier cleaning, gradient tensor on multi-frame datasets."""
     from pivpy.synthetic import multivortex
+
     ds = multivortex(n_frames=4, n=33, n_vortices=3)
     u_orig = ds["u"].values[10, 10, 2]
-    
+
     # Inject outlier in frame 2
     ds["u"].values[10, 10, 2] = 200.0
 

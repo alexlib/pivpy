@@ -4,8 +4,8 @@ import json
 import re
 import urllib.request
 from dataclasses import dataclass
-from importlib.metadata import PackageNotFoundError, version as _dist_version
-from typing import Optional
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _dist_version
 
 
 @dataclass(frozen=True)
@@ -75,7 +75,7 @@ def _compare_versions(installed: str, latest: str) -> int:
 def check_update(
     package: str = "pivpy",
     *,
-    dist_name: Optional[str] = None,
+    dist_name: str | None = None,
     timeout: float = 3.0,
     verbose: bool = False,
 ) -> UpdateCheckResult:
@@ -111,7 +111,9 @@ def check_update(
     if cmp < 0:
         status = 2
         if verbose:
-            print(f"New version available: {package} {latest} (installed: {installed}).")
+            print(
+                f"New version available: {package} {latest} (installed: {installed})."
+            )
     elif cmp > 0:
         status = 3
         if verbose:

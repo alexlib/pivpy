@@ -1,8 +1,6 @@
 import numpy as np
 import xarray as xr
 
-import pivpy.pivpy  # registers accessor
-
 
 def _make_ds(x, y):
     xx, yy = np.meshgrid(x, y, indexing="xy")

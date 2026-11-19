@@ -21,7 +21,7 @@ nav:
   - Data model: pivpy_data_model.md
   - Visualization: pivpy_visualization.md
   - Notebook: notebook.md
-  - Tutorial: tutorial.md
+  - Interactive tutorial: tutorial.md
   - Explore: explore.md
   - Written tutorial: pivpy_tutorial.md
   - FAQ: pivpy_faq.md

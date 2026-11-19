@@ -1,10 +1,11 @@
 """Checks for the Phase 3 accessor cleanups: no silent in-place mutation on
 __mul__/__div__, a visible warning on the 'w' name-collision footgun, and a
 DeprecationWarning on the still-mutating crop()/vec2scal() methods."""
+
 import pytest
 
-from pivpy import io
 import pivpy.pivpy  # noqa: F401 -- registers the .piv accessor
+from pivpy import io
 
 
 def test_mul_does_not_mutate_original_dataset():

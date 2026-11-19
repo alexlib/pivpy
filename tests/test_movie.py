@@ -2,9 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-import pivpy.pivpy  # registers the .piv accessor
-from pivpy import io
-from pivpy import graphics
+from pivpy import graphics, io
 
 
 def test_to_movie_vector_returns_frames_length_and_shape():
@@ -37,7 +35,9 @@ def test_to_movie_scalar_returns_frames_and_changes_with_time():
     # Concatenate into a 2-frame scalar dataset (keep variable name 'w')
     ds = xr.concat([ds0, ds1], dim="t")
 
-    frames = graphics.to_movie(ds, None, return_frames=True, show="scalar", scalar="w", close=True)
+    frames = graphics.to_movie(
+        ds, None, return_frames=True, show="scalar", scalar="w", close=True
+    )
     assert len(frames) == 2
 
     # Frames should differ for different scalar inputs (very likely, but keep robust)

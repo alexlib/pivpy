@@ -15,14 +15,13 @@ The core data model is an xarray.Dataset with:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from abc import ABC, abstractmethod
+import glob
 import pathlib
 import re
-import warnings
-from typing import Any, Optional
-import glob
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -40,9 +39,7 @@ from pivpy.schema import (
     TIME_UNITS,
     VEL_UNITS,
     build_dataset,
-    is_valid,
     set_default_attrs,
-    validate,
 )
 
 
@@ -114,7 +111,9 @@ def vec2mat(
     elif "w" in f.data_vars:
         mdict["w"] = np.asarray(f["w"].values)
     else:
-        raise ValueError("vec2mat expects variables (u,v) for vector fields or (w) for scalar fields")
+        raise ValueError(
+            "vec2mat expects variables (u,v) for vector fields or (w) for scalar fields"
+        )
 
     if "chc" in f.data_vars:
         mdict["chc"] = np.asarray(f["chc"].values)
@@ -139,7 +138,7 @@ def from_arrays(
     y: np.ndarray,
     u: np.ndarray,
     v: np.ndarray,
-    mask: Optional[np.ndarray] = None,
+    mask: np.ndarray | None = None,
     frame: int = 0,
 ) -> xr.Dataset:
     x = np.asarray(x)
@@ -274,7 +273,10 @@ def create_sample_Dataset(
     noise_sigma: float = 0.0,
 ) -> xr.Dataset:
     n_frames = int(n_frames)
-    fields = [create_sample_field(rows=rows, cols=cols, frame=i, noise_sigma=noise_sigma) for i in range(n_frames)]
+    fields = [
+        create_sample_field(rows=rows, cols=cols, frame=i, noise_sigma=noise_sigma)
+        for i in range(n_frames)
+    ]
     ds = xr.concat(fields, dim="t")
     ds.attrs["delta_t"] = float(DELTA_T)
     ds.attrs.setdefault("files", [])
@@ -290,6 +292,7 @@ def create_vortex_dataset(
 ) -> xr.Dataset:
     """Create a synthetic vortex dataset (convenience wrapper around pivpy.synthetic.vortex)."""
     from pivpy.synthetic import vortex
+
     return vortex(n=n, r0=r0, vorticity=vorticity, mode=mode, diver=diver)
 
 
@@ -336,7 +339,15 @@ def parse_header(filepath: Any):
         if len(nums) >= 2:
             cols = int(nums[-2])
             rows = int(nums[-1])
-        return ["x", "y", "u", "v"], ["mm", "mm", "m/s", "m/s"], rows, cols, float(DELTA_T), frame, header_line
+        return (
+            ["x", "y", "u", "v"],
+            ["mm", "mm", "m/s", "m/s"],
+            rows,
+            cols,
+            float(DELTA_T),
+            frame,
+            header_line,
+        )
 
     first_data = header_line
     if first_data.lstrip().startswith("#"):
@@ -375,8 +386,8 @@ class PIVMetadata:
     time_units: str = TIME_UNITS
     delta_t: float = float(DELTA_T)
     variables: list[str] = field(default_factory=list)
-    rows: Optional[int] = None
-    cols: Optional[int] = None
+    rows: int | None = None
+    cols: int | None = None
     frame: int = 0
 
 
@@ -425,7 +436,7 @@ class InsightVECReader(PIVReader):
             frame=int(frame),
         )
 
-    def read(self, filepath: Any, frame: Optional[int] = None, **kwargs) -> xr.Dataset:
+    def read(self, filepath: Any, frame: int | None = None, **kwargs) -> xr.Dataset:
         path = _to_path(filepath)
         md = self.read_metadata(path)
         if frame is None:
@@ -439,10 +450,20 @@ class InsightVECReader(PIVReader):
         y = arr[:, 1].reshape((rows, cols))
         u = arr[:, 2].reshape((rows, cols))
         v = arr[:, 3].reshape((rows, cols))
-        chc = arr[:, 4].reshape((rows, cols)) if arr.shape[1] >= 5 else np.ones((rows, cols))
+        chc = (
+            arr[:, 4].reshape((rows, cols))
+            if arr.shape[1] >= 5
+            else np.ones((rows, cols))
+        )
         ds = build_dataset(
-            x[0, :], y[:, 0], u, v, chc=chc, t=[frame],
-            delta_t=md.delta_t, files=[str(path)],
+            x[0, :],
+            y[:, 0],
+            u,
+            v,
+            chc=chc,
+            t=[frame],
+            delta_t=md.delta_t,
+            files=[str(path)],
         )
         ds["x"].attrs["units"] = md.pos_units
         ds["y"].attrs["units"] = md.pos_units
@@ -469,7 +490,8 @@ class OpenPIVReader(PIVReader):
                         return False
                     if toks[0].startswith("#DaVis"):
                         return False
-                    float(toks[0]); float(toks[1])
+                    float(toks[0])
+                    float(toks[1])
                     return len(toks) in (5, 6)
         except Exception:
             return False
@@ -494,7 +516,7 @@ class OpenPIVReader(PIVReader):
             frame=int(frame),
         )
 
-    def read(self, filepath: Any, frame: Optional[int] = None, **kwargs) -> xr.Dataset:
+    def read(self, filepath: Any, frame: int | None = None, **kwargs) -> xr.Dataset:
         path = _to_path(filepath)
         md = self.read_metadata(path)
         if frame is None:
@@ -529,8 +551,14 @@ class OpenPIVReader(PIVReader):
             v2[invalid] = 0.0
 
         return build_dataset(
-            x2[0, :], y2[:, 0], u2, v2, chc=chc2, t=[frame],
-            delta_t=DELTA_T, files=[str(path)],
+            x2[0, :],
+            y2[:, 0],
+            u2,
+            v2,
+            chc=chc2,
+            t=[frame],
+            delta_t=DELTA_T,
+            files=[str(path)],
         )
 
 
@@ -561,7 +589,7 @@ class Davis8Reader(PIVReader):
             frame=int(frame),
         )
 
-    def read(self, filepath: Any, frame: Optional[int] = None, **kwargs) -> xr.Dataset:
+    def read(self, filepath: Any, frame: int | None = None, **kwargs) -> xr.Dataset:
         path = _to_path(filepath)
         md = self.read_metadata(path)
         if frame is None:
@@ -581,14 +609,20 @@ class Davis8Reader(PIVReader):
         if arr.ndim == 1:
             arr = arr[None, :]
         if rows == 0 or cols == 0:
-            cols = len(np.unique(arr[:, 0])); rows = len(np.unique(arr[:, 1]))
+            cols = len(np.unique(arr[:, 0]))
+            rows = len(np.unique(arr[:, 1]))
         x = arr[:, 0].reshape((rows, cols))
         y = arr[:, 1].reshape((rows, cols))
         u = arr[:, 2].reshape((rows, cols))
         v = arr[:, 3].reshape((rows, cols))
         return build_dataset(
-            x[0, :], y[:, 0], u, v, t=[frame],
-            delta_t=md.delta_t, files=[str(path)],
+            x[0, :],
+            y[:, 0],
+            u,
+            v,
+            t=[frame],
+            delta_t=md.delta_t,
+            files=[str(path)],
         )
 
 
@@ -601,9 +635,11 @@ class LaVisionVC7Reader(PIVReader):
 
     def read_metadata(self, filepath: Any) -> PIVMetadata:
         path = _to_path(filepath)
-        return PIVMetadata(variables=["x", "y", "u", "v"], frame=int(_extract_frame_number(path)))
+        return PIVMetadata(
+            variables=["x", "y", "u", "v"], frame=int(_extract_frame_number(path))
+        )
 
-    def read(self, filepath: Any, frame: Optional[int] = None, **kwargs) -> xr.Dataset:
+    def read(self, filepath: Any, frame: int | None = None, **kwargs) -> xr.Dataset:
         path = _to_path(filepath)
         md = self.read_metadata(path)
         if frame is None:
@@ -621,11 +657,14 @@ class LaVisionVC7Reader(PIVReader):
         u = data.components["U0"][plane]
         v = data.components["V0"][plane]
         mask_bad = np.logical_not(data.masks[plane] & data.enabled[plane])
-        u = u.astype(float); v = v.astype(float)
-        u[mask_bad] = 0.0; v[mask_bad] = 0.0
+        u = u.astype(float)
+        v = v.astype(float)
+        u[mask_bad] = 0.0
+        v[mask_bad] = 0.0
         u = data.scales.i.offset + u * data.scales.i.slope
         v = data.scales.i.offset + v * data.scales.i.slope
-        x = np.arange(u.shape[1]); y = np.arange(u.shape[0])
+        x = np.arange(u.shape[1])
+        y = np.arange(u.shape[0])
         x = data.scales.x.offset + (x + 0.5) * data.scales.x.slope * data.grid.x
         y = data.scales.y.offset + (y + 0.5) * data.scales.y.slope * data.grid.y
         x2d, y2d = np.meshgrid(x, y)
@@ -654,21 +693,33 @@ class PIVLabReader(PIVReader):
         except ImportError as e:
             raise ImportError("h5py is required to read PIVLab MAT files") from e
         with h5py.File(path, "r") as f:
-            indices = sorted(int(m.group(1)) for k in f.keys() for m in [re.match(r"u_(\d+)$", k)] if m)
+            indices = sorted(
+                int(m.group(1))
+                for k in f.keys()
+                for m in [re.match(r"u_(\d+)$", k)]
+                if m
+            )
             if not indices:
                 raise ValueError("No u_<n> datasets found")
             u0 = np.array(f[f"u_{indices[0]}"])
             rows, cols = u0.shape
-        return PIVMetadata(variables=["x", "y", "u", "v"], rows=int(rows), cols=int(cols))
+        return PIVMetadata(
+            variables=["x", "y", "u", "v"], rows=int(rows), cols=int(cols)
+        )
 
-    def read(self, filepath: Any, frame: Optional[int] = None, **kwargs) -> xr.Dataset:
+    def read(self, filepath: Any, frame: int | None = None, **kwargs) -> xr.Dataset:
         path = _to_path(filepath)
         try:
             import h5py
         except ImportError as e:
             raise ImportError("h5py is required to read PIVLab MAT files") from e
         with h5py.File(path, "r") as f:
-            indices = sorted(int(m.group(1)) for k in f.keys() for m in [re.match(r"u_(\d+)$", k)] if m)
+            indices = sorted(
+                int(m.group(1))
+                for k in f.keys()
+                for m in [re.match(r"u_(\d+)$", k)]
+                if m
+            )
             if not indices:
                 raise ValueError("No u_<n> datasets found")
             if frame is not None:
@@ -679,9 +730,12 @@ class PIVLabReader(PIVReader):
                 u_list.append(np.array(f[f"u_{i}"]))
                 v_list.append(np.array(f[f"v_{i}"]))
                 chc_key = f"typevector_{i}"
-                chc_list.append(np.array(f[chc_key])) if chc_key in f else chc_list.append(np.ones_like(u_list[-1]))
+                chc_list.append(
+                    np.array(f[chc_key])
+                ) if chc_key in f else chc_list.append(np.ones_like(u_list[-1]))
                 if x2d is None and f"x_{i}" in f and f"y_{i}" in f:
-                    x2d = np.array(f[f"x_{i}"]); y2d = np.array(f[f"y_{i}"])
+                    x2d = np.array(f[f"x_{i}"])
+                    y2d = np.array(f[f"y_{i}"])
             u = np.stack(u_list, axis=-1)
             v = np.stack(v_list, axis=-1)
             chc = np.stack(chc_list, axis=-1)
@@ -689,8 +743,14 @@ class PIVLabReader(PIVReader):
                 x2d, y2d = np.meshgrid(np.arange(u.shape[1]), np.arange(u.shape[0]))
             x1d, y1d = _coords_from_mesh(x2d, y2d)
             ds = build_dataset(
-                x1d, y1d, u, v, chc=chc, t=indices,
-                delta_t=DELTA_T, files=[str(path)],
+                x1d,
+                y1d,
+                u,
+                v,
+                chc=chc,
+                t=indices,
+                delta_t=DELTA_T,
+                files=[str(path)],
             )
         return ds
 
@@ -723,7 +783,7 @@ class NetCDFReader(PIVReader):
             frame=0,
         )
 
-    def read(self, filepath: Any, frame: Optional[int] = None, **kwargs) -> xr.Dataset:
+    def read(self, filepath: Any, frame: int | None = None, **kwargs) -> xr.Dataset:
         path = _to_path(filepath)
         ds0 = xr.open_dataset(path)
 
@@ -741,7 +801,11 @@ class NetCDFReader(PIVReader):
         else:
             raise ValueError("Unsupported NetCDF schema")
 
-        chc0 = ds0["chc"] if "chc" in ds0 else (ds0["mask"] if "mask" in ds0 else xr.ones_like(u0))
+        chc0 = (
+            ds0["chc"]
+            if "chc" in ds0
+            else (ds0["mask"] if "mask" in ds0 else xr.ones_like(u0))
+        )
 
         # Provide x/y/t coordinates if they are missing.
         xcoord = None
@@ -787,8 +851,12 @@ class NetCDFReader(PIVReader):
         return build_dataset(
             xcoord if xcoord is not None else np.arange(u.sizes["x"]),
             ycoord if ycoord is not None else np.arange(u.sizes["y"]),
-            u.values, v.values, chc=chc.values, t=tcoord,
-            delta_t=float(ds0.attrs.get("delta_t", DELTA_T)), files=[str(path)],
+            u.values,
+            v.values,
+            chc=chc.values,
+            t=tcoord,
+            delta_t=float(ds0.attrs.get("delta_t", DELTA_T)),
+            files=[str(path)],
         )
 
 
@@ -799,7 +867,9 @@ class ZarrReader(PIVReader):
         path = _to_path(filepath)
         if path.suffix.lower() == ".zarr":
             return True
-        return path.is_dir() and ((path / "zarr.json").exists() or (path / ".zattrs").exists())
+        return path.is_dir() and (
+            (path / "zarr.json").exists() or (path / ".zattrs").exists()
+        )
 
     def read_metadata(self, filepath: Any) -> PIVMetadata:
         path = _to_path(filepath)
@@ -818,7 +888,7 @@ class ZarrReader(PIVReader):
             frame=0,
         )
 
-    def read(self, filepath: Any, chunks: Optional[dict] = None, **kwargs) -> xr.Dataset:
+    def read(self, filepath: Any, chunks: dict | None = None, **kwargs) -> xr.Dataset:
         path = _to_path(filepath)
         ds = xr.open_zarr(path, chunks=chunks)
         return set_default_attrs(ds)
@@ -843,11 +913,16 @@ class CSVReader(PIVReader):
             frame=_extract_frame_number(path),
         )
 
-    def read(self, filepath: Any, frame: Optional[int] = None, **kwargs) -> xr.Dataset:
+    def read(self, filepath: Any, frame: int | None = None, **kwargs) -> xr.Dataset:
         path = _to_path(filepath)
         df = pd.read_csv(path)
         col_map = {c.lower(): c for c in df.columns}
-        if "x" not in col_map or "y" not in col_map or "u" not in col_map or "v" not in col_map:
+        if (
+            "x" not in col_map
+            or "y" not in col_map
+            or "u" not in col_map
+            or "v" not in col_map
+        ):
             raise ValueError(f"CSV file {path} missing required x, y, u, v columns.")
 
         x_col = col_map["x"]
@@ -863,7 +938,11 @@ class CSVReader(PIVReader):
 
         u_grid = df[u_col].values.reshape((ny, nx))
         v_grid = df[v_col].values.reshape((ny, nx))
-        chc_grid = df[chc_col].values.reshape((ny, nx)) if chc_col is not None else np.ones((ny, nx), dtype=float)
+        chc_grid = (
+            df[chc_col].values.reshape((ny, nx))
+            if chc_col is not None
+            else np.ones((ny, nx), dtype=float)
+        )
 
         t_val = float(frame if frame is not None else _extract_frame_number(path))
 
@@ -896,7 +975,16 @@ class PIVReaderRegistry:
         self._register_builtin_readers()
 
     def _register_builtin_readers(self) -> None:
-        self._readers = [InsightVECReader(), OpenPIVReader(), Davis8Reader(), LaVisionVC7Reader(), PIVLabReader(), NetCDFReader(), ZarrReader(), CSVReader()]
+        self._readers = [
+            InsightVECReader(),
+            OpenPIVReader(),
+            Davis8Reader(),
+            LaVisionVC7Reader(),
+            PIVLabReader(),
+            NetCDFReader(),
+            ZarrReader(),
+            CSVReader(),
+        ]
 
     def register(self, reader: PIVReader) -> None:
         self._readers.insert(0, reader)
@@ -904,7 +992,7 @@ class PIVReaderRegistry:
     def get_readers(self) -> list[PIVReader]:
         return list(self._readers)
 
-    def find_reader(self, filepath: Any) -> Optional[PIVReader]:
+    def find_reader(self, filepath: Any) -> PIVReader | None:
         path = _to_path(filepath)
         if not path.exists():
             return None
@@ -916,7 +1004,7 @@ class PIVReaderRegistry:
                 continue
         return None
 
-    def get_by_name(self, fmt: str) -> Optional[PIVReader]:
+    def get_by_name(self, fmt: str) -> PIVReader | None:
         """Look up a registered reader (builtin or custom) by its `name`,
         so `register_reader()` covers explicit `format=` dispatch too, not
         just auto-detection."""
@@ -934,14 +1022,14 @@ def register_reader(reader: PIVReader) -> None:
     _REGISTRY.register(reader)
 
 
-def read_piv(filepath: Any, format: Optional[str] = None, **kwargs) -> xr.Dataset:
+def read_piv(filepath: Any, format: str | None = None, **kwargs) -> xr.Dataset:
     path = _to_path(filepath)
     if not path.exists():
         raise FileNotFoundError(str(path))
     frame_override = kwargs.pop("frame", None)
     delta_t_override = kwargs.pop("delta_t", None)
     chunks = kwargs.pop("chunks", None)
-    reader: Optional[PIVReader]
+    reader: PIVReader | None
     if format is not None:
         reader = _REGISTRY.get_by_name(format)
     else:
@@ -961,7 +1049,9 @@ def read_piv(filepath: Any, format: Optional[str] = None, **kwargs) -> xr.Datase
     return set_default_attrs(ds)
 
 
-def read_directory(directory: Any, pattern: str = "*", ext: Optional[str] = None) -> xr.Dataset:
+def read_directory(
+    directory: Any, pattern: str = "*", ext: str | None = None
+) -> xr.Dataset:
     dirpath = _to_path(directory)
     if not dirpath.exists() or not dirpath.is_dir():
         raise FileNotFoundError(str(dirpath))
@@ -970,7 +1060,7 @@ def read_directory(directory: Any, pattern: str = "*", ext: Optional[str] = None
         glob_pattern = f"{pattern}{ext}"
     files = sorted(dirpath.glob(glob_pattern))
     if not files:
-        raise IOError("No files")
+        raise OSError("No files")
     datasets = [read_piv(fp, frame=i) for i, fp in enumerate(files)]
     combined = xr.concat(datasets, dim="t")
     combined.attrs["delta_t"] = float(datasets[0].attrs.get("delta_t", DELTA_T))
@@ -982,8 +1072,8 @@ def convert_directory_to_zarr(
     directory: Any,
     zarr_path: Any,
     pattern: str = "*",
-    ext: Optional[str] = None,
-    chunks: Optional[dict] = None,
+    ext: str | None = None,
+    chunks: dict | None = None,
 ) -> None:
     """Stream a directory of per-frame PIV files into one chunked Zarr store.
 
@@ -1002,13 +1092,15 @@ def convert_directory_to_zarr(
         glob_pattern = f"{pattern}{ext}"
     files = sorted(dirpath.glob(glob_pattern))
     if not files:
-        raise IOError("No files")
+        raise OSError("No files")
 
     zpath = _to_path(zarr_path)
     chunk_spec = chunks or {"t": 1}
     for i, fp in enumerate(files):
         frame_ds = read_piv(fp, frame=i).chunk(chunk_spec)
-        frame_ds.to_zarr(zpath, mode="w" if i == 0 else "a", append_dim=None if i == 0 else "t")
+        frame_ds.to_zarr(
+            zpath, mode="w" if i == 0 else "a", append_dim=None if i == 0 else "t"
+        )
 
 
 # Modern alias for convert_directory_to_zarr
@@ -1018,7 +1110,7 @@ stream_directory_to_zarr = convert_directory_to_zarr
 def stream_statistics(
     source: Any,
     pattern: str = "*",
-    ext: Optional[str] = None,
+    ext: str | None = None,
     name_mean: str = "mean",
     name_prime: str = "prime",
 ) -> xr.Dataset:
@@ -1058,11 +1150,11 @@ def stream_statistics(
     """
     coords = None
     attrs = {}
-    u_mean: Optional[np.ndarray] = None
-    v_mean: Optional[np.ndarray] = None
-    M2_xx: Optional[np.ndarray] = None
-    M2_yy: Optional[np.ndarray] = None
-    M2_xy: Optional[np.ndarray] = None
+    u_mean: np.ndarray | None = None
+    v_mean: np.ndarray | None = None
+    M2_xx: np.ndarray | None = None
+    M2_yy: np.ndarray | None = None
+    M2_xy: np.ndarray | None = None
     n_frames = 0
 
     def _process_frame(u_k: np.ndarray, v_k: np.ndarray, k: int):
@@ -1093,8 +1185,16 @@ def stream_statistics(
         attrs = source.attrs.copy()
 
         for k in range(n_t):
-            u_k = source["u"].isel(t=k).to_numpy().squeeze() if has_t else source["u"].to_numpy().squeeze()
-            v_k = source["v"].isel(t=k).to_numpy().squeeze() if has_t else source["v"].to_numpy().squeeze()
+            u_k = (
+                source["u"].isel(t=k).to_numpy().squeeze()
+                if has_t
+                else source["u"].to_numpy().squeeze()
+            )
+            v_k = (
+                source["v"].isel(t=k).to_numpy().squeeze()
+                if has_t
+                else source["v"].to_numpy().squeeze()
+            )
             _process_frame(u_k, v_k, k)
 
     elif isinstance(source, (str, pathlib.Path)):
@@ -1102,7 +1202,9 @@ def stream_statistics(
         if p.is_dir() and (p / ".zmetadata").exists() or p.name.endswith(".zarr"):
             # Zarr store
             ds_lazy = read_directory_lazy(p)
-            return stream_statistics(ds_lazy, name_mean=name_mean, name_prime=name_prime)
+            return stream_statistics(
+                ds_lazy, name_mean=name_mean, name_prime=name_prime
+            )
         elif p.is_dir():
             # Directory of files
             glob_pattern = pattern
@@ -1110,7 +1212,7 @@ def stream_statistics(
                 glob_pattern = f"{pattern}{ext}"
             files = sorted(p.glob(glob_pattern))
             if not files:
-                raise IOError(f"No matching PIV files found in {p}")
+                raise OSError(f"No matching PIV files found in {p}")
             for k, fp in enumerate(files):
                 frame_ds = read_piv(fp, frame=k)
                 if coords is None:
@@ -1121,7 +1223,9 @@ def stream_statistics(
                 _process_frame(u_k, v_k, k)
         else:
             frame_ds = read_piv(p)
-            return stream_statistics(frame_ds, name_mean=name_mean, name_prime=name_prime)
+            return stream_statistics(
+                frame_ds, name_mean=name_mean, name_prime=name_prime
+            )
 
     elif isinstance(source, Sequence):
         for k, item in enumerate(source):
@@ -1188,7 +1292,7 @@ def save_piv(
     filepath: Any,
     format: str = "zarr",
     frame: int = 0,
-    chunks: Optional[dict] = None,
+    chunks: dict | None = None,
     mode: str = "w",
     **kwargs,
 ) -> None:
@@ -1206,7 +1310,14 @@ def save_piv(
         x = ds["x"].values
         y = ds["y"].values
         x2d, y2d = np.meshgrid(x, y)
-        df = pd.DataFrame({"x": x2d.ravel(), "y": y2d.ravel(), "u": ds["u"].values.ravel(), "v": ds["v"].values.ravel()})
+        df = pd.DataFrame(
+            {
+                "x": x2d.ravel(),
+                "y": y2d.ravel(),
+                "u": ds["u"].values.ravel(),
+                "v": ds["v"].values.ravel(),
+            }
+        )
         df.to_csv(path, index=False)
         return
     raise ValueError("Unsupported format")
@@ -1235,9 +1346,13 @@ def load_directory(path: Any, basename: str = "*", ext: str = ".vec") -> xr.Data
     return read_directory(path, pattern=basename, ext=ext)
 
 
-def load_pivlab(filepath: Any, frame: Optional[int] = None) -> xr.Dataset:
+def load_pivlab(filepath: Any, frame: int | None = None) -> xr.Dataset:
     reader = PIVLabReader()
-    return reader.read(filepath, frame=frame) if frame is not None else reader.read(filepath)
+    return (
+        reader.read(filepath, frame=frame)
+        if frame is not None
+        else reader.read(filepath)
+    )
 
 
 def batchf(
@@ -1318,12 +1433,16 @@ def batchf(
             if mod is not None and hasattr(mod, name):
                 return getattr(mod, name)(ds, *args, **kwargs)
 
-        raise ValueError(f"Unknown function '{name}'. Pass a callable or a ds.piv method name.")
+        raise ValueError(
+            f"Unknown function '{name}'. Pass a callable or a ds.piv method name."
+        )
 
     results: list[Any] = []
     for fp in files:
         if not nodisp:
-            arg_s = ", ".join([repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()])
+            arg_s = ", ".join(
+                [repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()]
+            )
             print(f"{fun}({fp!r}{', ' if arg_s else ''}{arg_s})")
         ds = read_piv(fp)
         results.append(_apply(ds))
@@ -1385,7 +1504,9 @@ def _expand_pivmat_file_patterns(pattern: Any) -> list[pathlib.Path]:
     return uniq
 
 
-def loadvec(filename: Any = None, *args: Any, **kwargs: Any) -> xr.Dataset | list[xr.Dataset]:
+def loadvec(
+    filename: Any = None, *args: Any, **kwargs: Any
+) -> xr.Dataset | list[xr.Dataset]:
     """PIVMAT-compatible loader (wrapper over :func:`read_piv`).
 
     This is a Python port of the user-facing behavior of PIVMAT's ``loadvec.m``.
@@ -1414,13 +1535,28 @@ def loadvec(filename: Any = None, *args: Any, **kwargs: Any) -> xr.Dataset | lis
         raise TypeError(f"Unsupported keyword arguments: {sorted(kwargs)}")
 
     if filename is None:
-        raise ValueError("loadvec requires a filename/pattern (no GUI picker in Python)")
+        raise ValueError(
+            "loadvec requires a filename/pattern (no GUI picker in Python)"
+        )
 
     # Numeric index selects from common PIVMAT extensions in cwd.
     if isinstance(filename, (int, np.integer)):
         cwd = pathlib.Path.cwd()
-        exts = {".vec", ".vc7", ".imx", ".img", ".im7", ".cm0", ".uwo", ".txt", ".mat", ".nc"}
-        files = sorted([p for p in cwd.iterdir() if p.is_file() and p.suffix.lower() in exts])
+        exts = {
+            ".vec",
+            ".vc7",
+            ".imx",
+            ".img",
+            ".im7",
+            ".cm0",
+            ".uwo",
+            ".txt",
+            ".mat",
+            ".nc",
+        }
+        files = sorted(
+            [p for p in cwd.iterdir() if p.is_file() and p.suffix.lower() in exts]
+        )
         idx = int(filename) - 1  # PIVMAT is 1-based
         if idx < 0 or idx >= len(files):
             raise IndexError("loadvec numeric index out of range")
@@ -1467,7 +1603,9 @@ def openim7(filename: Any, **kwargs: Any) -> xr.Dataset:
     try:
         from lvpyio import read_buffer  # type: ignore
     except Exception as e:
-        raise ImportError("Reading .im7 requires the optional dependency 'lvpyio'") from e
+        raise ImportError(
+            "Reading .im7 requires the optional dependency 'lvpyio'"
+        ) from e
 
     buf = read_buffer(str(path))
     data = buf[0]
@@ -1490,7 +1628,9 @@ def openimx(filename: Any, **kwargs: Any) -> xr.Dataset:
     try:
         from lvpyio import read_buffer  # type: ignore
     except Exception as e:
-        raise ImportError("Reading .imx requires the optional dependency 'lvpyio'") from e
+        raise ImportError(
+            "Reading .imx requires the optional dependency 'lvpyio'"
+        ) from e
 
     buf = read_buffer(str(path))
     data = buf[0]
@@ -1511,7 +1651,9 @@ def openimg(filename: Any, **kwargs: Any) -> xr.Dataset:
     try:
         from lvpyio import read_buffer  # type: ignore
     except Exception as e:
-        raise ImportError("Reading .img requires the optional dependency 'lvpyio'") from e
+        raise ImportError(
+            "Reading .img requires the optional dependency 'lvpyio'"
+        ) from e
 
     buf = read_buffer(str(path))
     data = buf[0]
@@ -1625,7 +1767,7 @@ def loadarrayvec(pathname: Any, fname: Any, *opts: str) -> list[list[xr.Dataset]
         # match files inside directory
         files = _expand_pivmat_file_patterns(str(d / str(fname)))
         if verbose:
-            print(f"Directory: {str(d)} ({len(files)} files)")
+            print(f"Directory: {d!s} ({len(files)} files)")
         out.append([read_piv(fp) for fp in files])
     return out
 
@@ -1652,8 +1794,7 @@ def readvec(name: Any, comments: int = 1, columns: int = 5) -> tuple[str, np.nda
     raw = raw.replace("\r\n", "\n").replace("\r", "\n").replace(",", " ")
     lines = raw.split("\n")
     comments = int(comments)
-    if comments < 0:
-        comments = 0
+    comments = max(comments, 0)
     header_lines = lines[:comments] if comments else []
     header = "\n".join(header_lines).lower()
     body = "\n".join(lines[comments:])
@@ -1781,7 +1922,7 @@ def getvar(s: Any, reqname: str | int | None = None, mode: str | None = None) ->
         return [getvar(x, reqname=reqname, mode=mode) for x in s]
 
     text = str(s)
-    keep_strings = (str(mode).lower().startswith("str") if mode is not None else False)
+    keep_strings = str(mode).lower().startswith("str") if mode is not None else False
 
     parts = [p for p in re.split(r"_+", text) if p]
     out: dict[str, Any] = {}
@@ -1907,7 +2048,7 @@ def getframedt(filename: Any) -> np.ndarray:
         # Best-effort: try common attribute locations.
         ats = None
         if hasattr(data, "attributes"):
-            ats = getattr(data, "attributes")
+            ats = data.attributes
         if ats and isinstance(ats, dict):
             # Some exports may store AcqTimeSeries0 as list of timestamps.
             for key in ("AcqTimeSeries0", "AcqTimeSeries"):
@@ -2050,7 +2191,9 @@ def multivortex(
 
         icenter = 1.0 + nsize * (3.0 * rng.random(numvortex_i) - 1.0)
         jcenter = 1.0 + nsize * (3.0 * rng.random(numvortex_i) - 1.0)
-        omega = np.sign(rng.random(numvortex_i) - 0.5) * (2.0 + rng.standard_normal(numvortex_i))
+        omega = np.sign(rng.random(numvortex_i) - 0.5) * (
+            2.0 + rng.standard_normal(numvortex_i)
+        )
         if "asym" in opt_l:
             omega = np.abs(omega)
         if "2d" in opt_l:
@@ -2068,14 +2211,21 @@ def multivortex(
             dy = jj - jcenter[num]
             radius = np.sqrt(dx * dx + dy * dy)
             safe_r2 = np.where(radius == 0, np.inf, radius * radius)
-            ampl = (core[num] ** 2) / safe_r2 * (1.0 - np.exp(-((radius / core[num]) ** 2))) / 1000.0
+            ampl = (
+                (core[num] ** 2)
+                / safe_r2
+                * (1.0 - np.exp(-((radius / core[num]) ** 2)))
+                / 1000.0
+            )
             vx = vx + ampl * (-omega[num] * dy + div[num] * dx)
             vy = vy + ampl * (omega[num] * dx + div[num] * dy)
 
         x = np.arange(0, nsize, dtype=float)
         y = np.arange(0, nsize, dtype=float)
         x2d, y2d = np.meshgrid(x, y)
-        ds = from_arrays(x2d, y2d, vx.T, vy.T, mask=np.ones((nsize, nsize), dtype=float), frame=k)
+        ds = from_arrays(
+            x2d, y2d, vx.T, vy.T, mask=np.ones((nsize, nsize), dtype=float), frame=k
+        )
         ds["x"].attrs["units"] = "mm"
         ds["y"].attrs["units"] = "mm"
         ds["u"].attrs["units"] = "m/s"
@@ -2204,7 +2354,9 @@ def randvec(
         vx = np.fft.ifft2(tux).real * (n**2)
         vy = np.fft.ifft2(tuy).real * (n**2)
 
-        ds = from_arrays(x2d, y2d, vx, vy, mask=np.ones((n, n), dtype=float), frame=frame)
+        ds = from_arrays(
+            x2d, y2d, vx, vy, mask=np.ones((n, n), dtype=float), frame=frame
+        )
         ds["x"].attrs["units"] = "au"
         ds["y"].attrs["units"] = "au"
         ds["u"].attrs["units"] = "au"

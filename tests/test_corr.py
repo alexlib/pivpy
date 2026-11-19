@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 import xarray as xr
 
-
 from pivpy.compute_funcs import corrm, corrx
 
 
@@ -96,7 +95,9 @@ def test_corrm_xarray_half_selects_nonnegative_lags():
     )
     out = corrm(a, dim="x", half=True)
     np.testing.assert_array_equal(out["lag"].values, np.array([0, 1, 2]))
-    np.testing.assert_allclose(out.values, np.array([[14.0 / 3.0, 4.0, 3.0]]), rtol=0, atol=1e-12)
+    np.testing.assert_allclose(
+        out.values, np.array([[14.0 / 3.0, 4.0, 3.0]]), rtol=0, atol=1e-12
+    )
 
 
 def test_corrm_numpy_rejects_non_2d():

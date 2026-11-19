@@ -1,8 +1,9 @@
 """Attrs-preservation checks: does delta_t/units/files survive accessor calls?"""
+
 import pytest
 
-from pivpy import io
 import pivpy.pivpy  # noqa: F401 -- registers the .piv accessor
+from pivpy import io
 
 
 def _base_dataset():
@@ -30,7 +31,16 @@ def _assert_core_attrs_preserved(ds):
         lambda ds: ds.piv.averf(),
         lambda ds: ds.piv.addnoisef(eps=0.1, seed=0),
     ],
-    ids=["crop", "pan", "filterf", "flipf", "vorticity", "strain", "averf", "addnoisef"],
+    ids=[
+        "crop",
+        "pan",
+        "filterf",
+        "flipf",
+        "vorticity",
+        "strain",
+        "averf",
+        "addnoisef",
+    ],
 )
 def test_accessor_method_preserves_core_attrs(apply):
     ds = _base_dataset()

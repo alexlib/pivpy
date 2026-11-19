@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Iterable, List
 
 
 @dataclass(frozen=True)
@@ -124,9 +123,9 @@ def expandstr(pattern: str) -> list[str]:
 
 # Re-export synthetic flow generators for PIVMat compatibility
 from pivpy.synthetic import (
-    vortex,
     multivortex,
     randvec,
+    vortex,
 )
 
-__all__ = ["expandstr", "vortex", "multivortex", "randvec"]
+__all__ = ["expandstr", "multivortex", "randvec", "vortex"]

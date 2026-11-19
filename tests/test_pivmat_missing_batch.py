@@ -6,16 +6,16 @@ from pivpy.compute_funcs import (
     setoriginf,
     shiftf,
     smoothf,
+    spatiotempcorrf,
+    statf,
+    stresstensor,
+    subsbr,
+    surfheight,
+    tempfilterf,
     timederivativef,
     truncf,
     zeropadf,
     zerotonanfield,
-    statf,
-    stresstensor,
-    subsbr,
-    tempfilterf,
-    surfheight,
-    spatiotempcorrf,
 )
 from pivpy.io import vec2mat
 
@@ -174,7 +174,9 @@ def test_tempfilterf_keeps_dc_for_constant():
     out_dc = tempfilterf(ds, [1])
     assert float(np.mean(out_dc["w"].values)) == pytest.approx(3.0, rel=1e-6)
     out_not_dc = tempfilterf(ds, [2])
-    assert float(np.mean(np.abs(out_not_dc["w"].values))) == pytest.approx(0.0, abs=1e-6)
+    assert float(np.mean(np.abs(out_not_dc["w"].values))) == pytest.approx(
+        0.0, abs=1e-6
+    )
 
 
 def test_surfheight_reconstructs_periodic_surface():

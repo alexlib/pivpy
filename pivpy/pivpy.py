@@ -57,6 +57,7 @@ from pivpy.compute_funcs import (
     convergence_analysis as cconvergence_analysis,
     detect_vortices as cdetect_vortices,
     spatial_vortex_probability as cspatial_vortex_probability,
+    fft_spectrum_2d as cfft_spectrum_2d,
     calc_moments as ccalc_moments,
     calc_all_products as ccalc_all_products,
     two_point_correlation as ctwo_point_correlation,
@@ -2152,6 +2153,9 @@ class PIVAccessor(object):
 
     def vortex_probability(self, criterion="gamma2", threshold=0.5, sign="all"):
         return cspatial_vortex_probability(self._obj, criterion=criterion, threshold=threshold, sign=sign)
+
+    def fft_spectrum(self, component="u", window="hann", detrend=True, azimuthal=True):
+        return cfft_spectrum_2d(self._obj, component=component, window=window, detrend=detrend, azimuthal=azimuthal)
 
     def fluct(
         self,

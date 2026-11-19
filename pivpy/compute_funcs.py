@@ -12409,3 +12409,61 @@ def spatial_vortex_probability(ds, criterion="gamma2", threshold=0.5, sign="all"
         # also mark regions? Use centers only for simplicity
     prob = prob / nt
     return xr.DataArray(prob, dims=("y","x"), coords={"y": ds["y"], "x": ds["x"]})
+def fft_spectrum_2d(ds, component="u", window="hann", detrend=True, azimuthal=True):
+    x = np.asarray(ds["x"].values, dtype=float)
+    y = np.asarray(ds["y"].values, dtype=float)
+    nx = len(x); ny = len(y)
+    dx = float(np.mean(np.diff(x))) if nx>1 else 1.0
+    dy = float(np.mean(np.diff(y))) if ny>1 else 1.0
+    has_t = "t" in ds.dims and ds.sizes.get("t",1)>1
+    nt = ds.sizes["t"] if has_t else 1
+    # window
+    wname = str(window).lower()
+    if wname.startswith("hann"):
+        W = np.outer(np.hanning(ny), np.hanning(nx))
+    elif wname.startswith("hamm"):
+        W = np.outer(np.hamming(ny), np.hamming(nx))
+    else:
+        W = np.ones((ny,nx))
+    wnorm = np.mean(W**2) if np.mean(W**2)>0 else 1.0
+    kx = np.fft.fftfreq(nx, d=dx)*2*np.pi
+    ky = np.fft.fftfreq(ny, d=dy)*2*np.pi
+    KX, KY = np.meshgrid(np.fft.fftshift(kx), np.fft.fftshift(ky))
+    K = np.sqrt(KX**2+KY**2)
+    E2d_sum = np.zeros((ny,nx))
+    for i in range(nt):
+        if component == "u":
+            sl = ds["u"].isel(t=i).to_numpy() if has_t else ds["u"].to_numpy()
+        elif component == "v":
+            sl = ds["v"].isel(t=i).to_numpy() if has_t else ds["v"].to_numpy()
+        else:
+            u = ds["u"].isel(t=i).to_numpy() if has_t else ds["u"].to_numpy()
+            v = ds["v"].isel(t=i).to_numpy() if has_t else ds["v"].to_numpy()
+            sl = np.sqrt(u*u+v*v)
+        sl = np.asarray(sl, dtype=float).squeeze()
+        if detrend:
+            sl = sl - np.nanmean(sl)
+        slw = np.nan_to_num(sl)*W
+        hat = np.fft.fft2(slw)/(nx*ny)
+        E2d = (np.abs(hat)**2)/wnorm
+        E2d_sum += np.fft.fftshift(E2d)
+    E2D = E2d_sum/nt
+    E_kx = E2D.sum(axis=0)
+    E_ky = E2D.sum(axis=1)
+    data_vars = {"E2D": (("ky","kx"), E2D), "E_kx": (("kx",), E_kx), "E_ky": (("ky",), E_ky)}
+    coords = {"kx": np.fft.fftshift(kx), "ky": np.fft.fftshift(ky)}
+    if azimuthal:
+        dk = min(2*np.pi/(nx*dx), 2*np.pi/(ny*dy))
+        kmax = K.max()
+        kbins = np.arange(0, kmax+dk, dk)
+        kc = 0.5*(kbins[:-1]+kbins[1:])
+        Er = np.zeros(len(kc))
+        for bi in range(len(kc)):
+            msk = (K>=kbins[bi])&(K<kbins[bi+1])
+            if msk.sum()>0:
+                Er[bi] = E2D[msk].mean()* (kbins[bi+1]-kbins[bi])  # approx
+        data_vars["E_radial"] = (("k",), Er)
+        coords["k"] = kc
+    out = xr.Dataset(data_vars=data_vars, coords=coords, attrs=ds.attrs.copy())
+    out.attrs["component"] = component
+    return out

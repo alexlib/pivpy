@@ -220,8 +220,6 @@ drag, the plot redraws, no "run cell" click needed.
 A minimal tuning panel for `ds.piv.plot()`:
 
 ```python {marimo}
-import marimo as mo
-
 cmap_dd = mo.ui.dropdown(
     options=["viridis", "plasma", "coolwarm", "turbo"], value="viridis", label="colormap"
 )
@@ -233,13 +231,13 @@ mo.vstack([cmap_dd, background_dd, skip_slider])
 ```
 
 ```python {marimo}
-fig, ax = ds.piv.plot(
+fig2, ax2 = ds.piv.plot(
     background=None if background_dd.value == "none" else background_dd.value,
     cmap=cmap_dd.value,
     skip=skip_slider.value,
     color_by=None if background_dd.value != "none" else "mag",
 )
-fig.gca()
+fig2.gca()
 ```
 
 A few practical notes from real use:

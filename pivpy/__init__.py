@@ -9,7 +9,7 @@ xr.set_options(keep_attrs=True, display_expand_attrs=False)
 try:
     __version__ = version("pivpy")
 except PackageNotFoundError:
-    __version__ = "0.2.1"
+    __version__ = "0.5.0"
 
 # registers the .piv xarray Dataset accessor (@xr.register_dataset_accessor) --
 # importing pivpy.io / pivpy.graphics alone does not trigger this

@@ -2774,3 +2774,14 @@ def vortex_disp(prob_da, vortices=None, figsize=(6, 5), cmap="viridis"):
     fig.colorbar(cf, ax=ax)
     fig.tight_layout()
     return fig, ax
+import matplotlib.pyplot as plt
+import numpy as np
+
+def fft_spectrum_disp(spec_ds, figsize=(6, 4)):
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.loglog(spec_ds["k"].values, spec_ds["E_radial"].values + 1e-20)
+    ax.set_xlabel("k")
+    ax.set_ylabel("E(k)")
+    ax.set_title("2D FFT spectrum")
+    fig.tight_layout()
+    return fig, ax

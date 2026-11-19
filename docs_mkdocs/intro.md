@@ -42,6 +42,16 @@ Core (no optional deps):
 - Insight / LaVision ASCII `.vec`
 - OpenPIV `.txt` (5- or 6-column exports; when present, the 6th column is loaded as `mask`)
 
+## Related work and inspiration
+
+Several recently added analysis features (TKE budget, convergence analysis, vortex
+identification, 2D FFT spectra, stress/TKE variants, anisotropy invariants) were
+inspired by the feature set of **uPrime** (Jibu Tom Jose and Omri Ram, Technion),
+an open-source desktop application for turbulence analysis of PIV/CFD velocity fields
+(GPL-3.0). PIVPy's implementations are original work written for this MIT-licensed
+codebase and are not derived from uPrime's source code; uPrime is acknowledged as
+prior art.
+
 ## Tutorials
 
 - [Tutorial](tutorial.md) (marimo notebook)

@@ -294,6 +294,16 @@ With `uv`:
 - [PIVPy on GitHub Pages](https://alexlib.github.io/pivpy) (MkDocs, with live interactive marimo notebooks)
 - [PIVPy on ReadTheDocs](http://pivpy.readthedocs.io) (mirrors the same MkDocs documentation)
 
+## Related work and inspiration
+
+PIVPy is part of a broader ecosystem of PIV post-processing tools. In particular, the
+design of several recently added analysis features (TKE budget, convergence analysis,
+vortex identification, 2D FFT spectra, stress/TKE variants, anisotropy invariants) was
+inspired by the feature set of **uPrime** (Jibu Tom Jose and Omri Ram, Technion), an
+open-source desktop application for turbulence analysis of PIV/CFD velocity fields
+(GPL-3.0). PIVPy's implementations are original work written for the MIT-licensed
+codebase and are not derived from uPrime's source; uPrime is acknowledged as prior art.
+
 ## How to help?
 
 Read the ToDo file and pick one item to program. Use Fork-Develop-Pull Request model to 

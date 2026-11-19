@@ -61,6 +61,9 @@ from pivpy.compute_funcs import (
     reynolds_stress_std as creynolds_stress_std,
     tke_std as ctke_std,
     stress_line_profile as cstress_line_profile,
+    anisotropy_tensor as canisotropy_tensor,
+    anisotropy_invariants as canisotropy_invariants,
+    barycentric_map as cbarycentric_map,
     calc_moments as ccalc_moments,
     calc_all_products as ccalc_all_products,
     two_point_correlation as ctwo_point_correlation,
@@ -2168,6 +2171,15 @@ class PIVAccessor(object):
 
     def stress_line_profile(self, x0, y0, x1, y1, component: str = "uu"):
         return cstress_line_profile(self._obj, x0=x0, y0=y0, x1=x1, y1=y1, component=component)
+
+    def anisotropy_tensor(self):
+        return canisotropy_tensor(self._obj)
+
+    def anisotropy_invariants(self):
+        return canisotropy_invariants(self._obj)
+
+    def barycentric_map(self):
+        return cbarycentric_map(self._obj)
 
     def fluct(
         self,

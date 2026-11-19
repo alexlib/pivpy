@@ -12529,3 +12529,52 @@ def stress_line_profile(ds, x0, y0, x1, y1, component="uu"):
     out["y"] = (("s",), ys)
     out.attrs["component"] = component
     return out
+def anisotropy_tensor(ds):
+    # Reynolds stresses
+    U = ds["u"].to_numpy(); V = ds["v"].to_numpy()
+    if U.ndim==2: U=U[:,:,None]; V=V[:,:,None]
+    Ubar=U.mean(axis=2); Vbar=V.mean(axis=2)
+    up=U-Ubar[:,:,None]; vp=V-Vbar[:,:,None]
+    ruu=(up**2).mean(axis=2); rvv=(vp**2).mean(axis=2); ruv=(up*vp).mean(axis=2)
+    k = 0.5*(ruu+rvv)
+    # anisotropy tensor b_ij = R_ij/(2k) - delta_ij/3 (2D approx; w'=0 assumed -> rww=0? use 0)
+    # R_ij matrix entries: ruu, ruv; rvv. Trace = ruu+rvv (+rww=0). k = 0.5*trace.
+    trace = ruu+rvv
+    # avoid div by zero
+    denom = np.where(trace>0, trace, 1.0)
+    b_xx = ruu/denom - 1.0/3.0
+    b_yy = rvv/denom - 1.0/3.0
+    b_xy = ruv/denom
+    b_yx = ruv/denom
+    out = xr.Dataset(coords={"y": ds["y"], "x": ds["x"]})
+    out["b_xx"] = (("y","x"), b_xx)
+    out["b_yy"] = (("y","x"), b_yy)
+    out["b_xy"] = (("y","x"), b_xy)
+    return out
+
+def anisotropy_invariants(ds):
+    at = anisotropy_tensor(ds)
+    bxx = at["b_xx"].to_numpy(); byy = at["b_yy"].to_numpy(); bxy = at["b_xy"].to_numpy()
+    # II = -0.5 b_ij b_ji ; III = det(b)
+    b2_xx = bxx*bxx + bxy*bxy
+    b2_yy = bxy*bxy + byy*byy
+    II = -0.5*(b2_xx + b2_yy)  # trace of b^2 with sign
+    # III = det(b) in 2D (with third eigenvalue from incompressibility? approximate)
+    III = bxx*byy - bxy*bxy
+    out = xr.Dataset(coords={"y": ds["y"], "x": ds["x"]})
+    out["neg_II"] = (("y","x"), -II)
+    out["III"] = (("y","x"), III)
+    return out
+
+def barycentric_map(ds):
+    inv = anisotropy_invariants(ds)
+    negII = inv["neg_II"].to_numpy()
+    III = inv["III"].to_numpy()
+    # barycentric coordinates (approx): x = III^(1/3)? Use simple mapping
+    # Standard barycentric: C1 = (III + 1/27? )... We'll provide normalized invariants as coords.
+    x_b = III
+    y_b = negII
+    out = xr.Dataset(coords={"y": ds["y"], "x": ds["x"]})
+    out["x_b"] = (("y","x"), x_b)
+    out["y_b"] = (("y","x"), y_b)
+    return out

@@ -2785,3 +2785,20 @@ def fft_spectrum_disp(spec_ds, figsize=(6, 4)):
     ax.set_title("2D FFT spectrum")
     fig.tight_layout()
     return fig, ax
+import matplotlib.pyplot as plt
+import numpy as np
+
+def stress_std_disp(std_ds, figsize=(8, 4)):
+    fig, axes = plt.subplots(1, 4, figsize=figsize)
+    for ax, name in zip(axes, ["uu_std", "vv_std", "uv_std", "tke_std"]):
+        x = std_ds.coords["x"].values if "x" in std_ds.coords else None
+        y = std_ds.coords["y"].values if "y" in std_ds.coords else None
+        Z = std_ds[name].values
+        if x is not None and y is not None:
+            X, Y = np.meshgrid(x, y)
+            cf = ax.contourf(X, Y, Z, levels=20)
+        else:
+            cf = ax.imshow(Z)
+        ax.set_title(name)
+    fig.tight_layout()
+    return fig, axes

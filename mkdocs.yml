@@ -29,6 +29,7 @@ nav:
   - Convergence analysis: convergence_analysis.md
   - Vortex identification: vortex_identification.md
   - FFT spectra (2D): fft_spectrum_2d.md
+  - Stress and TKE variants: stress_tke_variants.md
   - API Reference: api_reference.md
 
 plugins:

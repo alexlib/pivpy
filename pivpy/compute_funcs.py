@@ -12339,3 +12339,73 @@ def convergence_analysis(ds, quantities=None, kernel="cumulative", window=None, 
     out.attrs["threshold"] = threshold
     out.attrs["kernel"] = kernel
     return out
+from scipy import ndimage
+
+def detect_vortices(ds, criterion="gamma2", threshold=0.5, sign="all", min_area=4):
+    # compute criterion field
+    if criterion == "gamma2":
+        g = ds.piv.gamma2().to_numpy() if False else None
+    # Use compute_funcs gamma2? We'll compute field from ds via accessor-like
+    import pivpy.compute_funcs as cf
+    if criterion == "gamma2":
+        tmp = cf.gamma2(ds.copy() if False else ds)
+        field = tmp["gamma2"].to_numpy() if "gamma2" in tmp.data_vars else tmp[list(tmp.data_vars)[0]].to_numpy()
+    elif criterion == "gamma1":
+        tmp = cf.gamma1(ds)
+        field = tmp["gamma1"].to_numpy() if "gamma1" in tmp.data_vars else tmp[list(tmp.data_vars)[0]].to_numpy()
+    elif criterion == "q":
+        tmp = cf.q_criterion(ds)
+        field = tmp["Q"].to_numpy() if "Q" in tmp.data_vars else tmp[list(tmp.data_vars)[0]].to_numpy()
+    else:
+        # fallback: vorticity
+        w = ds["w"] if "w" in ds.data_vars else None
+        if w is None:
+            # compute vorticity via accessor? use gradient
+            field = np.zeros((ds.sizes["y"], ds.sizes["x"]))
+        else:
+            field = w.to_numpy()
+    if field.ndim == 3:
+        field = field[:, :, 0]
+    mask = np.abs(field) >= threshold
+    if sign == "positive":
+        mask = mask & (field >= 0)
+    elif sign == "negative":
+        mask = mask & (field <= 0)
+    labeled, nlab = ndimage.label(mask)
+    vortices = []
+    for lab in range(1, nlab+1):
+        region = labeled == lab
+        area = int(region.sum())
+        if area < min_area:
+            continue
+        ys, xs = np.where(region)
+        cy = int(round(ys.mean())); cx = int(round(xs.mean()))
+        peak_idx = np.unravel_index(np.argmax(np.abs(field)*region), field.shape)
+        vortices.append({
+            "label": lab,
+            "center": (int(peak_idx[0]), int(peak_idx[1])),
+            "centroid": (cy, cx),
+            "area": area,
+            "peak": float(field[peak_idx]),
+        })
+    return vortices
+
+def spatial_vortex_probability(ds, criterion="gamma2", threshold=0.5, sign="all"):
+    if "t" not in ds.dims:
+        # single frame -> 0/1
+        vs = detect_vortices(ds, criterion=criterion, threshold=threshold, sign=sign)
+        prob = np.zeros((ds.sizes["y"], ds.sizes["x"]))
+        for v in vs:
+            prob[v["center"][0], v["center"][1]] = 1.0
+        return xr.DataArray(prob, dims=("y","x"), coords={"y": ds["y"], "x": ds["x"]})
+    nt = ds.sizes["t"]
+    prob = np.zeros((ds.sizes["y"], ds.sizes["x"]))
+    for i in range(nt):
+        sub = ds.isel(t=i)
+        # criterion field for this frame
+        vs = detect_vortices(sub, criterion=criterion, threshold=threshold, sign=sign)
+        for v in vs:
+            prob[v["center"][0], v["center"][1]] += 1.0
+        # also mark regions? Use centers only for simplicity
+    prob = prob / nt
+    return xr.DataArray(prob, dims=("y","x"), coords={"y": ds["y"], "x": ds["x"]})

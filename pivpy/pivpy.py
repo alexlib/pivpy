@@ -55,6 +55,8 @@ from pivpy.compute_funcs import (
     tke_turb as ctke_turb,
     tke_budget as ctke_budget,
     convergence_analysis as cconvergence_analysis,
+    detect_vortices as cdetect_vortices,
+    spatial_vortex_probability as cspatial_vortex_probability,
     calc_moments as ccalc_moments,
     calc_all_products as ccalc_all_products,
     two_point_correlation as ctwo_point_correlation,
@@ -2144,6 +2146,12 @@ class PIVAccessor(object):
             threshold=threshold,
             point=point,
         )
+
+    def detect_vortices(self, criterion="gamma2", threshold=0.5, sign="all", min_area=4):
+        return cdetect_vortices(self._obj, criterion=criterion, threshold=threshold, sign=sign, min_area=min_area)
+
+    def vortex_probability(self, criterion="gamma2", threshold=0.5, sign="all"):
+        return cspatial_vortex_probability(self._obj, criterion=criterion, threshold=threshold, sign=sign)
 
     def fluct(
         self,

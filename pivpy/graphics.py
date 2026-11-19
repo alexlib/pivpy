@@ -2757,3 +2757,20 @@ def convergence_disp(conv_ds, quantities=None, figsize=(8, 5)):
     ax.legend()
     fig.tight_layout()
     return fig, ax
+import matplotlib.pyplot as plt
+import numpy as np
+
+def vortex_disp(prob_da, vortices=None, figsize=(6, 5), cmap="viridis"):
+    fig, ax = plt.subplots(figsize=figsize)
+    x = prob_da.coords["x"].values
+    y = prob_da.coords["y"].values
+    X, Y = np.meshgrid(x, y)
+    cf = ax.contourf(X, Y, prob_da.values, levels=20, cmap=cmap)
+    if vortices:
+        for v in vortices:
+            r, c = v["center"]
+            ax.plot(x[c], y[r], "rx", markersize=10)
+    ax.set_title("Vortex probability")
+    fig.colorbar(cf, ax=ax)
+    fig.tight_layout()
+    return fig, ax

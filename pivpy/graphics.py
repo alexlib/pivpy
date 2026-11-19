@@ -2716,3 +2716,28 @@ def display_vector_field(
         scalingFactor=arrowScale,
         widthFactor=arrowWidth,
     )
+import matplotlib.pyplot as plt
+import numpy as np
+
+def tke_budget_disp(budget_ds, terms=None, figsize=(12, 8), cmap="viridis"):
+    if terms is None:
+        terms = ["k", "production", "dissipation", "advection", "turbulent_transport", "residual"]
+    n = len(terms)
+    ncols = 3
+    nrows = (n + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+    axes = np.atleast_1d(axes).ravel()
+    x = budget_ds["x"].values
+    y = budget_ds["y"].values
+    X, Y = np.meshgrid(x, y)
+    for i, t in enumerate(terms):
+        ax = axes[i]
+        Z = budget_ds[t].values
+        cf = ax.contourf(X, Y, Z, levels=20, cmap=cmap)
+        ax.set_title(t)
+        ax.set_xlabel("x"); ax.set_ylabel("y")
+        fig.colorbar(cf, ax=ax, shrink=0.7)
+    for j in range(i+1, len(axes)):
+        axes[j].axis("off")
+    fig.tight_layout()
+    return fig, axes[:n]

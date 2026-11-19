@@ -6027,3 +6027,106 @@ def moving_average(
         raise ValueError(f"dimension {dim!r} not in dataset")
     smoothed = ds.rolling({dim: window}, center=False).mean()
     return smoothed.isel({dim: slice(window - 1, None)}).assign_attrs(ds.attrs)
+import numpy as np
+import xarray as xr
+
+def tke_budget(ds, nu=None, rho=1.0, method="central"):
+    if "t" not in ds.dims or ds.sizes.get("t", 1) < 2:
+        raise ValueError("tke_budget requires a multi-frame dataset with 't' dimension (>=2 frames).")
+    x = np.asarray(ds["x"].values, dtype=float)
+    y = np.asarray(ds["y"].values, dtype=float)
+    dx = float(np.mean(np.diff(x))) if len(x) > 1 else 1.0
+    dy = float(np.mean(np.diff(y))) if len(y) > 1 else 1.0
+    has_w = "w" in ds.data_vars
+    U = ds["u"].to_numpy()  # (y,x,t) or (y,x,t)
+    V = ds["v"].to_numpy()
+    # ensure shape (ny,nx,nt)
+    if U.ndim == 2:
+        U = U[:, :, None]; V = V[:, :, None]
+    W = ds["w"].to_numpy() if has_w else None
+    if W is not None and W.ndim == 2:
+        W = W[:, :, None]
+    nt = U.shape[2]
+    Ubar = U.mean(axis=2)
+    Vbar = V.mean(axis=2)
+    Wbar = W.mean(axis=2) if W is not None else None
+    up = U - Ubar[:, :, None]
+    vp = V - Vbar[:, :, None]
+    wp = (W - Wbar[:, :, None]) if W is not None else None
+    # Reynolds stresses <u_i' u_j'>
+    ruu = (up**2).mean(axis=2)
+    rvv = (vp**2).mean(axis=2)
+    ruv = (up*vp).mean(axis=2)
+    if W is not None:
+        rww = (wp**2).mean(axis=2)
+        ruw = (up*wp).mean(axis=2)
+        rvw = (vp*wp).mean(axis=2)
+    else:
+        rww = np.zeros_like(ruu); ruw = np.zeros_like(ruu); rvw = np.zeros_like(ruu)
+    k = 0.5*(ruu + rvv + rww)
+    # gradients of mean
+    def grad(f, axis, h):
+        return np.gradient(f, h, axis=axis)
+    dUdx = grad(Ubar, 1, dx); dUdy = grad(Ubar, 0, dy)
+    dVdx = grad(Vbar, 1, dx); dVdy = grad(Vbar, 0, dy)
+    production = -(ruu*dUdx + ruv*dUdy + ruv*dVdx + rvv*dVdy)
+    if W is not None:
+        dWdx = grad(Wbar, 1, dx); dWdy = grad(Wbar, 0, dy); dWdz = None
+        production = production - (ruw*dWdx + rvw*dWdy + rww*0.0)  # z-deriv unavailable in 2D
+    # advection
+    dkdx = grad(k, 1, dx); dkdy = grad(k, 0, dy)
+    advection = Ubar*dkdx + Vbar*dkdy
+    if W is not None and Wbar is not None:
+        advection = advection + Wbar*0.0
+    # turbulent transport: -d/dx(<up*kp'>) - d/dy(<vp*kp'>)
+    kp = 0.5*(up**2 + vp**2 + (wp**2 if wp is not None else 0.0))
+    flux_x = (up*kp).mean(axis=2)
+    flux_y = (vp*kp).mean(axis=2)
+    turb_transport = -grad(flux_x, 1, dx) - grad(flux_y, 0, dy)
+    # dissipation
+    if nu is None:
+        dissipation = np.full_like(k, np.nan)
+        visc_diff = np.full_like(k, np.nan)
+    else:
+        # per-frame gradients of fluctuations
+        dudx = np.zeros_like(U); dudy = np.zeros_like(U)
+        dvdx = np.zeros_like(V); dvdy = np.zeros_like(V)
+        for i in range(nt):
+            dudx[:,:,i] = np.gradient(up[:,:,i], dx, axis=1)
+            dudy[:,:,i] = np.gradient(up[:,:,i], dy, axis=0)
+            dvdx[:,:,i] = np.gradient(vp[:,:,i], dx, axis=1)
+            dvdy[:,:,i] = np.gradient(vp[:,:,i], dy, axis=0)
+        eps_sum = (dudx**2 + dudy**2 + dvdx**2 + dvdy**2).mean(axis=2)
+        if W is not None and wp is not None:
+            dwdx = np.zeros_like(W); dwdy = np.zeros_like(W)
+            for i in range(nt):
+                dwdx[:,:,i] = np.gradient(wp[:,:,i], dx, axis=1)
+                dwdy[:,:,i] = np.gradient(wp[:,:,i], dy, axis=0)
+            eps_sum = eps_sum + (dwdx**2 + dwdy**2).mean(axis=2)
+        dissipation = nu * eps_sum
+        # viscous diffusion
+        d2kdx2 = np.gradient(np.gradient(k, dx, axis=1), dx, axis=1)
+        d2kdy2 = np.gradient(np.gradient(k, dy, axis=0), dy, axis=0)
+        visc_diff = nu*(d2kdx2 + d2kdy2)
+    residual = production - dissipation - advection - turb_transport - visc_diff
+    # build dataset
+    coords = {"y": ds["y"], "x": ds["x"]}
+    out = xr.Dataset(
+        data_vars={
+            "k": (("y","x"), k),
+            "production": (("y","x"), production),
+            "dissipation": (("y","x"), dissipation),
+            "advection": (("y","x"), advection),
+            "turbulent_transport": (("y","x"), turb_transport),
+            "viscous_diffusion": (("y","x"), visc_diff),
+            "residual": (("y","x"), residual),
+        },
+        coords=coords,
+        attrs=ds.attrs.copy(),
+    )
+    for v in ["k","production","dissipation","advection","turbulent_transport","viscous_diffusion","residual"]:
+        out[v].attrs["units"] = "(m/s)^3/m" if v!="k" else "(m/s)^2"
+        out[v].attrs["standard_name"] = v
+    out.attrs["nu"] = nu if nu is not None else "None"
+    out.attrs["rho"] = rho
+    return out

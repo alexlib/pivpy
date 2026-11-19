@@ -53,6 +53,7 @@ from pivpy.compute_funcs import (
     calculate_product as ccalculate_product,
     reynolds_stresses as creynolds_stresses,
     tke_turb as ctke_turb,
+    tke_budget as ctke_budget,
     calc_moments as ccalc_moments,
     calc_all_products as ccalc_all_products,
     two_point_correlation as ctwo_point_correlation,
@@ -2112,6 +2113,19 @@ class PIVAccessor(object):
         new_obj[name].attrs["standard_name"] = "TKE"
 
         return new_obj
+
+    def tke_budget(
+        self,
+        nu: Optional[float] = None,
+        rho: float = 1.0,
+        method: str = "central",
+    ) -> xr.Dataset:
+        """Compute turbulent kinetic energy budget terms.
+
+        Returns a Dataset with data vars: k, production, dissipation, advection,
+        turbulent_transport, viscous_diffusion, residual.
+        """
+        return ctke_budget(self._obj, nu=nu, rho=rho, method=method)
 
     def fluct(
         self,

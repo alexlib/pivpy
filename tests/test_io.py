@@ -832,7 +832,7 @@ def test_netcdf_reader_roundtrip():
             pytest.skip(f"NetCDF write not available in this environment: {e}")
 
         loaded = io.read_piv(fp, format="netcdf")
-        assert set(["u", "v", "chc"]).issubset(set(loaded.data_vars))
+        assert {"u", "v", "chc"}.issubset(set(loaded.data_vars))
         assert tuple(loaded["u"].dims) == ("y", "x", "t")
         assert loaded.sizes["t"] == 2
 

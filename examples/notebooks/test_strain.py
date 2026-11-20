@@ -6,12 +6,14 @@ app = marimo.App()
 
 @app.cell
 def _():
-    """ tests pivpy.pivpy methods """
+    """tests pivpy.pivpy methods"""
     import pathlib
-    import numpy as np
     from importlib.resources import files
-    from pivpy import io
+
+    import numpy as np
+
     import pivpy.pivpy  # noqa: F401 -- registers the .piv accessor
+    from pivpy import io
 
     FILE1 = "Run000001.T000.D000.P000.H001.L.vec"
     FILE2 = "Run000002.T000.D000.P000.H001.L.vec"
@@ -31,38 +33,32 @@ def _(io):
 
 @app.cell
 def _(data):
-    data.piv.set_scale(1/16)
-    return
+    data.piv.set_scale(1 / 16)
 
 
 @app.cell
 def _(data):
     data
-    return
 
 
 @app.cell
 def _(data):
     data.isel(t=0)["u"]
-    return
 
 
 @app.cell
 def _(data):
     data["u"].differentiate("x")
-    return
 
 
 @app.cell
 def _(data):
     data["v"].differentiate("y")
-    return
 
 
 @app.cell
 def _(data):
     data.piv.strain()["w"]
-    return
 
 
 @app.cell
@@ -82,7 +78,6 @@ def _(io, np):
 @app.cell
 def _(test_strain):
     test_strain()
-    return
 
 
 if __name__ == "__main__":

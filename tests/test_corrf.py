@@ -11,7 +11,7 @@ def _expected_corr_along_x(values: np.ndarray) -> np.ndarray:
     values shape: (y, x, t)
     returns shape: (x,)
     """
-    y, x, t = values.shape
+    _y, x, _t = values.shape
     out = np.zeros(x, dtype=float)
     for lag in range(x):
         prod = values[:, : (x - lag), :] * values[:, lag:, :]
@@ -25,7 +25,7 @@ def _expected_corr_along_y(values: np.ndarray) -> np.ndarray:
     values shape: (y, x, t)
     returns shape: (y,)
     """
-    y, x, t = values.shape
+    y, _x, _t = values.shape
     out = np.zeros(y, dtype=float)
     for lag in range(y):
         prod = values[: (y - lag), :, :] * values[lag:, :, :]

@@ -387,7 +387,7 @@ def plot(
         if quiver:
             ny, nx = u_arr.shape
             if skip is None:
-                step_y = step_x = max(1, int(round(max(nx, ny) / 16)))
+                step_y = step_x = max(1, round(max(nx, ny) / 16))
             elif isinstance(skip, (tuple, list)):
                 step_y, step_x = max(1, int(skip[0])), max(1, int(skip[1]))
             else:
@@ -499,7 +499,7 @@ def plot(
         scalar_name = (
             str(background)
             if (background and str(background) in data_slice)
-            else ("w" if "w" in data_slice else list(data_slice.data_vars.keys())[0])
+            else ("w" if "w" in data_slice else next(iter(data_slice.data_vars.keys())))
         )
         sc_val = np.asarray(data_slice[scalar_name].values, dtype=float)
         if blur and float(blur) > 0.0:
@@ -1326,7 +1326,7 @@ def streamscal_panels(
 
     t_idx = kwargs.get("t_idx", 0)
     # Shared colour limits ---------------------------------------------------
-    cmap = kwargs.get("cmap", "RdBu_r")
+    kwargs.get("cmap", "RdBu_r")
     if isinstance(clim, str) and clim == "shared":
         smooth = kwargs.get("smooth", 1.0)
         upsample = kwargs.get("upsample", 4.0)
@@ -1394,13 +1394,18 @@ def streamscal_panels(
         )
         axs.append(ax)
         if labels is not None and i < len(labels):
-            lk = dict(
-                fontsize=11,
-                fontweight="bold",
-                va="top",
-                ha="left",
-                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.85),
-            )
+            lk = {
+                "fontsize": 11,
+                "fontweight": "bold",
+                "va": "top",
+                "ha": "left",
+                "bbox": {
+                    "boxstyle": "round,pad=0.2",
+                    "fc": "white",
+                    "ec": "none",
+                    "alpha": 0.85,
+                },
+            }
             lk.update(label_kwargs or {})
             ax.text(0.02, 0.98, labels[i], transform=ax.transAxes, zorder=5, **lk)
 
@@ -2270,7 +2275,7 @@ def animate(
     # Quiver Vector Layer
     ny, nx = y2d.shape
     if skip is None:
-        step_y = step_x = max(1, int(round(max(nx, ny) / 16)))
+        step_y = step_x = max(1, round(max(nx, ny) / 16))
     elif isinstance(skip, (tuple, list)):
         step_y, step_x = max(1, int(skip[0])), max(1, int(skip[1]))
     else:
@@ -3065,9 +3070,9 @@ def stress_std_disp(std_ds, figsize=(8, 4)):
         Z = std_ds[name].values
         if x is not None and y is not None:
             X, Y = np.meshgrid(x, y)
-            cf = ax.contourf(X, Y, Z, levels=20)
+            ax.contourf(X, Y, Z, levels=20)
         else:
-            cf = ax.imshow(Z)
+            ax.imshow(Z)
         ax.set_title(name)
     fig.tight_layout()
     return fig, axes

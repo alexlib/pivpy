@@ -600,7 +600,7 @@ def channel(
     """
     x_coords = np.arange(cols, dtype=float) * dx
     y_coords = np.arange(rows, dtype=float) * dy
-    x2d, y2d = np.meshgrid(x_coords, y_coords)
+    _x2d, y2d = np.meshgrid(x_coords, y_coords)
 
     y_min = y_coords[0]
     y_max = y_coords[-1]

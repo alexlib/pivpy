@@ -20,16 +20,11 @@ def _(mo):
     and reuse the same cells in a dashboard, a printable team report,
     and a seminar slide deck (marimo-studio views).
     """)
-    return
 
 
 @app.cell
 def _():
     import importlib.resources as importlib_resources
-
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import xarray as xr
 
     from pivpy import graphics, io
 
@@ -71,9 +66,7 @@ def _(data, frame):
     frame_idx = int(frame.value)
     # vorticity() returns a new dataset with a 'w' variable; keep original intact
     frame_data = data.isel(t=frame_idx).piv.vorticity()
-    speed = float(
-        ((frame_data["u"] ** 2 + frame_data["v"] ** 2) ** 0.5).mean().values
-    )
+    speed = float(((frame_data["u"] ** 2 + frame_data["v"] ** 2) ** 0.5).mean().values)
     vort_mean = float(frame_data["w"].mean().values)
     vort_max = float(abs(frame_data["w"]).max().values)
     # frame_data
@@ -86,29 +79,22 @@ def _(frame_idx, mo, speed, vort_max, vort_mean):
     **Frame {frame_idx}** · mean speed `{speed:.3f}` · mean vorticity
     `{vort_mean:.4f}` · max |vorticity| `{vort_max:.4f}`
     """)
-    return
 
 
 @app.cell
 def quiver_view_(frame_data, graphics, vec_scale):
-    fig_q, _ax_q = graphics.quiver(
-        frame_data, scalingFactor=float(vec_scale.value)
-    )
+    fig_q, _ax_q = graphics.quiver(frame_data, scalingFactor=float(vec_scale.value))
     fig_q.set_size_inches(7, 5.5)
     fig_q
-    return
 
 
 @app.cell
 def vorticity_view_(cmap, frame_data, graphics, show_vectors):
-    fig_w, ax_w = graphics.contour_plot(
-        frame_data, property="w", cmap=cmap.value
-    )
+    fig_w, ax_w = graphics.contour_plot(frame_data, property="w", cmap=cmap.value)
     if bool(show_vectors.value):
         graphics.quiver(frame_data, ax=ax_w, scalingFactor=1.0, arrowColor="k")
     fig_w.set_size_inches(7, 5.5)
     fig_w
-    return
 
 
 @app.cell
@@ -123,7 +109,6 @@ def speed_overlay_view_(cmap, frame_data, graphics, show_vectors):
         graphics.quiver(frame_data, ax=ax_s, scalingFactor=1.0, arrowColor="white")
     fig_s.set_size_inches(7, 5.5)
     fig_s
-    return
 
 
 @app.cell
@@ -131,7 +116,6 @@ def histogram_view_(frame_data, graphics):
     fig_h, _ax_h = graphics.histogram(frame_data, bins=50)
     fig_h.set_size_inches(7, 4.2)
     fig_h
-    return
 
 
 @app.cell
@@ -139,16 +123,13 @@ def streamlines_view_(frame_data, graphics):
     fig_st, _ax_st = graphics.streamplot(frame_data, density=1.2)
     fig_st.set_size_inches(7, 5.5)
     fig_st
-    return
 
 
 @app.cell
 def stats_view_(frame_data, mo):
     _u = float(frame_data["u"].mean().values)
     _v = float(frame_data["v"].mean().values)
-    _sp = float(
-        ((frame_data["u"] ** 2 + frame_data["v"] ** 2) ** 0.5).mean().values
-    )
+    _sp = float(((frame_data["u"] ** 2 + frame_data["v"] ** 2) ** 0.5).mean().values)
     _w = float(frame_data["w"].mean().values)
     _n = int((frame_data["chc"] > 0).sum().values)
     # Plain markdown (not mo.ui.table / dataframe widget) so the cell stays
@@ -164,7 +145,6 @@ def stats_view_(frame_data, mo):
     | valid vectors | {_n} |
     """
     )
-    return
 
 
 @app.cell(hide_code=True)
@@ -176,7 +156,6 @@ def _(mo):
     - Compare frames 0–4: does the high-vorticity patch advect or diffuse?
     - Decide crop window + filter settings for the next processing pass.
     """)
-    return
 
 
 if __name__ == "__main__":

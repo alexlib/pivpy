@@ -133,11 +133,11 @@ For velocity vectors, image backgrounds and colorbars use `ds.piv.plot()`. Every
 ```python
 # Velocity magnitude background with vectors only (no streamlines)
 fig, ax = ds.piv.plot(
-    background="mag",       # 'vorticity' (default), 'mag', 'ke', 'divergence', or None
-    streamlines=False,      # toggle flow streamlines
-    quiver=True,            # toggle velocity vectors
-    blur=1.5,               # smooth fluid color gradient
-    arrow_scale=0.75,       # custom vector arrow scale
+    background="mag",  # 'vorticity' (default), 'mag', 'ke', 'divergence', or None
+    streamlines=False,  # toggle flow streamlines
+    quiver=True,  # toggle velocity vectors
+    blur=1.5,  # smooth fluid color gradient
+    arrow_scale=0.75,  # custom vector arrow scale
     title="Velocity Magnitude & Vectors",
 )
 

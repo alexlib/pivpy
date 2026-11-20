@@ -27,9 +27,11 @@ def separated_flow(nx=64, ny=72, sep=1.0):
     # free stream confined above a diagonal shear layer
     psi = 0.22 * np.logaddexp(0.0, (Y + 0.55 * X - 0.85) / 0.22) * 0.9
     # (cx, cy, width, signed strength) of the three recirculation vortices
-    for cx, cy, s, g in [(0.16, 0.95, 0.11, -0.075),
-                         (0.14, 0.38, 0.10, 0.075),
-                         (0.52, 0.07, 0.13, -0.075)]:
+    for cx, cy, s, g in [
+        (0.16, 0.95, 0.11, -0.075),
+        (0.14, 0.38, 0.10, 0.075),
+        (0.52, 0.07, 0.13, -0.075),
+    ]:
         psi += sep * g * np.exp(-((X - cx) ** 2 + (Y - cy) ** 2) / (2 * s**2))
 
     u = np.gradient(psi, y, axis=0)

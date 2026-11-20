@@ -17,11 +17,12 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
+    from pathlib import Path
+
     import marimo as mo
     import numpy as np
-    import xarray as xr
-    from pathlib import Path
     from lvpyio import read_buffer
+
     from pivpy.schema import build_dataset
 
     return Path, build_dataset, mo, np, read_buffer
@@ -32,12 +33,13 @@ def _(mo):
     mo.md("""
     # Channel Flow - Vmax After Pump Shutdown
     """)
-    return
 
 
 @app.cell
 def _(Path, mo):
-    data_dir = Path(r"D:\channel_flow_research\baseline_channel\Vmax_after_pump_shutdown")
+    data_dir = Path(
+        r"D:\channel_flow_research\baseline_channel\Vmax_after_pump_shutdown"
+    )
     vc7_dir = data_dir / "PIV_MPd(4x16x16_25%ov_ImgCorr)"
     vc7_files = sorted(vc7_dir.glob("B*.vc7"))
     n_files = len(vc7_files)
@@ -108,7 +110,6 @@ def _(bg_inst, ds_inst, mo, path, scale_inst, skip_inst, stream_inst):
         title=f"Instantaneous: {path.name}",
     )
     mo.mpl.interactive(_fig)
-    return
 
 
 @app.cell
@@ -116,7 +117,6 @@ def _(mo):
     mo.md("""
     ---
     """)
-    return
 
 
 @app.cell
@@ -156,8 +156,12 @@ def _(build_dataset, mo, np, read_buffer, vc7_files):
         if _x is None:
             _x = np.arange(_u.shape[1])
             _y = np.arange(_u.shape[0])
-            _x = _data.scales.x.offset + (_x + 0.5) * _data.scales.x.slope * _data.grid.x
-            _y = _data.scales.y.offset + (_y + 0.5) * _data.scales.y.slope * _data.grid.y
+            _x = (
+                _data.scales.x.offset + (_x + 0.5) * _data.scales.x.slope * _data.grid.x
+            )
+            _y = (
+                _data.scales.y.offset + (_y + 0.5) * _data.scales.y.slope * _data.grid.y
+            )
 
         _u_phys = _data.scales.i.offset + _u * _data.scales.i.slope
         _v_phys = _data.scales.i.offset + _v * _data.scales.i.slope
@@ -195,7 +199,6 @@ def _(bg_avg, ds_avg, mo, scale_avg, skip_avg, stream_avg):
         title="Ensemble Average",
     )
     mo.mpl.interactive(_fig)
-    return
 
 
 if __name__ == "__main__":

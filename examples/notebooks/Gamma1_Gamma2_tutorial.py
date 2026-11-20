@@ -34,7 +34,6 @@ def _(mo):
 
     This tutorial uses only two velocity fields, because, otherwise, it would take a lot of time to obtain Γ1 and Γ2 fields.
     """)
-    return
 
 
 @app.cell(hide_code=True)
@@ -43,17 +42,17 @@ def _(mo):
     ### An example with a custom flow.
     For the first example, let's use a custom bubble driven upward water flow along an inclined wall.
     """)
-    return
 
 
 @app.cell
 def _():
     import pathlib
-    import numpy as np
+
     import matplotlib.pyplot as plt
-    from pivpy import io, pivpy, graphics
+    import numpy as np
     from openpiv import pyprocess, scaling, tools
-    from importlib.resources import files
+
+    from pivpy import io
 
     return io, np, pathlib, plt, pyprocess, scaling, tools
 
@@ -62,7 +61,13 @@ def _():
 def _(pathlib):
     # The example velocity field are stored as OpenPIV .txt files in the packaged data directory.
     from importlib import resources
-    fieldsDir = pathlib.Path(resources.files('pivpy') / "data" / "openpiv_txt" / "Gamma1_Gamma2_tutorial_notebook")
+
+    fieldsDir = pathlib.Path(
+        resources.files("pivpy")
+        / "data"
+        / "openpiv_txt"
+        / "Gamma1_Gamma2_tutorial_notebook"
+    )
     print(list(fieldsDir.rglob("*.txt")))
     return (fieldsDir,)
 
@@ -70,7 +75,7 @@ def _(pathlib):
 @app.cell
 def _():
     # Global variables
-    n = 4 # the size of the neighborhood around every velocity vector is given by (2*n+1) x (2*n+1);
+    n = 4  # the size of the neighborhood around every velocity vector is given by (2*n+1) x (2*n+1);
     return (n,)
 
 
@@ -78,9 +83,7 @@ def _():
 def _(fieldsDir, io):
     # Load our time series of two velocity fields as a piv object of PIVPY package:
     dataBaseXarray = io.load_directory(
-        path = fieldsDir,
-        basename = "OpenPIVtxtFilePair?",
-        ext = ".txt"
+        path=fieldsDir, basename="OpenPIVtxtFilePair?", ext=".txt"
     )
     return (dataBaseXarray,)
 
@@ -88,19 +91,17 @@ def _(fieldsDir, io):
 @app.cell
 def _(dataBaseXarray):
     dataBaseXarray.u
-    return
 
 
 @app.cell
 def _(dataBaseXarray, n):
     # Compute Γ1 simultaneously adding it as a DataArray to dataBaseXarray Dataset.
     # To compute either Γ1 or Γ2, the function must create additional DataArrays within dataBaseXarray Dataset.
-    # Those additional DataArrays just store the x and y coordinates of the velocity field as DataArrays 
+    # Those additional DataArrays just store the x and y coordinates of the velocity field as DataArrays
     # within dataBaseXarray Dataset and their names are xCoordinates and yCoordinates. Since we are running
-    # Γ1 for the first time, we haven't created xCoordinates and yCoordinates yet. That's why we must give 
+    # Γ1 for the first time, we haven't created xCoordinates and yCoordinates yet. That's why we must give
     # True to the argument convCoords below.
     dataBaseXarray.piv.Γ1(n, convCoords=True)
-    return
 
 
 @app.cell(hide_code=True)
@@ -108,17 +109,17 @@ def _(mo):
     mo.md(r"""
     Notice the warning about empty slice above. It appears because we have regions without flow in our example velocity fields (thouse regions are, actually, a wall).
     """)
-    return
 
 
 @app.cell
 def _(dataBaseXarray, n):
     # Compute Γ2 simultaneously adding it as a DataArray to dataBaseXarray Dataset.
-    dataBaseXarray.piv.Γ2(n, convCoords=False) # False flag used, because the coordinates have already been 
-                                               # converted at the previous line and we can speed up the 
-                                               # calculations by not converting the coordinates again; see 
-                                               # the comment in the cell above
-    return
+    dataBaseXarray.piv.Γ2(
+        n, convCoords=False
+    )  # False flag used, because the coordinates have already been
+    # converted at the previous line and we can speed up the
+    # calculations by not converting the coordinates again; see
+    # the comment in the cell above
 
 
 @app.cell(hide_code=True)
@@ -126,7 +127,6 @@ def _(mo):
     mo.md(r"""
     Notice the warning about empty slice above. It appears because we have regions without flow in our example velocity fields (thouse regions are, actually, a wall).
     """)
-    return
 
 
 @app.cell
@@ -138,30 +138,41 @@ def _(np):
             eps = 1e-12 if vmin == 0 else abs(vmin) * 1e-12
             return [vmin - eps, vmax + eps]
         return np.linspace(vmin, vmax, n)
+
     return (safe_levels,)
 
 
 @app.cell
 def _(dataBaseXarray, plt, safe_levels):
     # Plot Γ1 and Γ2 fields.
-    _levelsΓ1 = safe_levels(dataBaseXarray['Γ1'].isel(t=0))
-    _levelsΓ2 = safe_levels(dataBaseXarray['Γ2'].isel(t=0))
+    _levelsΓ1 = safe_levels(dataBaseXarray["Γ1"].isel(t=0))
+    _levelsΓ2 = safe_levels(dataBaseXarray["Γ2"].isel(t=0))
     # For t=0
-    _figΓ, _axΓ = plt.subplots(nrows=1, ncols=2, clear=True, num='figGamma', figsize=(15, 10))
-    dataBaseXarray['Γ1'].isel(t=0).plot.contourf(x='x', y='y', levels=_levelsΓ1, cmap=plt.get_cmap('RdYlBu'), ax=_axΓ[0])
-    dataBaseXarray['Γ2'].isel(t=0).plot.contourf(x='x', y='y', levels=_levelsΓ2, cmap=plt.get_cmap('RdYlBu'), ax=_axΓ[1])
-    return
+    _figΓ, _axΓ = plt.subplots(
+        nrows=1, ncols=2, clear=True, num="figGamma", figsize=(15, 10)
+    )
+    dataBaseXarray["Γ1"].isel(t=0).plot.contourf(
+        x="x", y="y", levels=_levelsΓ1, cmap=plt.get_cmap("RdYlBu"), ax=_axΓ[0]
+    )
+    dataBaseXarray["Γ2"].isel(t=0).plot.contourf(
+        x="x", y="y", levels=_levelsΓ2, cmap=plt.get_cmap("RdYlBu"), ax=_axΓ[1]
+    )
 
 
 @app.cell
 def _(dataBaseXarray, plt, safe_levels):
     # For t=1
-    _levelsΓ1 = safe_levels(dataBaseXarray['Γ1'].isel(t=1))
-    _levelsΓ2 = safe_levels(dataBaseXarray['Γ2'].isel(t=1))
-    _figΓ, _axΓ = plt.subplots(nrows=1, ncols=2, clear=True, num='figGamma_t1', figsize=(15, 10))
-    dataBaseXarray['Γ1'].isel(t=1).plot.contourf(x='x', y='y', levels=_levelsΓ1, cmap=plt.get_cmap('RdYlBu'), ax=_axΓ[0])
-    dataBaseXarray['Γ2'].isel(t=1).plot.contourf(x='x', y='y', levels=_levelsΓ2, cmap=plt.get_cmap('RdYlBu'), ax=_axΓ[1])
-    return
+    _levelsΓ1 = safe_levels(dataBaseXarray["Γ1"].isel(t=1))
+    _levelsΓ2 = safe_levels(dataBaseXarray["Γ2"].isel(t=1))
+    _figΓ, _axΓ = plt.subplots(
+        nrows=1, ncols=2, clear=True, num="figGamma_t1", figsize=(15, 10)
+    )
+    dataBaseXarray["Γ1"].isel(t=1).plot.contourf(
+        x="x", y="y", levels=_levelsΓ1, cmap=plt.get_cmap("RdYlBu"), ax=_axΓ[0]
+    )
+    dataBaseXarray["Γ2"].isel(t=1).plot.contourf(
+        x="x", y="y", levels=_levelsΓ2, cmap=plt.get_cmap("RdYlBu"), ax=_axΓ[1]
+    )
 
 
 @app.cell(hide_code=True)
@@ -177,7 +188,6 @@ def _(mo):
 
     As it was mentioned in the preamble to this example, we are looking at bubble driven vertical flow along an inclined wall. Those right hand sides of the plots with absolutely uniform colors represent the wall. There is no flow there and, therefore, our $\Gamma 1$ and $\Gamma 2$ functions found no vortices there. However, we can see primarily red inclined stretch in the middle of the plots. This is the wall along which the bubbles are rising in chain and creating swirls in the water. The colors are rich there - we have strong swirls there. At the left most vertical edge of the plots we see primarily blue and yellow colors, which according to the colorbars, correspond to positive vortices. It so happens that the left most edge of the plots coincide with the wall of the vessel where this flow occurs. There are no bubbles rising alon that wall. So, you may conclude now that the strongest vortices appear on the walls (where the largest shear occurs) and the vortices on the opposite walls "spin" in the opposite directions. And since the bubbles are rising in chain only along the right wall (i.e., the inclined wall), the vortices are much "stronger" there than along the left vertical wall.
     """)
-    return
 
 
 @app.cell(hide_code=True)
@@ -186,7 +196,6 @@ def _(mo):
     ### A strong vortex example.
     Now, let's see what we get for a standard vortex. The example PIV images for this task were taken from the PIV challenge website and all the credit for the images goes there (https://www.pivchallenge.org/pub/index.html#a).
     """)
-    return
 
 
 @app.cell
@@ -194,21 +203,23 @@ def _(np, pyprocess, scaling, tools):
     # Start with a quick OpenPIV-based function to obtain the velocity fields from the PIV images.
     def PIVanalysis(frameA, frameB, nameTXT):
         """
-        The function goes through the directory containing frames A and B of PIV images and calculates 
+        The function goes through the directory containing frames A and B of PIV images and calculates
         velocity fields for them. Then, it stores them as OpenPIV .txt files.
         Parameters: frameA (str) - the path to frame A of the PIV pair of images
                     frameB (str) - the path to frame B of the PIV pair of images
                     nameTXT (str) - name of the .txt file to save the velocity field to
         Returns: none
         """
-        dataArray = np.asarray([tools.imread(frameA), tools.imread(frameB)]) # 0 flag = read as gray scale
+        dataArray = np.asarray(
+            [tools.imread(frameA), tools.imread(frameB)]
+        )  # 0 flag = read as gray scale
 
         # Find the correlations map. Hard code 32 as search area size and 16 as overlap.
         corrs = pyprocess.fft_correlate_images(
-            pyprocess.moving_window_array(dataArray[0],32,16),
-            pyprocess.moving_window_array(dataArray[1],32,16),
+            pyprocess.moving_window_array(dataArray[0], 32, 16),
+            pyprocess.moving_window_array(dataArray[1], 32, 16),
             normalized_correlation=True,
-            correlation_method="linear"
+            correlation_method="linear",
         )
         mesh = pyprocess.get_field_shape(dataArray[0].shape, 32, 16)
         nrows, ncols = mesh[0], mesh[1]
@@ -220,7 +231,7 @@ def _(np, pyprocess, scaling, tools):
 
         x, y = pyprocess.get_coordinates(dataArray[0].shape, 32, 16)
 
-        x, y, xDisp, yDisp = scaling.uniform(x, y, xDisp, yDisp, scaling_factor = 1)
+        x, y, xDisp, yDisp = scaling.uniform(x, y, xDisp, yDisp, scaling_factor=1)
 
         tools.save(nameTXT, x, y, xDisp, yDisp)
 
@@ -231,10 +242,14 @@ def _(np, pyprocess, scaling, tools):
 def _(PIVanalysis):
     # Obtain velocity field for PIV challenge case A.
     from importlib.resources import files as _files
-    _case_a_dir = _files('pivpy') / 'data/openpiv_txt/Gamma1_Gamma2_tutorial_notebook/StrongVortex/A'
-    caseAframeA = str(_case_a_dir / 'PIVchallengeCaseAframeA.jpg')
-    caseAframeB = str(_case_a_dir / 'PIVchallengeCaseAframeB.jpg')
-    caseAnameTXT = str(_case_a_dir / 'PIVchallengeCaseAvelField.txt')
+
+    _case_a_dir = (
+        _files("pivpy")
+        / "data/openpiv_txt/Gamma1_Gamma2_tutorial_notebook/StrongVortex/A"
+    )
+    caseAframeA = str(_case_a_dir / "PIVchallengeCaseAframeA.jpg")
+    caseAframeB = str(_case_a_dir / "PIVchallengeCaseAframeB.jpg")
+    caseAnameTXT = str(_case_a_dir / "PIVchallengeCaseAvelField.txt")
     PIVanalysis(caseAframeA, caseAframeB, caseAnameTXT)
     return (caseAnameTXT,)
 
@@ -243,10 +258,14 @@ def _(PIVanalysis):
 def _(PIVanalysis):
     # Obtain velocity field for PIV challenge case B.
     from importlib.resources import files as _files
-    _case_b_dir = _files('pivpy') / 'data/openpiv_txt/Gamma1_Gamma2_tutorial_notebook/StrongVortex/B'
-    caseBframeA = str(_case_b_dir / 'PIVchallengeCaseBframeA.jpg')
-    caseBframeB = str(_case_b_dir / 'PIVchallengeCaseBframeB.jpg')
-    caseBnameTXT = str(_case_b_dir / 'PIVchallengeCaseBvelField.txt')
+
+    _case_b_dir = (
+        _files("pivpy")
+        / "data/openpiv_txt/Gamma1_Gamma2_tutorial_notebook/StrongVortex/B"
+    )
+    caseBframeA = str(_case_b_dir / "PIVchallengeCaseBframeA.jpg")
+    caseBframeB = str(_case_b_dir / "PIVchallengeCaseBframeB.jpg")
+    caseBnameTXT = str(_case_b_dir / "PIVchallengeCaseBvelField.txt")
     PIVanalysis(caseBframeA, caseBframeB, caseBnameTXT)
     return (caseBnameTXT,)
 
@@ -254,33 +273,52 @@ def _(PIVanalysis):
 @app.cell
 def _(caseAnameTXT, plt, tools):
     # Plot velocity field case A.
-    _figure, _ = tools.display_vector_field(filename=caseAnameTXT, scaling_factor=1, scale=300, on_img=False, show_invalid=True)
+    _figure, _ = tools.display_vector_field(
+        filename=caseAnameTXT,
+        scaling_factor=1,
+        scale=300,
+        on_img=False,
+        show_invalid=True,
+    )
     plt.show()
-    return
 
 
 @app.cell
 def _(caseBnameTXT, plt, tools):
     # Plot velocity field case B.
-    _figure, _ = tools.display_vector_field(filename=caseBnameTXT, scaling_factor=1, scale=50, on_img=False, show_invalid=True)
+    _figure, _ = tools.display_vector_field(
+        filename=caseBnameTXT,
+        scaling_factor=1,
+        scale=50,
+        on_img=False,
+        show_invalid=True,
+    )
     plt.show()
-    return
 
 
 @app.cell
 def _(io, n, plt, safe_levels):
     # Calculate Γ1, Γ2 and plot them for case A.
     from importlib.resources import files as _files
-    caseA = _files('pivpy') / 'data/openpiv_txt/Gamma1_Gamma2_tutorial_notebook/StrongVortex/A/PIVchallengeCaseAvelField.txt'
+
+    caseA = (
+        _files("pivpy")
+        / "data/openpiv_txt/Gamma1_Gamma2_tutorial_notebook/StrongVortex/A/PIVchallengeCaseAvelField.txt"
+    )
     dataBaseXarrayCaseA = io.load_openpiv_txt(filename=caseA, frame=0)
     dataBaseXarrayCaseA.piv.Γ1(n, convCoords=True)
     dataBaseXarrayCaseA.piv.Γ2(n, convCoords=False)
-    _levelsΓ1 = safe_levels(dataBaseXarrayCaseA['Γ1'].isel(t=0))
-    _levelsΓ2 = safe_levels(dataBaseXarrayCaseA['Γ2'].isel(t=0))
-    _figΓ, _axΓ = plt.subplots(nrows=1, ncols=2, clear=True, num='figGamma_caseA', figsize=(15, 10))
-    dataBaseXarrayCaseA['Γ1'].isel(t=0).plot.contourf(x='x', y='y', levels=_levelsΓ1, cmap=plt.get_cmap('RdYlBu'), ax=_axΓ[0])
-    dataBaseXarrayCaseA['Γ2'].isel(t=0).plot.contourf(x='x', y='y', levels=_levelsΓ2, cmap=plt.get_cmap('RdYlBu'), ax=_axΓ[1])
-    return
+    _levelsΓ1 = safe_levels(dataBaseXarrayCaseA["Γ1"].isel(t=0))
+    _levelsΓ2 = safe_levels(dataBaseXarrayCaseA["Γ2"].isel(t=0))
+    _figΓ, _axΓ = plt.subplots(
+        nrows=1, ncols=2, clear=True, num="figGamma_caseA", figsize=(15, 10)
+    )
+    dataBaseXarrayCaseA["Γ1"].isel(t=0).plot.contourf(
+        x="x", y="y", levels=_levelsΓ1, cmap=plt.get_cmap("RdYlBu"), ax=_axΓ[0]
+    )
+    dataBaseXarrayCaseA["Γ2"].isel(t=0).plot.contourf(
+        x="x", y="y", levels=_levelsΓ2, cmap=plt.get_cmap("RdYlBu"), ax=_axΓ[1]
+    )
 
 
 @app.cell(hide_code=True)
@@ -288,23 +326,31 @@ def _(mo):
     mo.md(r"""
     One may notice the rings on the plots above and wonder why neither of $\Gamma$ functions monotoneously increases towards the center of the vortex. Have a look at the original PIV frames caseAframeA and caseAframeB: you'll see there are not PIV particles in the center of the vortex (all of them were driven towards the edges of the vortex by the centrifugal force, because the vortex was rather strong). And on the contrary to the referenced article, $\Gamma1$ doesn't reach $0.9-1$ at the center of the vortex. Remember, the threshold suggested in the referenced article was derived for a theoretical vortex. But $\Gamma2$ does exhibit the value of $2\pi = 0.6$ at the edges of the vortex. Of course just looking at the velocity field, it is difficult to understand where the edges of the vortex are. Evidently, $\Gamma2$ offers a consisten way for their identification.
     """)
-    return
 
 
 @app.cell
 def _(io, n, plt, safe_levels):
     # Calculate Γ1, Γ2 and plot them for case B.
     from importlib.resources import files as _files
-    caseB = _files('pivpy') / 'data/openpiv_txt/Gamma1_Gamma2_tutorial_notebook/StrongVortex/B/PIVchallengeCaseBvelField.txt'
+
+    caseB = (
+        _files("pivpy")
+        / "data/openpiv_txt/Gamma1_Gamma2_tutorial_notebook/StrongVortex/B/PIVchallengeCaseBvelField.txt"
+    )
     dataBaseXarrayCaseB = io.load_openpiv_txt(filename=caseB, frame=0)
     dataBaseXarrayCaseB.piv.Γ1(n, convCoords=True)
     dataBaseXarrayCaseB.piv.Γ2(n, convCoords=False)
-    _levelsΓ1 = safe_levels(dataBaseXarrayCaseB['Γ1'].isel(t=0))
-    _levelsΓ2 = safe_levels(dataBaseXarrayCaseB['Γ2'].isel(t=0))
-    _figΓ, _axΓ = plt.subplots(nrows=1, ncols=2, clear=True, num='figGamma_caseB', figsize=(15, 10))
-    dataBaseXarrayCaseB['Γ1'].isel(t=0).plot.contourf(x='x', y='y', levels=_levelsΓ1, cmap=plt.get_cmap('RdYlBu'), ax=_axΓ[0])
-    dataBaseXarrayCaseB['Γ2'].isel(t=0).plot.contourf(x='x', y='y', levels=_levelsΓ2, cmap=plt.get_cmap('RdYlBu'), ax=_axΓ[1])
-    return
+    _levelsΓ1 = safe_levels(dataBaseXarrayCaseB["Γ1"].isel(t=0))
+    _levelsΓ2 = safe_levels(dataBaseXarrayCaseB["Γ2"].isel(t=0))
+    _figΓ, _axΓ = plt.subplots(
+        nrows=1, ncols=2, clear=True, num="figGamma_caseB", figsize=(15, 10)
+    )
+    dataBaseXarrayCaseB["Γ1"].isel(t=0).plot.contourf(
+        x="x", y="y", levels=_levelsΓ1, cmap=plt.get_cmap("RdYlBu"), ax=_axΓ[0]
+    )
+    dataBaseXarrayCaseB["Γ2"].isel(t=0).plot.contourf(
+        x="x", y="y", levels=_levelsΓ2, cmap=plt.get_cmap("RdYlBu"), ax=_axΓ[1]
+    )
 
 
 @app.cell(hide_code=True)
@@ -312,7 +358,6 @@ def _(mo):
     mo.md(r"""
     On the contrary to case A, here we see no rings but rather monotoneously filled vortex. $\Gamma1$ monotoneously increases towards the center of the vortex and reaches its maximum of about $0.85$ at its center. And as you may notice, $0.85$ is not that far from $0.9$ suggested in the referenced article. In turn, $\Gamma 2$ - in spite of giving us the suggested threshold of $2\pi = 0.6$ - doesn't show a visually well defined boundary of the vortex (as opposed to case A, where, visually, the boundary of the vortex is obvious). And the last thing to notice is that the vortex in case B is blue, whereas the vortex in case A is red. Have a look at the color bars and you will notice that positive values lean toward the blue end of the colorbar, whereas negative values lean toward the red end of the colorbar. I.e., if the vortex is blue it's, presumably, counter clockwise (i.e., obeys the right hand rule) and if the the vortex is red it's, presumably, clock wise. And looking at the velocity fields for cases A and B, you will notice this is true.
     """)
-    return
 
 
 if __name__ == "__main__":

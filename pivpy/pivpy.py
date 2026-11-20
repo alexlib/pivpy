@@ -465,7 +465,7 @@ class PIVAccessor:
         min=None,
         max=None,
         *,
-        by: str = None,
+        by: str | None = None,
         keep_attrs: bool = True,
     ):
         """Clips values in the dataset based on specified thresholds
@@ -556,7 +556,7 @@ class PIVAccessor:
 
     def filterf(
         self,
-        sigma: list[float] | float = [1.0, 1.0, 0.0],
+        sigma: list[float] | float | None = None,
         method: str = "gauss",
         *opts: str,
         **kwargs,
@@ -583,6 +583,8 @@ class PIVAccessor:
         """
 
         # --- Legacy path: sigma is a 3-vector
+        if sigma is None:
+            sigma = [1.0, 1.0, 0.0]
         if isinstance(sigma, (list, tuple, np.ndarray)):
             sigma_list = list(sigma)
             if len(sigma_list) != 3:
@@ -660,7 +662,7 @@ class PIVAccessor:
             if name not in out.data_vars:
                 continue
             da_in = ds[name]
-            da_out_template = out[name]
+            out[name]
             if "y" not in da_in.dims or "x" not in da_in.dims:
                 continue
             filtered = xr.apply_ufunc(
@@ -919,7 +921,7 @@ class PIVAccessor:
             return self._obj
 
         opt_l = str(opt).lower()
-        if not (opt_l.startswith("add") or opt_l.startswith("mul")):
+        if not (opt_l.startswith(("add", "mul"))):
             raise ValueError("opt must be 'add' or 'mul'")
 
         if "u" not in self._obj or "v" not in self._obj:
@@ -1199,7 +1201,7 @@ class PIVAccessor:
         dx = float(np.nanmedian(np.diff(x)))
         dy = float(np.nanmedian(np.diff(y)))
         dx_abs = abs(dx) if dx != 0 else 1.0
-        dy_abs = abs(dy) if dy != 0 else 1.0
+        abs(dy) if dy != 0 else 1.0
         dr = dx_abs
         if not np.isfinite(dr) or dr == 0.0:
             dr = 1.0
@@ -1501,7 +1503,7 @@ class PIVAccessor:
         dx = float(np.nanmedian(np.diff(x)))
         dx_abs = abs(dx) if np.isfinite(dx) and dx != 0 else 1.0
         if na is None:
-            na = int(round(4.0 * float(r) / dx_abs))
+            na = round(4.0 * float(r) / dx_abs)
         na = int(na)
         if na <= 0:
             raise ValueError("na must be positive")
@@ -1510,7 +1512,7 @@ class PIVAccessor:
         x_s = x0 + float(r) * np.cos(angle)
         y_s = y0 + float(r) * np.sin(angle)
 
-        a_da = xr.DataArray(angle, dims=(angle_dim,), coords={angle_dim: angle})
+        xr.DataArray(angle, dims=(angle_dim,), coords={angle_dim: angle})
         x_da = xr.DataArray(x_s, dims=(angle_dim,), coords={angle_dim: angle})
         y_da = xr.DataArray(y_s, dims=(angle_dim,), coords={angle_dim: angle})
         cos_da = xr.DataArray(
@@ -1607,7 +1609,7 @@ class PIVAccessor:
         # Determine period type.
         if np.isscalar(period):
             p = float(period)
-            if abs(p - float(int(round(p)))) < 1e-10:
+            if abs(p - float(round(p))) < 1e-10:
                 P = int(np.floor(p))
                 if P <= 0:
                     raise ValueError("period must be positive")

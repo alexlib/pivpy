@@ -29,7 +29,6 @@ def _(mo):
     parameters for a real experiment, running here on a synthetic sample
     dataset, entirely client-side in your browser.
     """)
-    return
 
 
 @app.cell
@@ -67,7 +66,9 @@ def _(mo):
     arrow_scale_slider = mo.ui.slider(
         0.1, 10.0, step=0.1, value=1.0, label="arrow scale (if not auto)"
     )
-    arrow_alpha_slider = mo.ui.slider(0.1, 1.0, step=0.05, value=0.75, label="arrow alpha")
+    arrow_alpha_slider = mo.ui.slider(
+        0.1, 1.0, step=0.05, value=0.75, label="arrow alpha"
+    )
     row2 = mo.hstack([arrow_scale_auto_cb, arrow_scale_slider, arrow_alpha_slider])
 
     skip_rows_slider = mo.ui.slider(1, 5, step=1, value=1, label="skip rows")
@@ -101,7 +102,7 @@ def _(
     skip_rows_slider,
     streamlines_cb,
 ):
-    fig, ax = ds.piv.plot(
+    fig, _ax = ds.piv.plot(
         background=None if background_dd.value == "off" else background_dd.value,
         color_by=None if color_by_dd.value == "none" else color_by_dd.value,
         cmap=cmap_dd.value,
@@ -112,7 +113,6 @@ def _(
         title="Sample PIV field",
     )
     fig.gca()
-    return
 
 
 if __name__ == "__main__":

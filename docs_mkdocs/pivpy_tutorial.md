@@ -29,7 +29,7 @@ the accessor `ds.piv`.
 import pivpy.pivpy  # registers the .piv accessor
 from pivpy import io
 
-ds = io.read_piv('your_file.vec')
+ds = io.read_piv("your_file.vec")
 ```
 
 Typical dataset structure:
@@ -48,10 +48,10 @@ from pivpy import io
 import pivpy.pivpy  # registers the .piv accessor
 
 im = np.random.rand(128, 256)
-ds_im = io.im2pivmat(im, namew='I', unit='au')
+ds_im = io.im2pivmat(im, namew="I", unit="au")
 
 # Plot the scalar field
-ds_im.piv.showscal(property='w')
+ds_im.piv.showscal(property="w")
 ```
 
 ## Save animations (PIVMAT-style `showf` / `imvectomovie`)
@@ -68,10 +68,10 @@ from pivpy import io
 ds = io.create_sample_Dataset(n_frames=20)
 
 # Write a movie (requires FFmpeg for mp4/avi)
-ds.piv.to_movie('movie.mp4', fps=10, show='vector', nthArr=2, scalingFactor=10.0)
+ds.piv.to_movie("movie.mp4", fps=10, show="vector", nthArr=2, scalingFactor=10.0)
 
 # Or collect frames as RGBA arrays (no external encoders required)
-frames = ds.piv.to_movie(None, return_frames=True, show='vector')
+frames = ds.piv.to_movie(None, return_frames=True, show="vector")
 ```
 
 Streaming from disk (loads files one-by-one, PIVMAT `imvectomovie`-style):
@@ -80,7 +80,7 @@ Streaming from disk (loads files one-by-one, PIVMAT `imvectomovie`-style):
 from pivpy import graphics
 
 # Convert many files to a movie without loading all of them into RAM
-graphics.imvectomovie('data/*.vc7', 'movie.mp4', fps=10, show='vector', nthArr=3)
+graphics.imvectomovie("data/*.vc7", "movie.mp4", fps=10, show="vector", nthArr=3)
 ```
 
 Notes:
@@ -102,12 +102,12 @@ ds = io.create_sample_Dataset(n_frames=5)
 ds_filled = ds.piv.interpf(method=0)  # Laplacian inpainting (smooth)
 
 # Faster options:
-ds_nn = ds.piv.interpf(method=1)      # nearest-neighbor
-ds_lin = ds.piv.interpf(method=2)     # linear + nearest fallback
+ds_nn = ds.piv.interpf(method=1)  # nearest-neighbor
+ds_lin = ds.piv.interpf(method=2)  # linear + nearest fallback
 
 # Control what is considered "missing":
-ds_nan_only = ds.piv.interpf(method=1, missing='nan')
-ds_zero_only = ds.piv.interpf(method=1, missing='0')
+ds_nan_only = ds.piv.interpf(method=1, missing="nan")
+ds_zero_only = ds.piv.interpf(method=1, missing="0")
 ```
 
 ## Joint PDF of two scalar fields (PIVMAT-style `jpdfscal`)
@@ -120,11 +120,11 @@ import pivpy.pivpy  # registers the .piv accessor
 from pivpy import io
 
 ds = io.create_sample_Dataset(n_frames=10)
-ds = ds.piv.vec2scal('vorticity', name='w')
-ds = ds.piv.vec2scal('divergence', name='div')
+ds = ds.piv.vec2scal("vorticity", name="w")
+ds = ds.piv.vec2scal("divergence", name="div")
 
-jpdf = ds.piv.jpdfscal('w', 'div', nbin=101)
-fig, ax = ds.piv.jpdfscal_disp('w', 'div', nbin=101)
+jpdf = ds.piv.jpdfscal("w", "div", nbin=101)
+fig, ax = ds.piv.jpdfscal_disp("w", "div", nbin=101)
 ```
 
 ## Probe time series (PIVMAT-style `probef` and `probeaverf`)
@@ -132,14 +132,14 @@ fig, ax = ds.piv.jpdfscal_disp('w', 'div', nbin=101)
 Sample the time evolution at a point (with bilinear interpolation):
 
 ```python
-p = ds.piv.probef(20.0, 30.0, variables=['u', 'v'])
+p = ds.piv.probef(20.0, 30.0, variables=["u", "v"])
 # p['u'] and p['v'] are 1D time series over the dataset's t dimension
 ```
 
 Average over a rectangular probe area `[x1, y1, x2, y2]`:
 
 ```python
-pavg = ds.piv.probeaverf([10.0, 10.0, 30.0, 40.0], variables=['u', 'v'])
+pavg = ds.piv.probeaverf([10.0, 10.0, 30.0, 40.0], variables=["u", "v"])
 ```
 
 ## Spatio-temporal diagram (PIVMAT-style `spatiotempf`)
@@ -147,8 +147,8 @@ pavg = ds.piv.probeaverf([10.0, 10.0, 30.0, 40.0], variables=['u', 'v'])
 Sample a scalar field along a line segment for each time frame:
 
 ```python
-ds = ds.piv.vec2scal('vorticity', name='w')
-st = ds.piv.spatiotempf([0.0, 50.0], [10.0, 10.0], var='w', n=200)
+ds = ds.piv.vec2scal("vorticity", name="w")
+st = ds.piv.spatiotempf([0.0, 50.0], [10.0, 10.0], var="w", n=200)
 # st['st'] has dims (t, s) and can be plotted with imshow/pcolormesh.
 ```
 
@@ -158,7 +158,7 @@ Compute the temporal correlation function `f(T)` of a scalar (or vector) time se
 averaged over space:
 
 ```python
-cor = ds.piv.tempcorrf(variables=['w'], normalize=True)
+cor = ds.piv.tempcorrf(variables=["w"], normalize=True)
 # cor['f'] is the correlation vs lag cor['t']
 ```
 
@@ -173,9 +173,9 @@ import pivpy.pivpy  # registers the .piv accessor
 from pivpy import io
 
 ds = io.create_sample_Dataset(n_frames=1)
-ds = ds.piv.vec2scal('vorticity', name='w')
+ds = ds.piv.vec2scal("vorticity", name="w")
 
-grad = ds.piv.gradientf(variable='w')
+grad = ds.piv.gradientf(variable="w")
 # grad contains grad['u'] = dw/dx and grad['v'] = dw/dy
 ```
 
@@ -191,7 +191,7 @@ Compute a histogram for a scalar field (values are stacked over the full field
 and all time frames):
 
 ```python
-h = ds.piv.histf(variable='w')
+h = ds.piv.histf(variable="w")
 # h is a Dataset with coordinate h['bin'] and counts h['h']
 ```
 
@@ -199,7 +199,7 @@ By default, zeros are treated as invalid and excluded. To include zeros, pass
 `opt='0'`:
 
 ```python
-h0 = ds.piv.histf(variable='w', opt='0')
+h0 = ds.piv.histf(variable="w", opt="0")
 ```
 
 Vector mode (no variable specified) computes histograms for both components of
@@ -220,13 +220,13 @@ Scalar histogram display (with optional PDF normalization):
 ```python
 from pivpy import graphics
 
-fig, ax = graphics.histscal_disp(ds, variable='w', opt='n')
+fig, ax = graphics.histscal_disp(ds, variable="w", opt="n")
 ```
 
 Vector histogram display:
 
 ```python
-fig, ax = graphics.histvec_disp(ds, opt='n')
+fig, ax = graphics.histvec_disp(ds, opt="n")
 ```
 
 ## Extract a rectangular region (PIVMAT-style `extractf`)
@@ -234,19 +234,19 @@ fig, ax = graphics.histvec_disp(ds, opt='n')
 Extract a rectangle defined in physical units:
 
 ```python
-sub = ds.piv.extractf([0.0, 0.0, 10.0, 5.0], 'phys')  # [x1, y1, x2, y2]
+sub = ds.piv.extractf([0.0, 0.0, 10.0, 5.0], "phys")  # [x1, y1, x2, y2]
 ```
 
 Or extract using mesh indices (MATLAB-like 1-based, inclusive):
 
 ```python
-sub = ds.piv.extractf([10, 5, 50, 40], 'mesh')
+sub = ds.piv.extractf([10, 5, 50, 40], "mesh")
 ```
 
 Optionally retrieve the effective mesh rectangle after clamping:
 
 ```python
-sub, mesh_rect = ds.piv.extractf([0.0, 0.0, 10.0, 5.0], 'phys', return_rect=True)
+sub, mesh_rect = ds.piv.extractf([0.0, 0.0, 10.0, 5.0], "phys", return_rect=True)
 ```
 
 ## Spatial correlation (PIVMAT-style `corrm` and `corrf`)
@@ -256,8 +256,8 @@ sub, mesh_rect = ds.piv.extractf([0.0, 0.0, 10.0, 5.0], 'phys', return_rect=True
 Compute a PIVMAT-like correlation map (returns a `DataArray` with a `lag` dimension):
 
 ```python
-cu = ds.piv.corrm(variable='u', dim='x')
-cv = ds.piv.corrm(variable='v', dim='y', half=True)
+cu = ds.piv.corrm(variable="u", dim="x")
+cv = ds.piv.corrm(variable="v", dim="y", half=True)
 ```
 
 ### Spatial correlation function and integral scales
@@ -265,7 +265,7 @@ cv = ds.piv.corrm(variable='v', dim='y', half=True)
 Compute the 1D correlation function `f(r)` and integral scales:
 
 ```python
-cor = ds.piv.corrf(variable='u', dim='x', normalize=True)
+cor = ds.piv.corrf(variable="u", dim="x", normalize=True)
 ```
 
 The result is an `xarray.Dataset` with:
@@ -279,13 +279,13 @@ The result is an `xarray.Dataset` with:
 Apply a low-pass Butterworth filter in Fourier space:
 
 ```python
-ds_low = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='low', trunc=True)
+ds_low = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode="low", trunc=True)
 ```
 
 Apply a high-pass filter:
 
 ```python
-ds_high = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='high')
+ds_high = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode="high")
 ```
 
 ### PIVMAT-compatible option wrapper
@@ -293,7 +293,7 @@ ds_high = ds.piv.bwfilterf(filtsize=3.0, order=8.0, mode='high')
 If you prefer PIVMAT-like option strings:
 
 ```python
-ds_high2 = ds.piv.bwfilterf_pm(3.0, 8.0, 'high', 'trunc')
+ds_high2 = ds.piv.bwfilterf_pm(3.0, 8.0, "high", "trunc")
 ```
 
 ## Spatial convolution filtering (PIVMAT-style `filterf`)
@@ -301,13 +301,13 @@ ds_high2 = ds.piv.bwfilterf_pm(3.0, 8.0, 'high', 'trunc')
 Apply a Gaussian convolution filter (NaN-aware). Use `'same'` to keep the same size:
 
 ```python
-ds_smooth = ds.piv.filterf(1.0, 'gauss', 'same')
+ds_smooth = ds.piv.filterf(1.0, "gauss", "same")
 ```
 
 Or omit `'same'` to get Matlab `conv2(...,'valid')` behavior (smaller field):
 
 ```python
-ds_smooth_valid = ds.piv.filterf(1.0, 'gauss')
+ds_smooth_valid = ds.piv.filterf(1.0, "gauss")
 ```
 
 ## Batch processing over filename series (PIVMAT-style `batchf`)
@@ -320,8 +320,8 @@ from pivpy.io import batchf
 
 # Apply an accessor method by name
 results = batchf(
-    'pivpy/data/day2/day2a00500[0:5].T000.D000.P003.H001.L.vec',
-    'averf',
+    "pivpy/data/day2/day2a00500[0:5].T000.D000.P003.H001.L.vec",
+    "averf",
 )
 ```
 
@@ -329,9 +329,10 @@ You can also pass a callable:
 
 ```python
 def mean_speed(ds):
-    return ((ds['u'] ** 2 + ds['v'] ** 2) ** 0.5).mean().item()
+    return ((ds["u"] ** 2 + ds["v"] ** 2) ** 0.5).mean().item()
 
-speeds = batchf('pivpy/data/day2/day2a00500[0:5].*.vec', mean_speed)
+
+speeds = batchf("pivpy/data/day2/day2a00500[0:5].*.vec", mean_speed)
 ```
 
 ## Check for updates on PyPI

@@ -51,7 +51,7 @@ def test_plot():
 
     # 4. Scalar dataset call
     d_scalar = _d.piv.vorticity()
-    fig4, ax4 = graphics.plot(d_scalar[["w"]])
+    fig4, _ax4 = graphics.plot(d_scalar[["w"]])
     assert fig4 is not None
 
 
@@ -65,7 +65,7 @@ def test_plot_quiver_respects_chc_mask():
     chc[:, :3] = 0
     d["chc"] = (d["chc"].dims, chc)
 
-    fig, ax = graphics.plot(
+    _fig, ax = graphics.plot(
         d, background=None, color_by="mag", streamlines=False, skip=1
     )
     Q = next(c for c in ax.get_children() if isinstance(c, Quiver))
@@ -79,10 +79,10 @@ def test_plot_colorbar_not_duplicated_when_redundant():
     "mag") used to draw two stacked, redundant colorbars for one field -
     should draw exactly one. Genuinely different quantities (background=
     "vorticity", color_by="mag") still get their own colorbar each."""
-    fig, ax = graphics.plot(_d, background="mag", color_by="mag", streamlines=False)
+    fig, _ax = graphics.plot(_d, background="mag", color_by="mag", streamlines=False)
     assert len(fig.axes) == 2  # 1 plot axes + 1 colorbar, not 2
 
-    fig2, ax2 = graphics.plot(
+    fig2, _ax2 = graphics.plot(
         _d, background="vorticity", color_by="mag", streamlines=False
     )
     assert len(fig2.axes) == 3  # 1 plot axes + 2 colorbars - legitimately different
@@ -184,7 +184,7 @@ def test_histscal_disp():
     assert ax is not None
 
     # log-y option
-    fig2, ax2 = graphics.histscal_disp(d, variable="u", smooth=0, opt="nl")
+    _fig2, ax2 = graphics.histscal_disp(d, variable="u", smooth=0, opt="nl")
     assert ax2.get_yscale() == "log"
 
     # accessor wrapper
@@ -200,7 +200,7 @@ def test_histvec_disp():
     assert fig is not None
     assert ax is not None
 
-    fig2, ax2 = graphics.histvec_disp(d, smooth=0, opt="nl")
+    _fig2, ax2 = graphics.histvec_disp(d, smooth=0, opt="nl")
     assert ax2.get_yscale() == "log"
 
     fig3, ax3 = d.piv.histvec_disp(smooth=0, opt="n")
@@ -238,12 +238,12 @@ def test_streamscal_handles_nan_and_flipped_axes():
     chc[:3, :3] = 0
     d["chc"] = (d["chc"].dims, chc)
     d = d.isel(y=slice(None, None, -1))  # descending y
-    fig, ax = graphics.streamscal(d, scalar="u")
+    fig, _ax = graphics.streamscal(d, scalar="u")
     assert fig is not None
 
 
 def test_streamscal_panels_shared_clim_and_gap():
-    fig, axs = graphics.streamscal_panels(
+    _fig, axs = graphics.streamscal_panels(
         [_d, _d], scalar="speed", labels=["(a)", "(b)"]
     )
     assert len(axs) == 2

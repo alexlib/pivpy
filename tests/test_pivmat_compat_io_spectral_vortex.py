@@ -27,7 +27,7 @@ def test_loadpivtxt_parses_header_and_grid(tmp_path: pathlib.Path):
 
     ds = io.loadpivtxt(p)
     assert isinstance(ds, xr.Dataset)
-    assert set(["u", "v", "chc"]).issubset(ds.data_vars)
+    assert {"u", "v", "chc"}.issubset(ds.data_vars)
     assert ds["u"].shape == (2, 2, 1)
     assert "Attributes" in ds.attrs
     assert "some header" in ds.attrs["Attributes"]
@@ -163,16 +163,7 @@ def test_readvec_parses_header_and_shapes(tmp_path: pathlib.Path):
     p = tmp_path / "demo.vec"
     header = 'variables="X" "mm" "Y" "mm" "U" "m/s" "V" "m/s" i=2 j=3\n'
     # 6 rows, 4 columns
-    body = "\n".join(
-        [
-            "0 0 1 10",
-            "1 0 2 20",
-            "0 1 3 30",
-            "1 1 4 40",
-            "0 2 5 50",
-            "1 2 6 60",
-        ]
-    )
+    body = "0 0 1 10\n1 0 2 20\n0 1 3 30\n1 1 4 40\n0 2 5 50\n1 2 6 60"
     p.write_text(header + body + "\n")
 
     hdr, data = io.readvec(p, comments=1)
@@ -211,7 +202,7 @@ def test_openim_requires_lvpyio_when_missing():
 def test_vortex_and_multivortex_basic_properties():
     ds = io.vortex(n=32, r0=6, vorticity=1.0, mode="burgers")
     assert isinstance(ds, xr.Dataset)
-    assert set(["u", "v"]).issubset(ds.data_vars)
+    assert {"u", "v"}.issubset(ds.data_vars)
     assert ds["u"].shape == (32, 32, 1)
     assert float(np.nanmax(np.abs(ds["u"].values))) > 0.0
 
@@ -227,7 +218,7 @@ def test_vortex_and_multivortex_basic_properties():
 def test_specf_and_spec2f_vector_outputs_and_even_enforcement():
     ds = io.create_sample_Dataset(n_frames=2, rows=9, cols=9, noise_sigma=0.0)
     out1 = specf(ds)
-    assert set(["exvx", "exvy", "eyvx", "eyvy"]).issubset(out1.data_vars)
+    assert {"exvx", "exvy", "eyvx", "eyvy"}.issubset(out1.data_vars)
     # odd inputs drop to even -> 8 -> nk=4
     assert out1.sizes["kx"] == 4
     assert out1.sizes["ky"] == 4
@@ -247,7 +238,7 @@ def test_specf_scalar_from_im2pivmat():
     im = np.random.default_rng(0).standard_normal((8, 8))
     ds = io.im2pivmat(im)
     out = specf(ds, "hann")
-    assert set(["ex", "ey"]).issubset(out.data_vars)
+    assert {"ex", "ey"}.issubset(out.data_vars)
     assert out.sizes["kx"] == 4
     assert out.sizes["ky"] == 4
     assert "k" in out.coords
@@ -286,7 +277,7 @@ def test_ssf_and_vsf_shapes_and_required_vars():
     assert out_v.sizes["r"] == 3
     assert out_v.sizes["bin"] == 21
     assert out_v.sizes["order"] == 4
-    assert set(["lsf", "tsf", "n_long", "n_trans"]).issubset(out_v.data_vars)
+    assert {"lsf", "tsf", "n_long", "n_trans"}.issubset(out_v.data_vars)
 
 
 def test_operf_unary_and_binary_vector():
@@ -336,7 +327,7 @@ def test_operf_list_behavior_uses_single_rhs():
 def test_randvec_shapes_determinism_and_near_zero_divergence():
     ds = io.randvec(32, 3, seed=0)
     assert isinstance(ds, xr.Dataset)
-    assert set(["u", "v", "chc"]).issubset(ds.data_vars)
+    assert {"u", "v", "chc"}.issubset(ds.data_vars)
     assert ds["u"].shape == (32, 32, 3)
     assert ds.sizes["t"] == 3
 

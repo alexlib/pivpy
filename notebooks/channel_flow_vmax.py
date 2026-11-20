@@ -17,23 +17,26 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
-    import marimo as mo
-    import numpy as np
-    import matplotlib.pyplot as plt
     from pathlib import Path
+
+    import marimo as mo
+    import matplotlib.pyplot as plt
+    import numpy as np
     from lvpyio import read_buffer
+
     return mo, np, plt, Path, read_buffer
 
 
 @app.cell
 def _(mo):
     mo.md("# Channel Flow - Vmax After Pump Shutdown")
-    return
 
 
 @app.cell
 def _(Path):
-    data_dir = Path(r"D:\channel_flow_research\baseline_channel\Vmax_after_pump_shutdown")
+    data_dir = Path(
+        r"D:\channel_flow_research\baseline_channel\Vmax_after_pump_shutdown"
+    )
     vc7_dir = data_dir / "PIV_MPd(4x16x16_25%ov_ImgCorr)"
     vc7_files = sorted(vc7_dir.glob("B*.vc7"))
     mo.md(f"Found **{len(vc7_files)}** vector field files")
@@ -100,7 +103,6 @@ def _(plt, X, Y, u_phys, v_phys, speed, path, mo):
     plt.tight_layout()
     mo.md(f"### Frame: `{path.name}`")
     plt.gcf()
-    return
 
 
 if __name__ == "__main__":

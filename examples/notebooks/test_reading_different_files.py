@@ -6,21 +6,21 @@ app = marimo.App()
 
 @app.cell
 def _():
-    from pivpy import io, pivpy, graphics
+    from pivpy import io
 
     return (io,)
 
 
 @app.cell
 def _():
-    import xarray as xr
-    from typing import List
+    from importlib.resources import files
+
+    import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
-    from importlib.resources import files
-    import matplotlib.pyplot as plt
+    import xarray as xr
 
-    return files, np, pd, plt, xr, List
+    return files, np, pd, plt, xr, list
 
 
 @app.cell
@@ -28,12 +28,12 @@ def _(files):
     import pathlib
 
     path = pathlib.Path(files("pivpy").joinpath("data"))
-    subdirs = [x for x in sorted(path.glob('**/*')) if x.is_dir()]
-    subdirs = [s for s in subdirs if s.stem != '.ipynb_checkpoints']
+    subdirs = [x for x in sorted(path.glob("**/*")) if x.is_dir()]
+    subdirs = [s for s in subdirs if s.stem != ".ipynb_checkpoints"]
 
     test_files = []
     for d in subdirs:
-        matches = [x for x in sorted(d.glob('[!.]*')) if not x.is_dir() ]
+        matches = [x for x in sorted(d.glob("[!.]*")) if not x.is_dir()]
         test_files.append(matches[0])
 
     print(test_files)
@@ -47,7 +47,9 @@ def _(io, plt, test_files):
     # doesn't parse as a supported format instead of aborting the whole scan.
     for file in test_files:
         try:
-            variables, units, rows, cols, dt, frame, method = io.parse_header(file)
+            _variables, _units, _rows, _cols, _dt, _frame, method = io.parse_header(
+                file
+            )
             print(file.stem, method)
             ds = io.read_piv(file)
         except (ValueError, OSError, ImportError) as e:
@@ -56,7 +58,6 @@ def _(io, plt, test_files):
         plt.figure()
         ds.isel(t=0).piv.quiver(arrScale=5)
         plt.title(file.stem)
-    return
 
 
 if __name__ == "__main__":

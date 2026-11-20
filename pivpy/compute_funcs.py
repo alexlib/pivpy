@@ -806,8 +806,6 @@ def spatiotempf(
 
         Y_arr = Y_arr.reshape(1, 2)
 
-        single_line = True
-
     else:
         if (
             X_arr.ndim != 2
@@ -817,7 +815,7 @@ def spatiotempf(
         ):
             raise ValueError("For multiple lines, X and Y must be shaped (nlines, 2)")
 
-        single_line = X_arr.shape[0] == 1
+        X_arr.shape[0] == 1
 
     # Heuristic for n based on average grid spacing
 
@@ -1464,9 +1462,8 @@ def corrf(
 
     f = f_da.values.astype(float)
 
-    if normalize and f.size:
-        if f[0] != 0.0:
-            f = f / float(f[0])
+    if normalize and f.size and f[0] != 0.0:
+        f = f / float(f[0])
 
     scales = _corrf_scales(r, f, nowarning=nowarning)
 
@@ -2537,14 +2534,10 @@ def specf(f: xr.Dataset | xr.DataArray, *opts: str) -> xr.Dataset:
     if isinstance(first, xr.Dataset):
         is_vector = "u" in first.data_vars and "v" in first.data_vars
 
-        is_scalar = ("w" in first.data_vars) and not is_vector
-
     else:
         # DataArray treated as scalar
 
         is_vector = False
-
-        is_scalar = True
 
     # Extract coords and sizes
 
@@ -2830,9 +2823,9 @@ def spec2f(f: xr.Dataset | xr.DataArray, *opts: str) -> xr.Dataset:
 
         y = y[:ny]
 
-    nkx = nx // 2
+    nx // 2
 
-    nky = ny // 2
+    ny // 2
 
     kx, ky = _kx_ky_from_coords(x, y, nx, ny)
 
@@ -2942,15 +2935,11 @@ def tempspecf(
 
         is_vector = "u" in v and "v" in v
 
-        is_scalar = ("w" in v) and not is_vector
-
     else:
         if "t" not in v.dims:
             raise ValueError("tempspecf expects a DataArray with dim 't'")
 
         is_vector = False
-
-        is_scalar = True
 
     if int(v.sizes["t"]) < 4:
         raise ValueError("Sample size too small")
@@ -2984,9 +2973,8 @@ def tempspecf(
 
         x = np.asarray(x, dtype=float)
 
-        if not include_zero:
-            if np.any(x == 0.0) or np.any(~np.isfinite(x)):
-                return None
+        if not include_zero and (np.any(x == 0.0) or np.any(~np.isfinite(x))):
+            return None
 
         if np.any(~np.isfinite(x)):
             x = np.nan_to_num(x, nan=0.0)
@@ -4317,14 +4305,14 @@ def zeropadf(f: xr.Dataset | list[xr.Dataset]) -> xr.Dataset | list[xr.Dataset]:
         out = ds.copy(deep=True)
 
         if nx > ny:
-            pad = nx - ny
+            nx - ny
 
             y_new = y[0] + dy * np.arange(nx, dtype=float)
 
             out = out.reindex(y=y_new, fill_value=0.0)
 
         else:
-            pad = ny - nx
+            ny - nx
 
             x_new = x[0] + dx * np.arange(ny, dtype=float)
 
@@ -4371,7 +4359,7 @@ def truncf(
     def _to_mesh_cut(ds: xr.Dataset, c: float) -> int:
 
         if "phys" not in opts_l:
-            return int(round(float(c)))
+            return round(float(c))
 
         x = np.asarray(ds["x"].values, dtype=float)
 
@@ -4380,7 +4368,7 @@ def truncf(
         if dx == 0:
             dx = 1.0
 
-        return int(round(float(c) / dx))
+        return round(float(c) / dx)
 
     def _nonzero_crop(ds: xr.Dataset) -> xr.Dataset:
 
@@ -4514,7 +4502,7 @@ def spatiotempcorrf(f: xr.Dataset, *opts: str) -> xr.Dataset:
 
     w = np.asarray(f["w"].values, dtype=float)
 
-    ny, nx, nt = w.shape
+    _ny, nx, nt = w.shape
 
     x = np.asarray(f["x"].values, dtype=float)
 
@@ -6397,7 +6385,7 @@ def smooth(
 
             return median_filter(arr2, size=max(1, size))
 
-        elif m.startswith("box") or m.startswith("uni") or m.startswith("flat"):
+        elif m.startswith(("box", "uni", "flat")):
             size = (
                 int(np.round(float(sigma)))
                 if not isinstance(sigma, (list, tuple))
@@ -6631,9 +6619,9 @@ def material_acceleration(
 
     """
 
-    dx = float(ds["x"][1] - ds["x"][0]) if len(ds["x"]) > 1 else 1.0
+    float(ds["x"][1] - ds["x"][0]) if len(ds["x"]) > 1 else 1.0
 
-    dy = float(ds["y"][1] - ds["y"][0]) if len(ds["y"]) > 1 else 1.0
+    float(ds["y"][1] - ds["y"][0]) if len(ds["y"]) > 1 else 1.0
 
     u = ds["u"]
 
@@ -6654,7 +6642,7 @@ def material_acceleration(
     ay_conv = u * dv_dx + v * dv_dy
 
     if unsteady and "t" in ds.dims and ds.sizes["t"] > 1:
-        dt = float(ds["t"][1] - ds["t"][0]) if len(ds["t"]) > 1 else 1.0
+        float(ds["t"][1] - ds["t"][0]) if len(ds["t"]) > 1 else 1.0
 
         ax_local = u.differentiate("t")
 
@@ -9625,7 +9613,6 @@ def tke_budget(ds, nu=None, rho=1.0, method="central"):
     if W is not None:
         dWdx = grad(Wbar, 1, dx)
         dWdy = grad(Wbar, 0, dy)
-        dWdz = None
 
         production = production - (
             ruw * dWdx + rvw * dWdy + rww * 0.0
@@ -9748,8 +9735,8 @@ def convergence_analysis(
         raise ValueError(
             "convergence_analysis requires a multi-frame dataset with 't'."
         )
-    x = np.asarray(ds["x"].values, dtype=float)
-    y = np.asarray(ds["y"].values, dtype=float)
+    np.asarray(ds["x"].values, dtype=float)
+    np.asarray(ds["y"].values, dtype=float)
     nt = ds.sizes["t"]
     # spatial index for point
     if point is None:
@@ -9761,7 +9748,7 @@ def convergence_analysis(
                 else arr.mean()
             )
     else:
-        iy, ix = point
+        _iy, _ix = point
     # compute per-frame arrays
     U = ds["u"].to_numpy()
     V = ds["v"].to_numpy()
@@ -9769,11 +9756,11 @@ def convergence_analysis(
         U = U[:, :, None]
         V = V[:, :, None]
     # cumulative mean of u,v
-    cumU = np.zeros_like(U)
-    cumV = np.zeros_like(V)
+    np.zeros_like(U)
+    np.zeros_like(V)
     # running means
-    runU = np.zeros(U.shape[:2])
-    runV = np.zeros(V.shape[:2])
+    np.zeros(U.shape[:2])
+    np.zeros(V.shape[:2])
     # store series
     series = {q: np.zeros(nt) for q in quantities}
     # fluctuations cumulative not trivial; do incremental Welford for stresses
@@ -9841,7 +9828,7 @@ from scipy import ndimage
 def detect_vortices(ds, criterion="gamma2", threshold=0.5, sign="all", min_area=4):
     # compute criterion field
     if criterion == "gamma2":
-        g = ds.piv.gamma2().to_numpy() if False else None
+        ds.piv.gamma2().to_numpy() if False else None
     # Use compute_funcs gamma2? We'll compute field from ds via accessor-like
     import pivpy.compute_funcs as cf
 
@@ -9850,21 +9837,21 @@ def detect_vortices(ds, criterion="gamma2", threshold=0.5, sign="all", min_area=
         field = (
             tmp["gamma2"].to_numpy()
             if "gamma2" in tmp.data_vars
-            else tmp[list(tmp.data_vars)[0]].to_numpy()
+            else tmp[next(iter(tmp.data_vars))].to_numpy()
         )
     elif criterion == "gamma1":
         tmp = cf.gamma1(ds)
         field = (
             tmp["gamma1"].to_numpy()
             if "gamma1" in tmp.data_vars
-            else tmp[list(tmp.data_vars)[0]].to_numpy()
+            else tmp[next(iter(tmp.data_vars))].to_numpy()
         )
     elif criterion == "q":
         tmp = cf.q_criterion(ds)
         field = (
             tmp["Q"].to_numpy()
             if "Q" in tmp.data_vars
-            else tmp[list(tmp.data_vars)[0]].to_numpy()
+            else tmp[next(iter(tmp.data_vars))].to_numpy()
         )
     else:
         # fallback: vorticity
@@ -9889,8 +9876,8 @@ def detect_vortices(ds, criterion="gamma2", threshold=0.5, sign="all", min_area=
         if area < min_area:
             continue
         ys, xs = np.where(region)
-        cy = int(round(ys.mean()))
-        cx = int(round(xs.mean()))
+        cy = round(ys.mean())
+        cx = round(xs.mean())
         peak_idx = np.unravel_index(np.argmax(np.abs(field) * region), field.shape)
         vortices.append(
             {
@@ -9999,7 +9986,7 @@ def reynolds_stress_std(ds, ddof=1):
     if U.ndim == 2:
         U = U[:, :, None]
         V = V[:, :, None]
-    nt = U.shape[2]
+    U.shape[2]
     Ubar = U.mean(axis=2)
     Vbar = V.mean(axis=2)
     up = U - Ubar[:, :, None]
@@ -10081,7 +10068,7 @@ def anisotropy_tensor(ds):
     ruu = (up**2).mean(axis=2)
     rvv = (vp**2).mean(axis=2)
     ruv = (up * vp).mean(axis=2)
-    k = 0.5 * (ruu + rvv)
+    0.5 * (ruu + rvv)
     # anisotropy tensor b_ij = R_ij/(2k) - delta_ij/3 (2D approx; w'=0 assumed -> rww=0? use 0)
     # R_ij matrix entries: ruu, ruv; rvv. Trace = ruu+rvv (+rww=0). k = 0.5*trace.
     trace = ruu + rvv
@@ -10090,7 +10077,7 @@ def anisotropy_tensor(ds):
     b_xx = ruu / denom - 1.0 / 3.0
     b_yy = rvv / denom - 1.0 / 3.0
     b_xy = ruv / denom
-    b_yx = ruv / denom
+    ruv / denom
     out = xr.Dataset(coords={"y": ds["y"], "x": ds["x"]})
     out["b_xx"] = (("y", "x"), b_xx)
     out["b_yy"] = (("y", "x"), b_yy)

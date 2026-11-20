@@ -71,9 +71,9 @@ $(u',v')$, on a uniform grid:
 def tke_budget(
     ds: xr.Dataset,
     *,
-    nu: float | None = None,          # kinematic viscosity; if None, dissipation skipped
+    nu: float | None = None,  # kinematic viscosity; if None, dissipation skipped
     rho: float = 1.0,
-    method: str = "central",         # gradient scheme: central | least_squares
+    method: str = "central",  # gradient scheme: central | least_squares
     smooth: bool = False,
 ) -> xr.Dataset:
     """Return a Dataset with data vars: k, production, dissipation, advection,
@@ -114,10 +114,10 @@ def convergence_analysis(
     ds: xr.Dataset,
     *,
     quantities: list[str] = ["u", "v", "uu", "vv", "uv", "k"],
-    kernel: str = "cumulative",      # cumulative | moving (window)
+    kernel: str = "cumulative",  # cumulative | moving (window)
     window: int | None = None,
-    threshold: float = 0.05,         # relative change threshold
-    point: tuple[int, int] | None = None,   # grid point; None = spatial mean
+    threshold: float = 0.05,  # relative change threshold
+    point: tuple[int, int] | None = None,  # grid point; None = spatial mean
 ) -> xr.Dataset:
     """Returns per-quantity series vs. N plus estimated convergence N."""
 ```
@@ -153,12 +153,13 @@ vorticity), add:
 def detect_vortices(
     ds: xr.Dataset,
     *,
-    criterion: str = "gamma2",       # gamma1 | gamma2 | q | ow | circulation
-    threshold: float = 0.5,          # |criterion| >= threshold for vortex region
-    sign: str = "all",               # positive | negative | all
-    min_area: int = 4,               # min connected-component size (grid cells)
-) -> list[dict]:                    # list of {center, area, circulation, peak, ...}
+    criterion: str = "gamma2",  # gamma1 | gamma2 | q | ow | circulation
+    threshold: float = 0.5,  # |criterion| >= threshold for vortex region
+    sign: str = "all",  # positive | negative | all
+    min_area: int = 4,  # min connected-component size (grid cells)
+) -> list[dict]:  # list of {center, area, circulation, peak, ...}
     ...
+
 
 def spatial_vortex_probability(
     ds: xr.Dataset,
@@ -166,7 +167,7 @@ def spatial_vortex_probability(
     criterion: str = "gamma2",
     threshold: float = 0.5,
     sign: str = "all",
-) -> xr.DataArray:                  # probability per grid point
+) -> xr.DataArray:  # probability per grid point
     ...
 ```
 Accessors: `ds.piv.detect_vortices(...)`, `ds.piv.vortex_probability(...)`.
@@ -199,12 +200,13 @@ azimuthal averaging.
 def fft_spectrum_2d(
     ds: xr.Dataset,
     *,
-    component: str = "u",            # u | v | (u,v) combined
-    window: str = "hann",            # hann | none
+    component: str = "u",  # u | v | (u,v) combined
+    window: str = "hann",  # hann | none
     detrend: bool = True,
-    azimuthal: bool = True,          # radial average -> E(k)
-    Lx: float | None = None, Ly: float | None = None,   # domain sizes (from attrs if None)
-) -> xr.Dataset:                     # k, E(k) (and optionally 2D spectrum)
+    azimuthal: bool = True,  # radial average -> E(k)
+    Lx: float | None = None,
+    Ly: float | None = None,  # domain sizes (from attrs if None)
+) -> xr.Dataset:  # k, E(k) (and optionally 2D spectrum)
     ...
 ```
 Accessor: `ds.piv.fft_spectrum(...)`.

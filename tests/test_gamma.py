@@ -73,7 +73,7 @@ def run_demo(*, make_plots: bool = True) -> None:
     # For t=0
     levels_g1 = _safe_levels(data["Γ1"].isel(t=0))
     levels_g2 = _safe_levels(data["Γ2"].isel(t=0))
-    fig_g, ax_g = plt.subplots(nrows=1, ncols=2, clear=True, figsize=(15, 10))
+    _fig_g, ax_g = plt.subplots(nrows=1, ncols=2, clear=True, figsize=(15, 10))
     data["Γ1"].isel(t=0).plot.contourf(
         x="x", y="y", levels=levels_g1, cmap=plt.get_cmap("RdYlBu"), ax=ax_g[0]
     )

@@ -694,10 +694,7 @@ class PIVLabReader(PIVReader):
             raise ImportError("h5py is required to read PIVLab MAT files") from e
         with h5py.File(path, "r") as f:
             indices = sorted(
-                int(m.group(1))
-                for k in f.keys()
-                for m in [re.match(r"u_(\d+)$", k)]
-                if m
+                int(m.group(1)) for k in f for m in [re.match(r"u_(\d+)$", k)] if m
             )
             if not indices:
                 raise ValueError("No u_<n> datasets found")
@@ -715,10 +712,7 @@ class PIVLabReader(PIVReader):
             raise ImportError("h5py is required to read PIVLab MAT files") from e
         with h5py.File(path, "r") as f:
             indices = sorted(
-                int(m.group(1))
-                for k in f.keys()
-                for m in [re.match(r"u_(\d+)$", k)]
-                if m
+                int(m.group(1)) for k in f for m in [re.match(r"u_(\d+)$", k)] if m
             )
             if not indices:
                 raise ValueError("No u_<n> datasets found")
@@ -1723,8 +1717,8 @@ def loadpivtxt(fname: Any) -> xr.Dataset:
     mask = arr[:, 4] if arr.shape[1] >= 5 else None
 
     # Infer grid
-    xu, xi = unsorted_unique(x)
-    yu, yi = unsorted_unique(y)
+    xu, _xi = unsorted_unique(x)
+    yu, _yi = unsorted_unique(y)
     cols = len(xu)
     rows_n = len(yu)
     if cols * rows_n != len(x):
@@ -1800,17 +1794,15 @@ def readvec(name: Any, comments: int = 1, columns: int = 5) -> tuple[str, np.nda
     body = "\n".join(lines[comments:])
 
     # Attempt to infer columns and units from header.
-    x_units = ""
-    u_units = ""
     m = re.search(r"variables=([^\n]+)", header)
     if m:
         variables = m.group(1)
         # crude parsing of quoted strings
         quoted = re.findall(r'"([^"]*)"', variables)
         if len(quoted) >= 2:
-            x_units = quoted[1]
+            quoted[1]
         if len(quoted) >= 6:
-            u_units = quoted[5]
+            quoted[5]
         if quoted:
             columns = max(4, len(quoted) // 2)
     else:
@@ -1853,7 +1845,7 @@ def readsetfile(filename: Any, attrname: str | None = None) -> dict[str, Any] | 
     attrs: dict[str, Any] = {}
     for line in txt.splitlines():
         s = line.strip()
-        if not s or s.startswith("#") or s.startswith(";"):
+        if not s or s.startswith(("#", ";")):
             continue
         # try key=value or key: value
         if "=" in s:
@@ -2292,7 +2284,7 @@ def randvec(
     if nc <= 0.0 or nl <= 0.0:
         raise ValueError("nc and nl must be positive")
 
-    k0_idx = n // 2  # 0-based index of the zero mode (PIVMAT: k0 = n/2 + 1)
+    n // 2  # 0-based index of the zero mode (PIVMAT: k0 = n/2 + 1)
     rng = np.random.default_rng(int(seed))
     fields: list[xr.Dataset] = []
 

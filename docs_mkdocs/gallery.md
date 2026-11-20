@@ -140,7 +140,9 @@ Analyze multi-frame time series and ensembles with comprehensive statistical and
 
     ```python
     x_mid, y_mid = float(ds.x.mean()), float(ds.y.mean())
-    corr = ds.piv.two_point_correlation(var_name="u", x_ref=x_mid, y_ref=y_mid, swap_dims=False)
+    corr = ds.piv.two_point_correlation(
+        var_name="u", x_ref=x_mid, y_ref=y_mid, swap_dims=False
+    )
 
     fig, ax = plt.subplots(figsize=(6, 5))
     cf = ax.contourf(corr.x, corr.y, corr.values, levels=30, cmap="coolwarm")
@@ -225,7 +227,7 @@ Render publication-ready vector fields and flow trajectories with customizable d
     Streamlines tracing instantaneous velocity trajectories, colored by velocity magnitude or any scalar field.
 
     ```python
-    speed = np.sqrt(ds["u"].isel(t=0)**2 + ds["v"].isel(t=0)**2).values
+    speed = np.sqrt(ds["u"].isel(t=0) ** 2 + ds["v"].isel(t=0) ** 2).values
     fig, ax = ds.piv.streamplot(color=speed, cmap="plasma", density=1.2)
     ```
 

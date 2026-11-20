@@ -9,8 +9,8 @@ from pivpy.synthetic import vortex
 def test_normalized_median_test_outlier_detection():
     """Verify that Normalized Median Test detects outliers with zero false positives on smooth flow."""
     ds = vortex(n=65, r0=8.0, vorticity=1.0, mode="lamb")
-    u_clean = ds["u"].to_numpy().copy()
-    v_clean = ds["v"].to_numpy().copy()
+    ds["u"].to_numpy().copy()
+    ds["v"].to_numpy().copy()
 
     # Inject discrete spurious outliers
     ds["u"].values[15, 20, 0] = 50.0

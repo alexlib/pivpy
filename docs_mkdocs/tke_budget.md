@@ -6,6 +6,7 @@ dataset: `k`, `production`, `dissipation`, `advection`, `turbulent_transport`,
 
 ```python
 from pivpy import io
+
 ds = io.create_sample_Dataset(n_frames=6, rows=16, cols=16)
 budget = ds.piv.tke_budget(nu=1e-3)
 ```
@@ -14,6 +15,7 @@ Plot all terms:
 
 ```python
 from pivpy.graphics import tke_budget_disp
+
 fig, axes = tke_budget_disp(budget)
 ```
 

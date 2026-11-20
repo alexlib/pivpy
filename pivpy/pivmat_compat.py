@@ -83,7 +83,7 @@ def _split_first_bracket(s: str) -> _BracketSpec | None:
         expr, nz_val = inside, 5.0
 
     width = int(nz_val)
-    prec = int(round(10 * (nz_val - int(nz_val))))
+    prec = round(10 * (nz_val - int(nz_val)))
     if width > 16:
         raise ValueError("Invalid number of zero padding: too large")
     fmt = f"{{:0{width}.{prec}f}}"

@@ -28,6 +28,7 @@ Pyodide) -- drag the slider and the plot redraws immediately.
 
 ```python {marimo}
 import micropip
+
 await micropip.install("pivpy")
 
 import marimo as mo
@@ -36,7 +37,9 @@ import pivpy.pivpy  # registers Dataset.piv accessor
 from pivpy import synthetic
 
 ds = synthetic.multivortex(n_frames=1, n=64, n_vortices=8, two_d=True, seed=42)
-blur_slider = mo.ui.slider(0.0, 4.0, step=0.25, value=1.5, label="background blur (sigma)")
+blur_slider = mo.ui.slider(
+    0.0, 4.0, step=0.25, value=1.5, label="background blur (sigma)"
+)
 blur_slider
 ```
 
@@ -113,13 +116,13 @@ All layers (background contour, quiver arrows, streamlines, color limits, Gaussi
 ```python
 # Velocity magnitude background with vectors only (no streamlines)
 fig, ax = ds.piv.plot(
-    background="mag",       # 'vorticity' (default), 'mag', 'ke', 'divergence', or None
-    streamlines=False,      # toggle flow streamlines
-    quiver=True,            # toggle velocity vectors
-    blur=1.5,               # Gaussian smoothing sigma for smooth fluid contours
-    arrow_scale=0.75,       # custom vector arrow scale
+    background="mag",  # 'vorticity' (default), 'mag', 'ke', 'divergence', or None
+    streamlines=False,  # toggle flow streamlines
+    quiver=True,  # toggle velocity vectors
+    blur=1.5,  # Gaussian smoothing sigma for smooth fluid contours
+    arrow_scale=0.75,  # custom vector arrow scale
     arrow_color="#1a1a1a",  # custom arrow color
-    arrow_alpha=0.8,        # arrow transparency
+    arrow_alpha=0.8,  # arrow transparency
     title="Velocity Magnitude & Vectors",
 )
 ```
@@ -138,21 +141,21 @@ Every argument in the call that produced it, explained:
 
 ```python
 fig, ax = ds.piv.plot(
-    background="image",          # (1) what to paint behind the vectors
-    image=raw_frame,             # (2) the actual 2D grayscale array to show
+    background="image",  # (1) what to paint behind the vectors
+    image=raw_frame,  # (2) the actual 2D grayscale array to show
     image_extent=(0, 2.0, -4.9, 0),  # (3) physical (left, right, bottom, top)
-    image_cmap="gray",           # (4) colormap for the *image*, not the data
-    image_alpha=0.6,             # (5) how much the image shows through
-    quiver=True,                 # (6) draw velocity arrows
-    color_by="mag",              # (7) color the arrows by speed
-    cmap="viridis",              # (8) colormap for whatever is colored (mag here)
-    arrow_scale=None,            # (9) None = auto-scaled, no overlap
-    arrow_width=0.004,           # (10) shaft thickness
-    skip=7,                      # (11) draw every 7th vector (density)
-    streamlines=True,            # (12) trace flow topology - this is what
-                                  #      actually reveals the vortex cleanly,
-                                  #      arrows alone rarely do
-    colorbar=True,               # (13) see "Getting the colorbar right" below
+    image_cmap="gray",  # (4) colormap for the *image*, not the data
+    image_alpha=0.6,  # (5) how much the image shows through
+    quiver=True,  # (6) draw velocity arrows
+    color_by="mag",  # (7) color the arrows by speed
+    cmap="viridis",  # (8) colormap for whatever is colored (mag here)
+    arrow_scale=None,  # (9) None = auto-scaled, no overlap
+    arrow_width=0.004,  # (10) shaft thickness
+    skip=7,  # (11) draw every 7th vector (density)
+    streamlines=True,  # (12) trace flow topology - this is what
+    #      actually reveals the vortex cleanly,
+    #      arrows alone rarely do
+    colorbar=True,  # (13) see "Getting the colorbar right" below
     title="Average flow field over 150 frames - canonical cavity vortex",
 )
 
@@ -221,7 +224,9 @@ A minimal tuning panel for `ds.piv.plot()`:
 
 ```python {marimo}
 cmap_dd = mo.ui.dropdown(
-    options=["viridis", "plasma", "coolwarm", "turbo"], value="viridis", label="colormap"
+    options=["viridis", "plasma", "coolwarm", "turbo"],
+    value="viridis",
+    label="colormap",
 )
 background_dd = mo.ui.dropdown(
     options=["mag", "vorticity", "ke", "none"], value="mag", label="background"
@@ -361,17 +366,17 @@ The `pivpy.graphics.animate` function exposes fine-grained control:
 
 ```python
 anim = ds.piv.animate(
-    background="vorticity",          # 'vorticity', 'mag', 'ke', 'divergence', or variable name
-    quiver=True,                     # overlay velocity vectors
-    blur=1.5,                        # Gaussian smoothing sigma
-    skip=8,                          # arrow subsampling step (e.g. every 8th vector)
-    arrow_width=0.007,               # shaft width of vector arrows
-    arrow_color="#1a1a1a",           # arrow color
-    arrow_alpha=0.75,                # arrow opacity
-    cmap="RdBu_r",                   # colormap for background
-    interval=60,                     # delay between frames in milliseconds (~16 fps)
-    repeat=True,                     # loop animation
-    title_fmt="Vortex Interaction (t = {t:.2f} s)", # custom dynamic title
+    background="vorticity",  # 'vorticity', 'mag', 'ke', 'divergence', or variable name
+    quiver=True,  # overlay velocity vectors
+    blur=1.5,  # Gaussian smoothing sigma
+    skip=8,  # arrow subsampling step (e.g. every 8th vector)
+    arrow_width=0.007,  # shaft width of vector arrows
+    arrow_color="#1a1a1a",  # arrow color
+    arrow_alpha=0.75,  # arrow opacity
+    cmap="RdBu_r",  # colormap for background
+    interval=60,  # delay between frames in milliseconds (~16 fps)
+    repeat=True,  # loop animation
+    title_fmt="Vortex Interaction (t = {t:.2f} s)",  # custom dynamic title
 )
 ```
 
@@ -386,7 +391,9 @@ from matplotlib.animation import FFMpegWriter, PillowWriter
 anim.save("flow.gif", writer=PillowWriter(fps=15))
 
 # High-definition MP4 (requires ffmpeg installed)
-anim.save("flow.mp4", writer=FFMpegWriter(fps=24, metadata=dict(artist="PIVPy"), bitrate=2000))
+anim.save(
+    "flow.mp4", writer=FFMpegWriter(fps=24, metadata=dict(artist="PIVPy"), bitrate=2000)
+)
 ```
 
 ## Batch Video Export (`ds.piv.to_movie`)
@@ -399,6 +406,7 @@ ds.piv.to_movie("output.mp4", background="vorticity", fps=15)
 
 # Out-of-core disk file sequences
 from pivpy.graphics import imvectomovie
+
 imvectomovie("data_run_*.vec", output="run_movie.mp4", background="mag", fps=20)
 ```
 

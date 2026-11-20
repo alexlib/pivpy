@@ -7,9 +7,8 @@ app = marimo.App()
 @app.cell
 def _():
     import re
-    from typing import Dict, Tuple
 
-    return Dict, Tuple, re
+    return dict, tuple, re
 
 
 @app.cell
@@ -21,7 +20,7 @@ def _(Dict, re):
         for item in result:
             pair = item.replace("DATASETAUXDATA ", "")
             key_value = pair.split("=")
-            dict[key_value[0]] = key_value[1].replace("\"", "")
+            dict[key_value[0]] = key_value[1].replace('"', "")
 
         # print(dict)
         return dict
@@ -31,19 +30,19 @@ def _(Dict, re):
 
 @app.cell
 def _(datasetauxdata_to_dict):
-    text=r"""
+    text = r"""
     TITLE="D:\Experiments2021\iai_0107_\exp1_\Analysis\exp1_006014.T000.D000.P001.H000.L.vec" VARIABLES="X mm", "Y mm", "U m/s", "V m/s", "CHC", DATASETAUXDATA Application="PIV" DATASETAUXDATA SourceImageWidth="4008" DATASETAUXDATA SourceImageHeight="2672" DATASETAUXDATA MicrometersPerPixelX="85.809998" DATASETAUXDATA MicrometersPerPixelY="85.809998" DATASETAUXDATA LengthUnit="mm" DATASETAUXDATA OriginInImageX="0.000000" DATASETAUXDATA OriginInImageY="0.000000" DATASETAUXDATA MicrosecondsPerDeltaT="50.000000" DATASETAUXDATA TimeUnit="ms" DATASETAUXDATA SecondaryPeakNumber="0" DATASETAUXDATA DewarpedImageSource="0" ZONE I=124, J=82, F=POINT
     """
 
     datasetauxdata_to_dict(text)
-    return
 
 
 @app.cell
 def _():
     import pathlib
     from importlib.resources import files
-    file = files('pivpy') / 'data/Insight/Run000001.T000.D000.P000.H001.L.vec'
+
+    file = files("pivpy") / "data/Insight/Run000001.T000.D000.P000.H001.L.vec"
     return file, pathlib
 
 
@@ -60,7 +59,7 @@ def _(datasetauxdata_to_dict, file):
 
 @app.cell
 def _(Tuple, pathlib, re):
-    def parse_header(filename: pathlib.Path)-> Tuple:
+    def parse_header(filename: pathlib.Path) -> Tuple:
         """
         parse_header ( filename)
         Parses header of the file (.vec) to get the variables (typically X,Y,U,V)
@@ -89,7 +88,7 @@ def _(Tuple, pathlib, re):
                 re.findall(r"\d+", fname.split("_")[1])[-1]
             )  # exp1_001_b.vec, .txt
 
-        with open(filename,"r") as fid:
+        with open(filename, "r") as fid:
             header = fid.readline()
 
         # if the file does not have a header, can be from OpenPIV or elsewhere
@@ -128,13 +127,11 @@ def _(Tuple, pathlib, re):
 @app.cell
 def _(file, parse_header):
     parse_header(file)
-    return
 
 
 @app.cell
 def _(header):
     header
-    return
 
 
 if __name__ == "__main__":

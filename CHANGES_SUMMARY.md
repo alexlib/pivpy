@@ -110,24 +110,24 @@ data = data.piv.vorticity()  # Creates data["w"] with vorticity
 **New Feature: Custom Names:**
 ```python
 # Store multiple scalars in one dataset
-data = data.piv.vorticity(name='vort')
-data = data.piv.strain(name='strain')
-data = data.piv.kinetic_energy(name='ke')
-data = data.piv.tke(name='tke')
-data = data.piv.reynolds_stress(name='rey_stress')
+data = data.piv.vorticity(name="vort")
+data = data.piv.strain(name="strain")
+data = data.piv.kinetic_energy(name="ke")
+data = data.piv.tke(name="tke")
+data = data.piv.reynolds_stress(name="rey_stress")
 
 # All scalar fields are now accessible:
-print(data['vort'])
-print(data['strain'])
-print(data['ke'])
-print(data['tke'])
-print(data['rey_stress'])
+print(data["vort"])
+print(data["strain"])
+print(data["ke"])
+print(data["tke"])
+print(data["rey_stress"])
 ```
 
 **Using vec2scal with custom names:**
 ```python
-data = data.piv.vec2scal('vorticity', name='vort')
-data = data.piv.vec2scal('strain', name='strain_field')
+data = data.piv.vec2scal("vorticity", name="vort")
+data = data.piv.vec2scal("strain", name="strain_field")
 ```
 
 ### Benefits
@@ -168,19 +168,19 @@ Modified `load_openpiv_txt()` to automatically detect the number of columns and 
 from pivpy import io
 
 # Old format: x, y, u, v, flags
-data = io.load_openpiv_txt('openpiv_output_old.txt')
+data = io.load_openpiv_txt("openpiv_output_old.txt")
 print(data.data_vars)  # ['u', 'v', 'chc']
 ```
 
 **Loading 6-column file (new format):**
 ```python
 # New format: x, y, u, v, flags, mask
-data = io.load_openpiv_txt('openpiv_output_new.txt')
+data = io.load_openpiv_txt("openpiv_output_new.txt")
 print(data.data_vars)  # ['u', 'v', 'chc', 'mask']
 
 # Mask convention in PIVPy: mask==0 is treated as invalid.
 # (Loader also zeros u/v at invalid points.)
-valid_velocities = data.where(data['mask'] != 0)
+valid_velocities = data.where(data["mask"] != 0)
 ```
 
 ### Benefits
@@ -228,9 +228,9 @@ data_rey.piv.reynolds_stress()
 Users can store all scalars in one Dataset:
 ```python
 # Efficient - single dataset with multiple scalars
-data.piv.vorticity(name='vort')
-data.piv.tke(name='tke')
-data.piv.reynolds_stress(name='rey_stress')
+data.piv.vorticity(name="vort")
+data.piv.tke(name="tke")
+data.piv.reynolds_stress(name="rey_stress")
 # Single dataset contains u, v, chc + all scalar fields
 ```
 
@@ -297,22 +297,22 @@ data = data.piv.strain()
 # data["w"] now contains strain (vorticity lost!)
 
 # After (creates different named fields)
-data = data.piv.vorticity(name='vort')
+data = data.piv.vorticity(name="vort")
 # data["vort"] contains vorticity
 
-data = data.piv.strain(name='strain')
+data = data.piv.strain(name="strain")
 # data["strain"] contains strain, data["vort"] still exists!
 ```
 
 **Option 2: Load mask column from OpenPIV files**
 ```python
 # Works automatically - no code changes needed!
-data = io.load_openpiv_txt('your_file.txt')
+data = io.load_openpiv_txt("your_file.txt")
 
 # Check if mask is available
-if 'mask' in data:
+if "mask" in data:
     # Use mask to filter data
-    clean_data = data.where(data['mask'] == 0)
+    clean_data = data.where(data["mask"] == 0)
 ```
 
 ---
@@ -364,34 +364,34 @@ import matplotlib.pyplot as plt
 data = io.create_sample_Dataset(n_frames=20, rows=10, cols=10)
 
 # Plot temporal autocorrelation (spatial average first)
-graphics.autocorrelation_plot(data, variable='u', spatial_average=True)
+graphics.autocorrelation_plot(data, variable="u", spatial_average=True)
 plt.show()
 
 # Using accessor method
-data.piv.autocorrelation_plot(variable='v')  # spatial_average=True by default
+data.piv.autocorrelation_plot(variable="v")  # spatial_average=True by default
 plt.show()
 ```
 
 **Flattened mode (original gist behavior):**
 ```python
 # Plot autocorrelation with all dimensions flattened
-graphics.autocorrelation_plot(data, variable='u', spatial_average=False)
+graphics.autocorrelation_plot(data, variable="u", spatial_average=False)
 plt.show()
 
 # Using accessor
-data.piv.autocorrelation_plot(variable='v', spatial_average=False)
+data.piv.autocorrelation_plot(variable="v", spatial_average=False)
 plt.show()
 ```
 
 **Autocorrelation of scalar fields:**
 ```python
 # Compute vorticity and plot its autocorrelation
-data = data.piv.vec2scal('curl')
-graphics.autocorrelation_plot(data, variable='w')
+data = data.piv.vec2scal("curl")
+graphics.autocorrelation_plot(data, variable="w")
 plt.show()
 
 # Or use accessor directly
-data.piv.autocorrelation_plot(variable='w')
+data.piv.autocorrelation_plot(variable="w")
 plt.show()
 ```
 
@@ -401,18 +401,18 @@ fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
 # Compare autocorrelation of different properties
 plt.sca(axes[0, 0])
-graphics.autocorrelation_plot(data, variable='u', spatial_average=True)
+graphics.autocorrelation_plot(data, variable="u", spatial_average=True)
 
 plt.sca(axes[0, 1])
-graphics.autocorrelation_plot(data, variable='v', spatial_average=True)
+graphics.autocorrelation_plot(data, variable="v", spatial_average=True)
 
 plt.sca(axes[1, 0])
-graphics.autocorrelation_plot(data, variable='u', spatial_average=False)
+graphics.autocorrelation_plot(data, variable="u", spatial_average=False)
 
 # Vorticity
-data_vort = data.piv.vec2scal('curl')
+data_vort = data.piv.vec2scal("curl")
 plt.sca(axes[1, 1])
-graphics.autocorrelation_plot(data_vort, variable='w')
+graphics.autocorrelation_plot(data_vort, variable="w")
 
 plt.tight_layout()
 plt.show()

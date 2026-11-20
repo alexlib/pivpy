@@ -27,18 +27,17 @@ def _(mo):
 
     Or use the direct link https://www.lavision.de/en/download.php?id=4817
     """)
-    return
 
 
 @app.cell
 def _():
     # !pip install /home/user/Downloads/lvreader-1.2.0/lvreader-1.2.0-cp38-cp38-linux_x86_64.whl
-    from pivpy import io, pivpy
-    from pivpy import graphics
-    import xarray as xr
-    import numpy as np
-    import matplotlib.pyplot as plt
     import pathlib
+
+    import numpy as np
+    import xarray as xr
+
+    from pivpy import graphics, io
 
     return graphics, io, np, pathlib, xr
 
@@ -46,7 +45,10 @@ def _():
 @app.cell
 def _(io, pathlib):
     from importlib import resources
-    filename = pathlib.Path(resources.files('pivpy') / "data" / "PIVMAT_jet" / "B00001.VC7")
+
+    filename = pathlib.Path(
+        resources.files("pivpy") / "data" / "PIVMAT_jet" / "B00001.VC7"
+    )
     ds = io.load_vc7(filename)
     return ds, filename
 
@@ -54,20 +56,17 @@ def _(io, pathlib):
 @app.cell
 def _(ds):
     ds
-    return
 
 
 @app.cell
 def _(ds, graphics):
-    graphics.quiver(ds.isel(t=0),scalingFactor=200)
-    return
+    graphics.quiver(ds.isel(t=0), scalingFactor=200)
 
 
 @app.cell
 def _(ds, graphics):
     new = ds.piv.filterf()
-    graphics.quiver(new.isel(t=0),scalingFactor=200)
-    return
+    graphics.quiver(new.isel(t=0), scalingFactor=200)
 
 
 @app.cell
@@ -79,16 +78,17 @@ def _(ds, graphics):
 
 @app.cell
 def _(new_1):
-    new_1.isel(t=0).plot.quiver(x='x', y='y', u='u', v='v')
-    return
+    new_1.isel(t=0).plot.quiver(x="x", y="y", u="u", v="v")
 
 
 @app.cell
 def _(io, np):
     ds_1 = io.create_sample_Dataset(n_frames=3, rows=5, cols=10)
     ds_1 = ds_1.piv.filterf([0.5, 0.5, 0.0])
-    ds_1['mag'] = np.hypot(ds_1['u'], ds_1['v'])
-    ds_1.plot.quiver(x='x', y='y', u='u', v='v', hue='mag', col='t', scale=150, cmap='RdBu')
+    ds_1["mag"] = np.hypot(ds_1["u"], ds_1["v"])
+    ds_1.plot.quiver(
+        x="x", y="y", u="u", v="v", hue="mag", col="t", scale=150, cmap="RdBu"
+    )
     return (ds_1,)
 
 
@@ -99,18 +99,19 @@ def _(mask_vars, xr):
     from scipy.ndimage import gaussian_filter
 
     def _get_dims(data):
-        """Get primary x-y dimensions of dataset
-        """
-        return ('y', 'x')
+        """Get primary x-y dimensions of dataset"""
+        return ("y", "x")
 
-    def gaussian_smooth(data, sigma = [1., 1.], mask=False, mode='reflect'):
+    def gaussian_smooth(data, sigma=None, mask=False, mode="reflect"):
         """Apply gaussian kernel to convolution. Uses Scipy
-           gaussian_filter method.
-           Parameters:
-           mode (str): {‘reflect’, ‘constant’, ‘nearest’, ‘mirror’, ‘wrap’}
-                       What to do at edges of matrix input. See Scipy docs
-                       for details on what these do.
+        gaussian_filter method.
+        Parameters:
+        mode (str): {‘reflect’, ‘constant’, ‘nearest’, ‘mirror’, ‘wrap’}
+                    What to do at edges of matrix input. See Scipy docs
+                    for details on what these do.
         """
+        if sigma is None:
+            sigma = [1.0, 1.0]
         dims = _get_dims(data)
 
         sc_gaussian_nd = lambda data: gaussian_filter(data, sigma, mode=mode)
@@ -118,15 +119,17 @@ def _(mask_vars, xr):
         if mask:
             data_masked = data.where(data[mask_vars[dims]])
         else:
-            data_masked = data.fillna(0.)
+            data_masked = data.fillna(0.0)
 
-        return xr.apply_ufunc(sc_gaussian_nd, data_masked,
-                              vectorize=True,
-                              dask='parallelized',
-                              input_core_dims = [dims],
-                              output_core_dims = [dims],
-                              # output_dtypes=[data.dtype]
-                            )
+        return xr.apply_ufunc(
+            sc_gaussian_nd,
+            data_masked,
+            vectorize=True,
+            dask="parallelized",
+            input_core_dims=[dims],
+            output_core_dims=[dims],
+            # output_dtypes=[data.dtype]
+        )
 
     return (gaussian_smooth,)
 
@@ -134,8 +137,9 @@ def _(mask_vars, xr):
 @app.cell
 def _(ds_1, gaussian_smooth):
     tmp = gaussian_smooth(ds_1)
-    tmp.plot.quiver(x='x', y='y', u='u', v='v', hue='mag', col='t', scale=150, cmap='RdBu')
-    return
+    tmp.plot.quiver(
+        x="x", y="y", u="u", v="v", hue="mag", col="t", scale=150, cmap="RdBu"
+    )
 
 
 @app.cell
@@ -144,7 +148,6 @@ def _(filename, gaussian_smooth, graphics, io):
     new_2 = gaussian_smooth(ds_2, sigma=[2.0, 2.0])
     # new.isel(t=0).plot.quiver(x='x',y='y',u='u',v='v')
     graphics.quiver(new_2.isel(t=0), scalingFactor=200)
-    return
 
 
 if __name__ == "__main__":

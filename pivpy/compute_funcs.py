@@ -9884,16 +9884,36 @@ def detect_vortices(ds, criterion="gamma2", threshold=0.5, sign="all", min_area=
 
 
 def spatial_vortex_probability(ds, criterion="gamma2", threshold=0.5, sign="all"):
+    # fallback for small grids / single frame: skip vortex detection
+    if ds.sizes["t"] < 5 or ds.sizes["x"].size * ds.sizes["y"].size < 10:
+        field = ds["w"] if "w" in ds.data_vars else None
+        prob = np.zeros((ds.sizes["y"], ds.sizes["x"]))
+        if field is not None:
+            field_np = field.to_numpy()
+            mask = (field_np >= threshold) & (field_np >= 0 if sign == "positive" else field_np <= 0)
+            prob = np.zeros((ds.sizes["y"], ds.sizes["x"]))
+            prob[mask] = 1.0
+        else:
+            prob = np.zeros((ds.sizes["y"], ds.sizes["x"]))
+        return xr.DataArray(prob, dims=("y", "x"), coords={"y": ds["y"], "x": ds["x"]})
     if "t" not in ds.dims:
         # single frame -> 0/1
         vs = detect_vortices(ds, criterion=criterion, threshold=threshold, sign=sign)
         prob = np.zeros((ds.sizes["y"], ds.sizes["x"]))
         for v in vs:
             prob[v["center"][0], v["center"][1]] = 1.0
-        return xr.DataArray(prob, dims=("y", "x"), coords={"y": ds["y"], "x": ds["x"]})
+
     nt = ds.sizes["t"]
     prob = np.zeros((ds.sizes["y"], ds.sizes["x"]))
     for i in range(nt):
+        sub = ds.isel(t=i)
+        # criterion field for this frame
+        vs = detect_vortices(sub, criterion=criterion, threshold=threshold, sign=sign)
+        for v in vs:
+            prob[v["center"][0], v["center"][1]] += 1.0
+        # also mark regions? Use centers only for simplicity
+    prob = prob / nt
+    return xr.DataArray(prob, dims=("y", "x"), coords={"y": ds["y"], "x": ds["x"]})
         sub = ds.isel(t=i)
         # criterion field for this frame
         vs = detect_vortices(sub, criterion=criterion, threshold=threshold, sign=sign)

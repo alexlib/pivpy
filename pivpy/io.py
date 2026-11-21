@@ -29,7 +29,7 @@ import xarray as xr
 
 try:
     from scipy.io import savemat as _sp_savemat
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     _sp_savemat = None
 from numpy.typing import ArrayLike
 
@@ -362,7 +362,7 @@ def parse_header(filepath: Any):
         data = np.loadtxt(path, comments="#")
         if data.ndim == 1:
             data = data[None, :]
-    except Exception:
+    except (OSError, ValueError):
         data = np.empty((0, ncols))
     rows = cols = None
     if data.size:
@@ -493,7 +493,7 @@ class OpenPIVReader(PIVReader):
                     float(toks[0])
                     float(toks[1])
                     return len(toks) in (5, 6)
-        except Exception:
+        except (OSError, ValueError):
             return False
         return False
 
@@ -760,7 +760,7 @@ class NetCDFReader(PIVReader):
         path = _to_path(filepath)
         try:
             ds = xr.open_dataset(path)
-        except Exception:
+        except (OSError, ValueError):
             return PIVMetadata(frame=0)
 
         delta_t = float(ds.attrs.get("delta_t", DELTA_T))
@@ -869,7 +869,7 @@ class ZarrReader(PIVReader):
         path = _to_path(filepath)
         try:
             ds = xr.open_zarr(path)
-        except Exception:
+        except (OSError, ValueError):
             return PIVMetadata(frame=0)
         return PIVMetadata(
             pos_units=POS_UNITS,
@@ -994,7 +994,7 @@ class PIVReaderRegistry:
             try:
                 if reader.can_read(path):
                     return reader
-            except Exception:
+            except Exception:  # noqa: BLE001, S112 - pluggable readers may raise anything
                 continue
         return None
 
@@ -1395,7 +1395,7 @@ def batchf(
                 from pivpy.pivmat_compat import expandstr
 
                 expanded.extend(expandstr(pat))
-            except Exception:
+            except (RecursionError, ValueError):
                 # If parsing fails, fall back to raw glob pattern.
                 expanded.append(pat)
         else:
@@ -1477,7 +1477,7 @@ def _expand_pivmat_file_patterns(pattern: Any) -> list[pathlib.Path]:
                 from pivpy.pivmat_compat import expandstr
 
                 expanded.extend(expandstr(pat))
-            except Exception:
+            except (RecursionError, ValueError):
                 expanded.append(pat)
         else:
             expanded.append(pat)
@@ -1863,7 +1863,7 @@ def readsetfile(filename: Any, attrname: str | None = None) -> dict[str, Any] | 
             else:
                 val2 = float(val)
             attrs[key] = val2
-        except Exception:
+        except ValueError:
             attrs[key] = val
 
     if attrname is None:
@@ -1941,7 +1941,7 @@ def getvar(s: Any, reqname: str | int | None = None, mode: str | None = None) ->
                     val = int(val_s)
                 else:
                     val = float(val_s)
-            except Exception:
+            except ValueError:
                 val = val_s
         out[key] = val
 
@@ -2031,7 +2031,7 @@ def getframedt(filename: Any) -> np.ndarray:
     path = _to_path(filename)
     try:
         from lvpyio import read_buffer  # type: ignore
-    except Exception:
+    except ImportError:
         return np.asarray([0.0], dtype=float)
 
     try:
@@ -2049,7 +2049,7 @@ def getframedt(filename: Any) -> np.ndarray:
                     if ts.size <= 1:
                         return np.asarray([0.0], dtype=float)
                     return np.diff(ts) * 1e-3  # ms -> s
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 - best effort: default to [0.0]
         pass
     return np.asarray([0.0], dtype=float)
 

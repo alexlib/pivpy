@@ -829,7 +829,7 @@ def test_netcdf_reader_roundtrip():
         fp = os.path.join(tmpdir, "sample.nc")
         try:
             ds.to_netcdf(fp)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - env availability guard: skip, don't fail
             pytest.skip(f"NetCDF write not available in this environment: {e}")
 
         loaded = io.read_piv(fp, format="netcdf")

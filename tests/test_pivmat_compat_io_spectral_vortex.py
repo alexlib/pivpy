@@ -14,7 +14,7 @@ def _pivpy_data_path() -> pathlib.Path:
         from importlib.resources import files
 
         return files("pivpy") / "data"
-    except Exception:  # pragma: no cover
+    except Exception:  # noqa: BLE001  # pragma: no cover
         from importlib.resources import path as resource_path
 
         with resource_path("pivpy", "data") as p:

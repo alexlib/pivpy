@@ -17,5 +17,5 @@ def pytest_runtest_teardown(item, nextitem):
         import matplotlib.pyplot as plt
 
         plt.close("all")
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 - defensive teardown cleanup
         pass

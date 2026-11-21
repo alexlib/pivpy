@@ -4,6 +4,7 @@ import json
 import re
 import urllib.request
 from dataclasses import dataclass
+from http.client import HTTPException
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _dist_version
 
@@ -59,7 +60,7 @@ def _compare_versions(installed: str, latest: str) -> int:
         a = Version(installed)
         b = Version(latest)
         return (a > b) - (a < b)
-    except Exception:
+    except (ImportError, ValueError):
         # Fallback: compare numeric components only (best-effort).
         def parts(v: str) -> tuple[int, ...]:
             nums = re.findall(r"\d+", v)
@@ -102,7 +103,13 @@ def check_update(
 
     try:
         latest = _get_pypi_version_str(package, timeout=timeout)
-    except Exception:
+    except (
+        HTTPException,
+        KeyError,
+        OSError,
+        TypeError,
+        ValueError,
+    ):
         if verbose:
             print("Update check failed: server unavailable.")
         return UpdateCheckResult(status=0, installed=installed, latest="")

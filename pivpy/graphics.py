@@ -380,7 +380,7 @@ def plot(
                 strm.lines.set_alpha(float(streamline_alpha))
                 for patch in ax.patches:
                     patch.set_alpha(float(streamline_alpha))
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - best effort: skip streamlines
                 pass
 
         # Quiver Vector Layer
@@ -631,7 +631,7 @@ def quiver(
     if nthArr is not None:
         try:
             step = int(nthArr)
-        except Exception:
+        except (TypeError, ValueError):
             step = 1
         if step and step > 1:
             x = x[::step, ::step]
@@ -667,7 +667,7 @@ def quiver(
     else:
         try:
             ax.set_aspect(float(aspectratio))
-        except Exception:
+        except (TypeError, ValueError):
             ax.set_aspect("equal")
 
     if add_guide:
@@ -702,7 +702,7 @@ def quiver(
                 arrowsize=sp_arrowsize,
                 ax=ax,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 - best effort: keep quiver usable
             # Keep quiver usable even if streamplot fails.
             pass
 
@@ -835,7 +835,7 @@ def showscal(
     if flow_property is not None and property not in ds:
         try:
             ds = ds.piv.vec2scal(flow_property)
-        except Exception:
+        except Exception:  # noqa: BLE001 - best effort: fall back to raw data
             # Fall back to plotting what we have.
             ds = data
 
@@ -1475,7 +1475,7 @@ def showf(data: xr.Dataset, **kwargs) -> tuple[plt.Figure, plt.Axes]:
                 clim=kwargs.get("clim", None),
                 cmap=kwargs.get("cmap", None),
             )
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 - best effort: keep showf usable
             # Keep showf usable even if background fails.
             pass
         return fig, ax
@@ -1573,7 +1573,7 @@ def _format_title(
         return None
     try:
         return str(title).format(i=i, t=t, file=file)
-    except Exception:
+    except (AttributeError, IndexError, KeyError, TypeError, ValueError):
         return str(title)
 
 
@@ -1632,7 +1632,7 @@ class _VectorMovieRenderer:
                 self._bg_mesh = _plot_scalar_background(
                     self.ax, first, background=str(background), clim=clim, cmap=cmap
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - best effort: skip background layer
                 self._bg_mesh = None
 
         quiver_plot_kwargs: dict = {
@@ -1657,7 +1657,7 @@ class _VectorMovieRenderer:
         else:
             try:
                 self.ax.set_aspect(float(self.aspectratio))
-            except Exception:
+            except (TypeError, ValueError):
                 self.ax.set_aspect("equal")
 
         if self.add_guide:
@@ -1671,13 +1671,13 @@ class _VectorMovieRenderer:
                     labelpos="E",
                     coordinates="figure",
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - best effort: skip guide
                 pass
 
         if self.streamlines:
             try:
                 streamplot(first, ax=self.ax)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - best effort: skip streamlines
                 pass
 
     @property
@@ -1718,7 +1718,7 @@ class _VectorMovieRenderer:
                         self._bg_mesh.set_clim(
                             float(np.min(finite)), float(np.max(finite))
                         )
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - best effort: keep old background
                 pass
 
         self._Q.set_UVC(u, v)
@@ -1734,7 +1734,7 @@ class _VectorMovieRenderer:
         if "t" in ds.coords and ds["t"].size:
             try:
                 t_val = float(ds["t"].values[0])
-            except Exception:
+            except (IndexError, TypeError, ValueError):
                 t_val = None
         else:
             t_val = None
@@ -1811,7 +1811,7 @@ class _ScalarMovieRenderer:
         if "t" in ds.coords and ds["t"].size:
             try:
                 t_val = float(ds["t"].values[0])
-            except Exception:
+            except (IndexError, TypeError, ValueError):
                 t_val = None
         else:
             t_val = None
@@ -1836,7 +1836,7 @@ def _resolve_files(pattern: str | list[str] | tuple[str, ...]) -> list[pathlib.P
 
                 expanded.extend(expandstr(pat))
                 continue
-            except Exception:
+            except (RecursionError, ValueError):
                 pass
         expanded.append(pat)
 

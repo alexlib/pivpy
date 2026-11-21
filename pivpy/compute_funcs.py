@@ -10,28 +10,28 @@ from numpy.typing import ArrayLike
 try:
     from scipy.ndimage import map_coordinates as _nd_map_coordinates
 
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     _nd_map_coordinates = None
 
 
 try:
     from scipy.interpolate import griddata as _sp_griddata
 
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     _sp_griddata = None
 
 
 try:
     from scipy.ndimage import convolve as _nd_convolve
 
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     _nd_convolve = None
 
 
 try:
     from scipy.signal import convolve2d as _signal_convolve2d
 
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     _signal_convolve2d = None
 
 
@@ -1648,7 +1648,7 @@ def histf(
         try:
             da0 = scalar.isel(t=0)
 
-        except Exception:
+        except (IndexError, ValueError):
             da0 = scalar
 
     ref = np.asarray(da0.values, dtype=float).ravel()
@@ -2238,7 +2238,7 @@ def interpf(
         try:
             filled = filled.transpose(*da.dims)
 
-        except Exception:
+        except ValueError:
             pass
 
         filled = filled.assign_coords({y_dim: da[y_dim], x_dim: da[x_dim]})
@@ -3087,7 +3087,7 @@ def ssf(s: xr.Dataset, dim: int | str = 1, *opts: str) -> xr.Dataset:
 
             maxorder = max(4, int(opts[idx + 1]))
 
-        except Exception:
+        except (IndexError, TypeError, ValueError):
             raise ValueError("ssf: expected integer after 'maxorder'")
 
     if maxorder > 30:
@@ -3120,7 +3120,7 @@ def ssf(s: xr.Dataset, dim: int | str = 1, *opts: str) -> xr.Dataset:
         try:
             bin_centers = np.asarray(opts[idx + 1], dtype=float)
 
-        except Exception:
+        except (IndexError, TypeError, ValueError):
             raise ValueError("ssf: expected a numeric bin vector after 'bin'")
 
     if bin_centers is None:
@@ -3315,7 +3315,7 @@ def vsf(v: xr.Dataset, *opts: str) -> xr.Dataset:
         try:
             maxorder = max(4, int(opts[idx + 1]))
 
-        except Exception:
+        except (IndexError, TypeError, ValueError):
             raise ValueError("vsf: expected integer after 'maxorder'")
 
     if maxorder > 30:
@@ -3335,7 +3335,7 @@ def vsf(v: xr.Dataset, *opts: str) -> xr.Dataset:
         try:
             bin_centers = np.asarray(opts[idx + 1], dtype=float)
 
-        except Exception:
+        except (IndexError, TypeError, ValueError):
             raise ValueError("vsf: expected a numeric bin vector after 'bin'")
 
     if bin_centers is None:
@@ -8292,7 +8292,7 @@ def _calc_L_integral_kernel(lag_values: np.ndarray, corr_values: np.ndarray) -> 
 
         return float(trapezoid(c_use, tau))
 
-    except Exception:
+    except (ImportError, TypeError, ValueError):
         return float(np.trapz(c_use, tau))
 
 
@@ -8323,7 +8323,7 @@ def _calc_L_fit_kernel(lag_values: np.ndarray, corr_values: np.ndarray) -> float
 
         return float(popt[0])
 
-    except Exception:
+    except (RuntimeError, TypeError, ValueError):
         return np.nan
 
 
@@ -8364,7 +8364,7 @@ def _calc_L_fit_biexp_kernel(
 
         return np.asarray(popt, dtype=float)
 
-    except Exception:
+    except (RuntimeError, TypeError, ValueError):
         return np.array([np.nan, np.nan, np.nan], dtype=float)
 
 
@@ -9014,7 +9014,7 @@ def smooth_spline(
 
             return spl(x)
 
-        except Exception:
+        except (TypeError, ValueError):
             return np.full_like(y, np.nan)
 
     smoothed = xr.apply_ufunc(

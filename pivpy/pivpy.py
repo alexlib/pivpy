@@ -950,7 +950,7 @@ class PIVAccessor:
                 dx = abs(dx) if dx != 0 else 1.0
                 dy = abs(dy) if dy != 0 else 1.0
                 sigma_yx = (abs(float(nc)) / dy, abs(float(nc)) / dx)
-            except Exception:
+            except (KeyError, TypeError, ValueError):
                 sigma_yx = (abs(float(nc)), abs(float(nc)))
 
         u = u0.copy()

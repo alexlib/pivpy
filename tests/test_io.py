@@ -1,3 +1,4 @@
+import importlib.util
 import pathlib
 
 import numpy as np
@@ -403,14 +404,12 @@ def test_pivlab_can_read_valid_file():
     pivlab_file = path / "pivlab" / "test_pivlab.mat"
 
     # This will only work if h5py is installed
-    try:
-        import h5py
-
-        assert reader.can_read(pivlab_file) is True
-        assert reader.can_read(vec_file) is False
-    except ImportError:
+    if importlib.util.find_spec("h5py") is None:
         # h5py not installed, skip
-        pass
+        return
+
+    assert reader.can_read(pivlab_file) is True
+    assert reader.can_read(vec_file) is False
 
 
 def test_pivlab_read_metadata():
@@ -563,9 +562,11 @@ def test_read_directory_empty_raises_error():
 
     import pytest
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        with pytest.raises(IOError, match="No files"):
-            io.read_directory(tmpdir, pattern="*.vec")
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        pytest.raises(IOError, match="No files"),
+    ):
+        io.read_directory(tmpdir, pattern="*.vec")
 
 
 def test_read_directory_with_pattern():

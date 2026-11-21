@@ -1,0 +1,8 @@
+# Minimal ruff config: bare trailing expressions in marimo cells are how the
+# notebook displays output, so B018 is expected there (and in the embedded
+# dashboard app). No rule selection is changed; this only adds per-file ignores.
+[lint.per-file-ignores]
+"examples/notebooks/*.py" = ["B018"]
+"notebooks/*.py" = ["B018"]
+"docs/source/*.py" = ["B018"]
+"pivpy/app.py" = ["B018"]

@@ -33,7 +33,7 @@ def _(mo):
 
 
 @app.cell
-def _(Path):
+def _(mo, Path):
     data_dir = Path(
         r"D:\channel_flow_research\baseline_channel\Vmax_after_pump_shutdown"
     )

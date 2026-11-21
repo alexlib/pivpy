@@ -1234,7 +1234,7 @@ def stream_statistics(
             v_k = frame_ds["v"].to_numpy().squeeze()
             _process_frame(u_k, v_k, k)
     else:
-        raise ValueError(f"Unsupported source type: {type(source)}")
+        raise TypeError(f"Unsupported source type: {type(source)}")
 
     if n_frames == 0 or u_mean is None or v_mean is None:
         raise ValueError("No frames processed during stream statistics accumulation.")

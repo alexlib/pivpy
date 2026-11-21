@@ -385,7 +385,7 @@ def launch_app(
     ]
     if not open_browser:
         cmd.append("--no-browser")
-    subprocess.run(cmd)
+    subprocess.run(cmd, check=False)
 
 
 if __name__ == "__main__":

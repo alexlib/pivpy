@@ -1977,11 +1977,8 @@ def _movie_from_iter(
         frame_index += 1
 
     if movie_writer is not None:
-        try:
-            movie_writer.finish()
-        except Exception:
-            # Some writers raise on finish if encoding failed.
-            raise
+        # Some writers raise on finish if encoding failed; let that propagate.
+        movie_writer.finish()
 
     if close:
         plt.close(fig)
@@ -2748,10 +2745,9 @@ def histscal_disp(
         use_ax.set_xlabel(variable)
         use_ax.set_ylabel("pdf" if normalize else "Histogram")
 
-        if logy:
-            # Matplotlib warns if attempting log scale with no positive values.
-            if np.any(y > 0):
-                use_ax.set_yscale("log")
+        # Matplotlib warns if attempting log scale with no positive values.
+        if logy and np.any(y > 0):
+            use_ax.set_yscale("log")
 
         # x-limits like PIVMAT: +/- 15*std around 0 or around mean.
         if mean < std:
@@ -2882,10 +2878,9 @@ def histvec_disp(
         use_ax.set_ylabel("pdf" if normalize else "Histogram")
         use_ax.legend()
 
-        if logy:
-            # Matplotlib warns if attempting log scale with no positive values.
-            if np.any(hx > 0) or np.any(hy > 0):
-                use_ax.set_yscale("log")
+        # Matplotlib warns if attempting log scale with no positive values.
+        if logy and (np.any(hx > 0) or np.any(hy > 0)):
+            use_ax.set_yscale("log")
 
         if gaussian:
             xg = np.linspace(float(centers[0]), float(centers[-1]), 2000)

@@ -815,8 +815,6 @@ def spatiotempf(
         ):
             raise ValueError("For multiple lines, X and Y must be shaped (nlines, 2)")
 
-        X_arr.shape[0] == 1
-
     # Heuristic for n based on average grid spacing
 
     if n is None:
@@ -1445,13 +1443,12 @@ def corrf(
 
         dr = float(np.abs(diffs[0])) if diffs.size else 1.0
 
-        if diffs.size and not np.allclose(diffs, diffs[0]):
-            if not nowarning:
-                warnings.warn(
-                    f"Non-uniform spacing detected along '{dim_name}'; using first step for dr.",
-                    UserWarning,
-                    stacklevel=2,
-                )
+        if diffs.size and not np.allclose(diffs, diffs[0]) and not nowarning:
+            warnings.warn(
+                f"Non-uniform spacing detected along '{dim_name}'; using first step for dr.",
+                UserWarning,
+                stacklevel=2,
+            )
 
     else:
         dr = 1.0
@@ -1757,7 +1754,7 @@ def meannz(
         dim = next((i for i, s in enumerate(arr.shape) if s != 1), 0)
 
     if not isinstance(dim, int):
-        raise ValueError("For NumPy inputs, dim must be an int or None.")
+        raise TypeError("For NumPy inputs, dim must be an int or None.")
 
     arr_f = arr.astype(float, copy=False)
 
@@ -9829,25 +9826,23 @@ def detect_vortices(ds, criterion="gamma2", threshold=0.5, sign="all", min_area=
     # compute criterion field
     if criterion == "gamma2":
         ds.piv.gamma2().to_numpy() if False else None
-    # Use compute_funcs gamma2? We'll compute field from ds via accessor-like
-    import pivpy.compute_funcs as cf
-
+    # Compute field from ds via this module's gamma/gamma2/Q functions
     if criterion == "gamma2":
-        tmp = cf.gamma2(ds.copy() if False else ds)
+        tmp = gamma2(ds.copy() if False else ds)
         field = (
             tmp["gamma2"].to_numpy()
             if "gamma2" in tmp.data_vars
             else tmp[next(iter(tmp.data_vars))].to_numpy()
         )
     elif criterion == "gamma1":
-        tmp = cf.gamma1(ds)
+        tmp = gamma1(ds)
         field = (
             tmp["gamma1"].to_numpy()
             if "gamma1" in tmp.data_vars
             else tmp[next(iter(tmp.data_vars))].to_numpy()
         )
     elif criterion == "q":
-        tmp = cf.q_criterion(ds)
+        tmp = q_criterion(ds)
         field = (
             tmp["Q"].to_numpy()
             if "Q" in tmp.data_vars

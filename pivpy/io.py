@@ -1499,7 +1499,11 @@ def _expand_pivmat_file_patterns(pattern: Any) -> list[pathlib.Path]:
 
 
 def loadvec(
-    filename: Any = None, *args: Any, **kwargs: Any
+    filename: Any = None,
+    *args: Any,
+    frame: Any = None,
+    verbose: bool = False,
+    **kwargs: Any,
 ) -> xr.Dataset | list[xr.Dataset]:
     """PIVMAT-compatible loader (wrapper over :func:`read_piv`).
 
@@ -1512,9 +1516,9 @@ def loadvec(
     filename:
         Path/pattern, a sequence of paths, or a 1-based numeric index selecting
         from files in the current directory (PIVMAT behavior).
-    frame:
+    frame (Any):
         Optional frame override passed through to :func:`read_piv`.
-    verbose:
+    verbose (bool):
         If True, prints each file being loaded.
 
     Returns
@@ -1523,8 +1527,7 @@ def loadvec(
         Single dataset if one file is matched, otherwise a list of datasets.
     """
 
-    frame = kwargs.pop("frame", None)
-    verbose = bool(kwargs.pop("verbose", False))
+    verbose = bool(verbose)
     if kwargs:
         raise TypeError(f"Unsupported keyword arguments: {sorted(kwargs)}")
 

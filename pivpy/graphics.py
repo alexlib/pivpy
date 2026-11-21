@@ -1420,7 +1420,14 @@ def streamscal_panels(
     return fig, axs
 
 
-def showf(data: xr.Dataset, **kwargs) -> tuple[plt.Figure, plt.Axes]:
+def showf(
+    data: xr.Dataset,
+    *,
+    background: str | None = None,
+    scalar: str = "w",
+    ax: plt.Axes | None = None,
+    **kwargs,
+) -> tuple[plt.Figure, plt.Axes]:
     """Display a vector or scalar field (PIVMAT-inspired dispatcher).
 
     This is a lightweight Python analogue of PIVMAT's ``showf``:
@@ -1432,16 +1439,16 @@ def showf(data: xr.Dataset, **kwargs) -> tuple[plt.Figure, plt.Axes]:
     ----------
     data:
         Dataset to display.
-    background:
+    background (str | None):
         Optional scalar background shown behind vectors.
 
         Use ``None``/``''``/``'off'`` for no background. If ``background`` matches
         an existing variable name, that variable is displayed. Otherwise, it is
         interpreted as a vector-derived flow property and computed using
         ``data.piv.vec2scal(background, name='w')``.
-    scalar:
+    scalar (str):
         Scalar variable to display if the dataset is scalar-only.
-    ax:
+    ax (matplotlib.axes.Axes | None):
         Optional axes.
     **kwargs:
         Forwarded to :func:`quiver` (vector mode) or matplotlib pcolormesh
@@ -1452,10 +1459,6 @@ def showf(data: xr.Dataset, **kwargs) -> tuple[plt.Figure, plt.Axes]:
     matplotlib.figure.Figure, matplotlib.axes.Axes
         Figure and axes used for plotting.
     """
-
-    background = kwargs.pop("background", None)
-    scalar = kwargs.pop("scalar", "w")
-    ax = kwargs.pop("ax", None)
 
     is_vector = "u" in data and "v" in data
     if is_vector:

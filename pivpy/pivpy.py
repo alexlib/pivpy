@@ -1980,8 +1980,6 @@ class PIVAccessor:
         This method uses scipy.interpolate.griddata to interpolate missing data.
         Parameters
         ----------
-        src_data: Any
-            Input data array.
         method: {'linear', 'nearest', 'cubic'}
             The method to use for interpolation in `scipy.interpolate.griddata`.
         Returns

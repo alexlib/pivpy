@@ -9823,12 +9823,9 @@ from scipy import ndimage
 
 
 def detect_vortices(ds, criterion="gamma2", threshold=0.5, sign="all", min_area=4):
-    # compute criterion field
-    if criterion == "gamma2":
-        ds.piv.gamma2().to_numpy() if False else None
     # Compute field from ds via this module's gamma/gamma2/Q functions
     if criterion == "gamma2":
-        tmp = gamma2(ds.copy() if False else ds)
+        tmp = gamma2(ds)
         field = (
             tmp["gamma2"].to_numpy()
             if "gamma2" in tmp.data_vars
